@@ -38,6 +38,12 @@ def provider_available(settings: Settings, provider: str) -> bool:
     return False
 
 
+
+# doc/08-AI与RAG策略 §3.1: chat_rag 场景说明
+# 当前统一使用 ollama_rag_model (qwen3:8b) 用于所有 RAG 对话。
+# 文档中描述的"轻量问答" vs "深度 RAG" 分级
+# 可在后续版本中通过 ChatRequest.complexity 字段实现。
+# 当前设计决策：统一使用 8b 保证回答质量，资源换质量。
 def model_for_scene(settings: Settings, provider: str, scene: str) -> str:
     if provider == "ollama":
         if scene == "chat_rag":

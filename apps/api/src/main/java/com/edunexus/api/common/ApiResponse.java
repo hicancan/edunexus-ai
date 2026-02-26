@@ -3,7 +3,7 @@ package com.edunexus.api.common;
 import java.time.Instant;
 
 public record ApiResponse(
-        int code,
+        Object code,
         String message,
         Object data,
         String traceId,
@@ -21,7 +21,11 @@ public record ApiResponse(
         return new ApiResponse(202, "success", data, traceId, Instant.now().toString());
     }
 
-    public static ApiResponse error(int code, String message, String traceId) {
-        return new ApiResponse(code, message, null, traceId, Instant.now().toString());
+    public static ApiResponse error(ErrorCode errorCode, String message, String traceId) {
+        return new ApiResponse(errorCode.name(), message, null, traceId, Instant.now().toString());
+    }
+
+    public static ApiResponse error(ErrorCode errorCode, String traceId) {
+        return new ApiResponse(errorCode.name(), errorCode.defaultMessage(), null, traceId, Instant.now().toString());
     }
 }

@@ -156,6 +156,11 @@ def create_app() -> FastAPI:
         started = time.perf_counter()
 
         contexts = await kb_service.retrieve(req.message, teacher_id=teacher_id, class_id=class_id, top_k=5)
+
+        # S-02: doc/08-AI与RAG策略 §2.1 — 相关性阈值过滤，低于阈值视为"课堂资料不足"
+        RAG_SCORE_THRESHOLD = 0.35
+        contexts = [ctx for ctx in contexts if ctx.get("score", 0.0) >= RAG_SCORE_THRESHOLD]
+
         citations = _build_citations(contexts)
 
         if not contexts:

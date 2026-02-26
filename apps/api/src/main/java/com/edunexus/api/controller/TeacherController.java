@@ -3,7 +3,6 @@ package com.edunexus.api.controller;
 import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
-import com.edunexus.api.common.DependencyException;
 import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.DbService;
 import com.edunexus.api.service.GovernanceService;
@@ -58,10 +57,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Validated
 @RestController
 @RequestMapping("/api/v1/teacher")
 public class TeacherController implements ControllerSupport {
+    private static final Logger log = LoggerFactory.getLogger(TeacherController.class);
+
     private final DbService db;
     private final AiClient aiClient;
     private final ObjectStorageService objectStorageService;
@@ -73,9 +77,7 @@ public class TeacherController implements ControllerSupport {
             AiClient aiClient,
             ObjectStorageService objectStorageService,
             GovernanceService governance,
-            @Qualifier("documentIngestExecutor")
-            TaskExecutor documentIngestExecutor
-    ) {
+            @Qualifier("documentIngestExecutor") TaskExecutor documentIngestExecutor) {
         this.db = db;
         this.aiClient = aiClient;
         this.objectStorageService = objectStorageService;
@@ -87,8 +89,7 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<ApiResponse> uploadDocument(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestParam("file") MultipartFile file,
-            HttpServletRequest request
-    ) throws IOException {
+            HttpServletRequest request) throws IOException {
         requireRole("TEACHER");
         AuthUser user = currentUser();
 
@@ -110,10 +111,10 @@ public class TeacherController implements ControllerSupport {
                 "filename", filename,
                 "fileType", fileType,
                 "fileSize", fileSize,
-                "contentSha256", sha256(fileBytes)
-        ));
+                "contentSha256", sha256(fileBytes)));
 
-        Map<String, Object> replay = governance.getIdempotentReplay("teacher.knowledge.upload", idempotencyKey, requestHash);
+        Map<String, Object> replay = governance.getIdempotentReplay("teacher.knowledge.upload", idempotencyKey,
+                requestHash);
         if (replay != null) {
             return ResponseEntity.status(202).body(ApiResponse.accepted(replay, trace(request)));
         }
@@ -122,32 +123,31 @@ public class TeacherController implements ControllerSupport {
         String storagePath = objectStorageService.upload(filename, fileType, fileBytes);
         db.update(
                 """
-                insert into documents(id,teacher_id,filename,file_type,file_size,storage_path,status,error_message)
-                values (?,?,?,?,?,?,?,null)
-                """,
+                        insert into documents(id,teacher_id,filename,file_type,file_size,storage_path,status,error_message)
+                        values (?,?,?,?,?,?,?,null)
+                        """,
                 documentId,
                 user.userId(),
                 filename,
                 fileType,
                 fileSize,
                 storagePath,
-                "UPLOADING"
-        );
+                "UPLOADING");
 
         Map<String, Object> documentVo = db.one(
                 "select id,filename,file_type,file_size,status,error_message,created_at,updated_at from documents where id=?",
-                documentId
-        );
+                documentId);
         Map<String, Object> data = toDocumentVo(documentVo);
-        governance.storeIdempotency("teacher.knowledge.upload", idempotencyKey, requestHash, data, Duration.ofHours(24));
-        governance.audit(user.userId(), user.role(), "UPLOAD_DOCUMENT", "DOCUMENT", documentId.toString(), trace(request));
+        governance.storeIdempotency("teacher.knowledge.upload", idempotencyKey, requestHash, data,
+                Duration.ofHours(24));
+        governance.audit(user.userId(), user.role(), "UPLOAD_DOCUMENT", "DOCUMENT", documentId.toString(),
+                trace(request));
 
         UUID jobId = governance.createJobRun("DOCUMENT_INGEST", documentId, Map.of(
                 "documentId", documentId.toString(),
                 "teacherId", user.userId().toString(),
                 "filename", filename,
-                "storagePath", storagePath
-        ));
+                "storagePath", storagePath));
 
         Path tempFile = Files.createTempFile("edunexus-doc-" + documentId + "-", "-" + sanitizeFilename(filename));
         Files.write(tempFile, fileBytes);
@@ -158,8 +158,7 @@ public class TeacherController implements ControllerSupport {
                 tempFile,
                 trace(request),
                 idempotencyKey,
-                jobId
-        ));
+                jobId));
 
         return ResponseEntity.status(202).body(ApiResponse.accepted(data, trace(request)));
     }
@@ -167,8 +166,7 @@ public class TeacherController implements ControllerSupport {
     @GetMapping("/knowledge/documents")
     public ResponseEntity<ApiResponse> listDocuments(
             @RequestParam(value = "status", required = false) String status,
-            HttpServletRequest request
-    ) {
+            HttpServletRequest request) {
         requireRole("TEACHER");
         if (status != null && !status.isBlank()
                 && !"UPLOADING".equals(status)
@@ -181,8 +179,7 @@ public class TeacherController implements ControllerSupport {
         AuthUser user = currentUser();
 
         StringBuilder sql = new StringBuilder(
-                "select id,filename,file_type,file_size,status,error_message,created_at,updated_at from documents where teacher_id=? and deleted_at is null"
-        );
+                "select id,filename,file_type,file_size,status,error_message,created_at,updated_at from documents where teacher_id=? and deleted_at is null");
         List<Object> args = new ArrayList<>();
         args.add(user.userId());
         if (status != null && !status.isBlank()) {
@@ -198,23 +195,28 @@ public class TeacherController implements ControllerSupport {
 
     @DeleteMapping("/knowledge/documents/{documentId}")
     @Transactional
-    public ResponseEntity<ApiResponse> deleteDocument(@PathVariable("documentId") UUID documentId, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> deleteDocument(@PathVariable("documentId") UUID documentId,
+            HttpServletRequest request) {
         requireRole("TEACHER");
         AuthUser user = currentUser();
         Map<String, Object> doc = ensureDocumentOwner(documentId);
 
-        try {
-            aiClient.deleteKb(Map.of(
-                    "traceId", trace(request),
-                    "documentId", documentId.toString()
-            ));
-        } catch (Exception ex) {
-            throw new DependencyException("向量删除失败", ex);
-        }
-
+        // M-06: 先标记删除，再异步删除向量 — 对齐 doc/05 §7.3
         objectStorageService.delete(String.valueOf(doc.get("storage_path")));
         db.update("update documents set deleted_at=now(),updated_at=now() where id=?", documentId);
-        governance.audit(user.userId(), user.role(), "DELETE_DOCUMENT", "DOCUMENT", documentId.toString(), trace(request));
+        governance.audit(user.userId(), user.role(), "DELETE_DOCUMENT", "DOCUMENT", documentId.toString(),
+                trace(request));
+
+        String docIdStr = documentId.toString();
+        String traceStr = trace(request);
+        documentIngestExecutor.execute(() -> {
+            try {
+                aiClient.deleteKb(Map.of("traceId", traceStr, "documentId", docIdStr));
+            } catch (Exception ex) {
+                log.error("async_kb_delete_failed documentId={} traceId={}", docIdStr, traceStr, ex);
+            }
+        });
+
         return ResponseEntity.ok(ApiResponse.ok(null, trace(request)));
     }
 
@@ -223,13 +225,13 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<ApiResponse> generatePlan(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody PlanGenerateReq req,
-            HttpServletRequest request
-    ) {
+            HttpServletRequest request) {
         requireRole("TEACHER");
         AuthUser user = currentUser();
 
         String requestHash = governance.requestHash(Map.of("teacherId", user.userId(), "payload", req));
-        Map<String, Object> replay = governance.getIdempotentReplay("teacher.plan.generate", idempotencyKey, requestHash);
+        Map<String, Object> replay = governance.getIdempotentReplay("teacher.plan.generate", idempotencyKey,
+                requestHash);
         if (replay != null) {
             return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
         }
@@ -240,8 +242,7 @@ public class TeacherController implements ControllerSupport {
                 "gradeLevel", req.gradeLevel(),
                 "durationMins", req.durationMins(),
                 "teacherId", user.userId().toString(),
-                "idempotencyKey", idempotencyKey == null ? "" : idempotencyKey
-        ));
+                "idempotencyKey", idempotencyKey == null ? "" : idempotencyKey));
 
         String contentMd = String.valueOf(aiResp.getOrDefault("contentMd", "# 教案生成失败"));
         UUID planId = db.newId();
@@ -252,13 +253,11 @@ public class TeacherController implements ControllerSupport {
                 req.topic(),
                 req.gradeLevel(),
                 req.durationMins(),
-                contentMd
-        );
+                contentMd);
 
         Map<String, Object> plan = db.one(
                 "select id,topic,grade_level,duration_mins,content_md,is_shared,share_token,shared_at,created_at,updated_at from lesson_plans where id=?",
-                planId
-        );
+                planId);
         Map<String, Object> data = toLessonPlanVo(plan);
         governance.storeIdempotency("teacher.plan.generate", idempotencyKey, requestHash, data, Duration.ofHours(24));
         governance.audit(user.userId(), user.role(), "GENERATE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
@@ -269,25 +268,24 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<ApiResponse> listPlans(
             @RequestParam(value = "page", defaultValue = "1") @Min(1) int page,
             @RequestParam(value = "size", defaultValue = "20") @Min(1) @Max(100) int size,
-            HttpServletRequest request
-    ) {
+            HttpServletRequest request) {
         requireRole("TEACHER");
         AuthUser user = currentUser();
 
         int offset = (page - 1) * size;
         List<Map<String, Object>> rows = db.list(
                 """
-                select id,topic,grade_level,duration_mins,content_md,is_shared,share_token,shared_at,created_at,updated_at
-                from lesson_plans
-                where teacher_id=? and deleted_at is null
-                order by updated_at desc
-                limit ? offset ?
-                """,
+                        select id,topic,grade_level,duration_mins,content_md,is_shared,share_token,shared_at,created_at,updated_at
+                        from lesson_plans
+                        where teacher_id=? and deleted_at is null
+                        order by updated_at desc
+                        limit ? offset ?
+                        """,
                 user.userId(),
                 size,
-                offset
-        );
-        long total = db.count("select count(*) from lesson_plans where teacher_id=? and deleted_at is null", user.userId());
+                offset);
+        long total = db.count("select count(*) from lesson_plans where teacher_id=? and deleted_at is null",
+                user.userId());
         List<Map<String, Object>> content = rows.stream().map(this::toLessonPlanVo).toList();
 
         return ResponseEntity.ok(ApiResponse.ok(ApiDataMapper.pagedData(content, page, size, total), trace(request)));
@@ -297,17 +295,16 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<ApiResponse> updatePlan(
             @PathVariable("planId") UUID planId,
             @Valid @RequestBody PlanUpdateReq req,
-            HttpServletRequest request
-    ) {
+            HttpServletRequest request) {
         requireRole("TEACHER");
         ensurePlanOwner(planId);
 
         db.update("update lesson_plans set content_md=?,updated_at=now() where id=?", req.contentMd(), planId);
         Map<String, Object> row = db.one(
                 "select id,topic,grade_level,duration_mins,content_md,is_shared,share_token,shared_at,created_at,updated_at from lesson_plans where id=?",
-                planId
-        );
-        governance.audit(currentUser().userId(), currentUser().role(), "UPDATE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
+                planId);
+        governance.audit(currentUser().userId(), currentUser().role(), "UPDATE_PLAN", "LESSON_PLAN", planId.toString(),
+                trace(request));
         return ResponseEntity.ok(ApiResponse.ok(toLessonPlanVo(row), trace(request)));
     }
 
@@ -316,7 +313,8 @@ public class TeacherController implements ControllerSupport {
         requireRole("TEACHER");
         ensurePlanOwner(planId);
         db.update("update lesson_plans set deleted_at=now(),updated_at=now() where id=?", planId);
-        governance.audit(currentUser().userId(), currentUser().role(), "DELETE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
+        governance.audit(currentUser().userId(), currentUser().role(), "DELETE_PLAN", "LESSON_PLAN", planId.toString(),
+                trace(request));
         return ResponseEntity.ok(ApiResponse.ok(null, trace(request)));
     }
 
@@ -324,15 +322,15 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<byte[]> exportPlan(
             @PathVariable("planId") UUID planId,
             @RequestParam("format") String format,
-            HttpServletRequest request
-    ) {
+            HttpServletRequest request) {
         requireRole("TEACHER");
         ensurePlanOwner(planId);
         if (!"md".equals(format) && !"pdf".equals(format)) {
             throw new IllegalArgumentException("format 仅支持 md/pdf");
         }
 
-        Map<String, Object> plan = db.one("select topic,content_md from lesson_plans where id=? and deleted_at is null", planId);
+        Map<String, Object> plan = db.one("select topic,content_md from lesson_plans where id=? and deleted_at is null",
+                planId);
         String topic = String.valueOf(plan.get("topic"));
         String contentMd = String.valueOf(plan.get("content_md"));
 
@@ -343,9 +341,11 @@ public class TeacherController implements ControllerSupport {
                 ? MediaType.APPLICATION_PDF
                 : MediaType.parseMediaType("text/markdown; charset=UTF-8");
 
-        governance.audit(currentUser().userId(), currentUser().role(), "EXPORT_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
+        governance.audit(currentUser().userId(), currentUser().role(), "EXPORT_PLAN", "LESSON_PLAN", planId.toString(),
+                trace(request));
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitizeFilename(topic) + "." + format + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + sanitizeFilename(topic) + "." + format + "\"")
                 .header("X-Request-Id", trace(request))
                 .contentType(contentType)
                 .body(content);
@@ -365,56 +365,61 @@ public class TeacherController implements ControllerSupport {
         db.update(
                 "update lesson_plans set is_shared=true,share_token=?,shared_at=coalesce(shared_at,now()),updated_at=now() where id=?",
                 shareToken,
-                planId
-        );
-        governance.audit(currentUser().userId(), currentUser().role(), "SHARE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
+                planId);
+        governance.audit(currentUser().userId(), currentUser().role(), "SHARE_PLAN", "LESSON_PLAN", planId.toString(),
+                trace(request));
 
         Map<String, Object> data = Map.of(
                 "planId", planId.toString(),
                 "shareToken", shareToken,
-                "shareUrl", "/api/v1/teacher/plans/shared/" + shareToken
-        );
+                "shareUrl", "/api/v1/teacher/plans/shared/" + shareToken);
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
     @GetMapping("/plans/shared/{shareToken}")
-    public ResponseEntity<ApiResponse> getSharedPlan(@PathVariable("shareToken") String shareToken, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> getSharedPlan(@PathVariable("shareToken") String shareToken,
+            HttpServletRequest request) {
         Map<String, Object> row = db.one(
                 """
-                select id,topic,grade_level,duration_mins,content_md,is_shared,share_token,shared_at,created_at,updated_at
-                from lesson_plans
-                where share_token=? and is_shared=true and deleted_at is null
-                """,
-                shareToken
-        );
+                        select id,topic,grade_level,duration_mins,content_md,is_shared,share_token,shared_at,created_at,updated_at
+                        from lesson_plans
+                        where share_token=? and is_shared=true and deleted_at is null
+                        """,
+                shareToken);
         return ResponseEntity.ok(ApiResponse.ok(toLessonPlanVo(row), trace(request)));
     }
 
     @GetMapping("/students/{studentId}/analytics")
-    public ResponseEntity<ApiResponse> studentAnalytics(@PathVariable("studentId") UUID studentId, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> studentAnalytics(@PathVariable("studentId") UUID studentId,
+            HttpServletRequest request) {
         requireRole("TEACHER");
         ensureStudentLinked(studentId);
 
-        Map<String, Object> student = db.one("select username from users where id=? and role='STUDENT' and deleted_at is null", studentId);
+        Map<String, Object> student = db
+                .one("select username from users where id=? and role='STUDENT' and deleted_at is null", studentId);
         long totalExercises = db.count("select count(*) from exercise_records where student_id=?", studentId);
-        long totalQuestions = db.count("select coalesce(sum(total_questions),0) from exercise_records where student_id=?", studentId);
-        long correctCount = db.count("select coalesce(sum(correct_count),0) from exercise_records where student_id=?", studentId);
-        double averageScore = ApiDataMapper.asDouble(db.one("select coalesce(avg(total_score),0) as avg_score from exercise_records where student_id=?", studentId).get("avg_score"));
-        long wrongBookCount = db.count("select count(*) from wrong_book where student_id=? and status='ACTIVE'", studentId);
+        long totalQuestions = db
+                .count("select coalesce(sum(total_questions),0) from exercise_records where student_id=?", studentId);
+        long correctCount = db.count("select coalesce(sum(correct_count),0) from exercise_records where student_id=?",
+                studentId);
+        double averageScore = ApiDataMapper.asDouble(
+                db.one("select coalesce(avg(total_score),0) as avg_score from exercise_records where student_id=?",
+                        studentId).get("avg_score"));
+        long wrongBookCount = db.count("select count(*) from wrong_book where student_id=? and status='ACTIVE'",
+                studentId);
 
         List<Map<String, Object>> weakRows = db.list(
                 """
-                select kp.knowledge_point as knowledge_point, count(*) as wrong_count
-                from wrong_book w
-                join questions q on q.id=w.question_id
-                join lateral jsonb_array_elements_text(coalesce(q.knowledge_points, '[]'::jsonb)) as kp(knowledge_point) on true
-                where w.student_id=? and w.status='ACTIVE'
-                group by kp.knowledge_point
-                order by count(*) desc
-                limit 5
-                """,
-                studentId
-        );
+                        select kp.knowledge_point as knowledge_point, count(*) as wrong_count
+                        from wrong_book w
+                        join questions q on q.id=w.question_id
+                        join lateral jsonb_array_elements_text(coalesce(q.knowledge_points, '[]'::jsonb)) as kp(knowledge_point) on true
+                        where w.student_id=? and w.status='ACTIVE'
+                        group by kp.knowledge_point
+                        order by count(*) desc
+                        limit 5
+                        """,
+                studentId);
 
         List<Map<String, Object>> topWeakPoints = weakRows.stream().map(row -> {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -436,7 +441,8 @@ public class TeacherController implements ControllerSupport {
     }
 
     @PostMapping("/suggestions")
-    public ResponseEntity<ApiResponse> createSuggestion(@Valid @RequestBody SuggestionReq req, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> createSuggestion(@Valid @RequestBody SuggestionReq req,
+            HttpServletRequest request) {
         requireRole("TEACHER");
         AuthUser user = currentUser();
 
@@ -460,14 +466,13 @@ public class TeacherController implements ControllerSupport {
                 studentId,
                 questionId,
                 req.knowledgePoint(),
-                req.suggestion()
-        );
+                req.suggestion());
         Map<String, Object> row = db.one(
                 "select id,teacher_id,student_id,question_id,knowledge_point,suggestion,created_at from teacher_suggestions where id=?",
-                suggestionId
-        );
+                suggestionId);
 
-        governance.audit(user.userId(), user.role(), "CREATE_SUGGESTION", "TEACHER_SUGGESTION", suggestionId.toString(), trace(request));
+        governance.audit(user.userId(), user.role(), "CREATE_SUGGESTION", "TEACHER_SUGGESTION", suggestionId.toString(),
+                trace(request));
         return ResponseEntity.ok(ApiResponse.ok(toTeacherSuggestionVo(row), trace(request)));
     }
 
@@ -478,8 +483,7 @@ public class TeacherController implements ControllerSupport {
             Path tempFile,
             String traceId,
             String idempotencyKey,
-            UUID jobId
-    ) {
+            UUID jobId) {
         try {
             governance.markJobRunning(jobId);
             db.update("update documents set status='PARSING',updated_at=now() where id=?", documentId);
@@ -491,16 +495,15 @@ public class TeacherController implements ControllerSupport {
                     "teacherId", teacherId.toString(),
                     "filename", filename,
                     "filePath", tempFile.toAbsolutePath().toString(),
-                    "idempotencyKey", idempotencyKey == null ? "" : idempotencyKey
-            ));
+                    "idempotencyKey", idempotencyKey == null ? "" : idempotencyKey));
 
             db.update("update documents set status='READY',error_message=null,updated_at=now() where id=?", documentId);
             governance.markJobSucceeded(jobId, Map.of(
                     "documentId", documentId.toString(),
-                    "chunks", ingestResult.getOrDefault("chunks", 0)
-            ));
+                    "chunks", ingestResult.getOrDefault("chunks", 0)));
         } catch (Exception ex) {
-            db.update("update documents set status='FAILED',error_message=?,updated_at=now() where id=?", ex.getMessage(), documentId);
+            db.update("update documents set status='FAILED',error_message=?,updated_at=now() where id=?",
+                    ex.getMessage(), documentId);
             governance.markJobDeadLetter(jobId, ex.getMessage());
         } finally {
             try {
@@ -512,7 +515,8 @@ public class TeacherController implements ControllerSupport {
     }
 
     private Map<String, Object> ensureDocumentOwner(UUID documentId) {
-        Map<String, Object> row = db.one("select teacher_id,storage_path from documents where id=? and deleted_at is null", documentId);
+        Map<String, Object> row = db
+                .one("select teacher_id,storage_path from documents where id=? and deleted_at is null", documentId);
         if (!currentUser().userId().equals(row.get("teacher_id"))) {
             throw new SecurityException("非资源归属者");
         }
@@ -520,7 +524,8 @@ public class TeacherController implements ControllerSupport {
     }
 
     private void ensurePlanOwner(UUID planId) {
-        Map<String, Object> row = db.one("select teacher_id from lesson_plans where id=? and deleted_at is null", planId);
+        Map<String, Object> row = db.one("select teacher_id from lesson_plans where id=? and deleted_at is null",
+                planId);
         if (!currentUser().userId().equals(row.get("teacher_id"))) {
             throw new SecurityException("非资源归属者");
         }
@@ -529,16 +534,15 @@ public class TeacherController implements ControllerSupport {
     private void ensureStudentLinked(UUID studentId) {
         boolean linked = db.exists(
                 """
-                select 1
-                from teacher_student_bindings
-                where teacher_id=?
-                  and student_id=?
-                  and status='ACTIVE'
-                  and (revoked_at is null or revoked_at > now())
-                """,
+                        select 1
+                        from teacher_student_bindings
+                        where teacher_id=?
+                          and student_id=?
+                          and status='ACTIVE'
+                          and (revoked_at is null or revoked_at > now())
+                        """,
                 currentUser().userId(),
-                studentId
-        );
+                studentId);
         if (!linked) {
             throw new SecurityException("无权限访问该学生");
         }
@@ -682,8 +686,7 @@ public class TeacherController implements ControllerSupport {
     public record PlanGenerateReq(
             @NotBlank String topic,
             @NotBlank String gradeLevel,
-            @Min(10) @Max(180) int durationMins
-    ) {
+            @Min(10) @Max(180) int durationMins) {
     }
 
     public record PlanUpdateReq(@NotBlank String contentMd) {
@@ -693,7 +696,6 @@ public class TeacherController implements ControllerSupport {
             @NotBlank String studentId,
             String questionId,
             String knowledgePoint,
-            @NotBlank @Size(min = 1, max = 2000) String suggestion
-    ) {
+            @NotBlank @Size(min = 1, max = 2000) String suggestion) {
     }
 }

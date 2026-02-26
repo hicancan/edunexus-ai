@@ -32,7 +32,7 @@ Write-Host "[1/4] Start infrastructure..."
 docker compose up -d
 
 Write-Host "[2/4] Start AI service..."
-Start-IfPortFree "AI service" ([int]$AiPort) "Set-Location '$PSScriptRoot/../apps/ai-service'; conda run --no-capture-output -n edunexus-ai uv sync --project . --python 3.12; conda run --no-capture-output -n edunexus-ai uv run --project . --python 3.12 uvicorn ai_service.app:app --host $HostBind --port $AiPort"
+Start-IfPortFree "AI service" ([int]$AiPort) "Set-Location '$PSScriptRoot/../apps/ai-service'; if (-not (Test-Path '.venv/pyvenv.cfg')) { if (Test-Path '.venv') { Remove-Item '.venv' -Recurse -Force }; conda run --no-capture-output -n edunexus-ai uv venv --python 3.12 .venv }; $env:UV_LINK_MODE='copy'; conda run --no-capture-output -n edunexus-ai uv sync --project .; conda run --no-capture-output -n edunexus-ai uv run --project . uvicorn ai_service.app:app --host $HostBind --port $AiPort"
 
 Write-Host "[3/4] Start API service..."
 Start-IfPortFree "API service" ([int]$ApiPort) "Set-Location '$PSScriptRoot/../apps/api'; mvn spring-boot:run '-Dspring-boot.run.arguments=--server.address=$HostBind --server.port=$ApiPort'"

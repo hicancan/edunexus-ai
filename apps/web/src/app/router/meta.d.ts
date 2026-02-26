@@ -6,7 +6,8 @@ declare module "vue-router" {
     roles?: Array<"STUDENT" | "TEACHER" | "ADMIN">;
     section?: string;
     requirementId?: string;
+    title?: string;
   }
 }
 
-export {};
+export { };

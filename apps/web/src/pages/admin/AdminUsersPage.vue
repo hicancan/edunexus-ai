@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, reactive, ref, watch } from "vue";
 import PaginationBar from "../../components/common/PaginationBar.vue";
 import { adminCreateUserSchema } from "../../schemas/admin.schemas";
 import type { Role, UserStatus } from "../../services/contracts";
@@ -32,14 +32,22 @@ const formError = ref("");
 const success = ref("");
 
 function syncRowEdits(): void {
+  const activeKeys = new Set<string>();
   for (const user of adminStore.users) {
     if (!user.id) {
       continue;
     }
+    activeKeys.add(user.id);
     rowEdits[user.id] = {
       role: (user.role || "STUDENT") as Role,
       status: (user.status || "ACTIVE") as UserStatus
     };
+  }
+
+  for (const key of Object.keys(rowEdits)) {
+    if (!activeKeys.has(key)) {
+      delete rowEdits[key];
+    }
   }
 }
 
@@ -117,6 +125,14 @@ async function updateSize(size: number): Promise<void> {
 }
 
 onMounted(loadUsers);
+
+watch(
+  () => adminStore.users,
+  () => {
+    syncRowEdits();
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -190,10 +206,10 @@ onMounted(loadUsers);
           <p class="list-item-title">{{ user.username }}</p>
           <p class="list-item-meta">用户 ID：{{ user.id }} · 创建时间：{{ user.createdAt }} · 邮箱：{{ user.email || "--" }}</p>
         </div>
-        <div class="list-item-actions user-edit-actions">
+        <div v-if="user.id && rowEdits[user.id]" class="list-item-actions user-edit-actions">
           <label>
             角色
-            <select v-model="rowEdits[user.id || ''].role">
+            <select v-model="rowEdits[user.id].role">
               <option value="STUDENT">STUDENT</option>
               <option value="TEACHER">TEACHER</option>
               <option value="ADMIN">ADMIN</option>
@@ -201,12 +217,15 @@ onMounted(loadUsers);
           </label>
           <label>
             状态
-            <select v-model="rowEdits[user.id || ''].status">
+            <select v-model="rowEdits[user.id].status">
               <option value="ACTIVE">ACTIVE</option>
               <option value="DISABLED">DISABLED</option>
             </select>
           </label>
-          <button class="btn success small" type="button" :disabled="adminStore.operationLoading" @click="saveUser(user.id || '')">保存</button>
+          <button class="btn success small" type="button" :disabled="adminStore.operationLoading" @click="saveUser(user.id)">保存</button>
+        </div>
+        <div v-else class="list-item-actions user-edit-actions">
+          <span class="list-item-meta">编辑状态初始化中...</span>
         </div>
       </article>
 

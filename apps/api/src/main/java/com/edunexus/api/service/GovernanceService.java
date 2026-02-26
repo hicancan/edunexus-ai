@@ -1,11 +1,10 @@
 package com.edunexus.api.service;
 
+import com.edunexus.api.common.CryptoUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
@@ -24,27 +23,29 @@ public class GovernanceService {
         if (idemKey == null || idemKey.isBlank()) {
             return null;
         }
-        if (!db.exists("select 1 from idempotency_keys where scope=? and idem_key=? and expires_at > now()", scope, idemKey)) {
+        if (!db.exists("select 1 from idempotency_keys where scope=? and idem_key=? and expires_at > now()", scope,
+                idemKey)) {
             return null;
         }
         Map<String, Object> row = db.one(
                 "select request_hash as \"requestHash\", response_snapshot::text as \"responseText\" from idempotency_keys where scope=? and idem_key=? and expires_at > now()",
                 scope,
-                idemKey
-        );
+                idemKey);
         String savedHash = String.valueOf(row.get("requestHash"));
         if (!savedHash.equals(requestHash)) {
             throw new IllegalArgumentException("Idempotency-Key 已用于不同请求");
         }
         String responseText = String.valueOf(row.get("responseText"));
         try {
-            return objectMapper.readValue(responseText, new TypeReference<>() {});
+            return objectMapper.readValue(responseText, new TypeReference<>() {
+            });
         } catch (Exception ex) {
             throw new IllegalArgumentException("幂等回放数据损坏");
         }
     }
 
-    public void storeIdempotency(String scope, String idemKey, String requestHash, Map<String, Object> responseSnapshot, Duration ttl) {
+    public void storeIdempotency(String scope, String idemKey, String requestHash, Map<String, Object> responseSnapshot,
+            Duration ttl) {
         if (idemKey == null || idemKey.isBlank()) {
             return;
         }
@@ -52,18 +53,17 @@ public class GovernanceService {
         long ttlSeconds = Math.max(300, ttl.getSeconds());
         db.update(
                 """
-                insert into idempotency_keys(id,scope,idem_key,request_hash,response_snapshot,expires_at)
-                values (?,?,?,?,?::jsonb, now() + (?::text || ' seconds')::interval)
-                on conflict (scope, idem_key)
-                do nothing
-                """,
+                        insert into idempotency_keys(id,scope,idem_key,request_hash,response_snapshot,expires_at)
+                        values (?,?,?,?,?::jsonb, now() + (?::text || ' seconds')::interval)
+                        on conflict (scope, idem_key)
+                        do nothing
+                        """,
                 db.newId(),
                 scope,
                 idemKey,
                 requestHash,
                 json,
-                String.valueOf(ttlSeconds)
-        );
+                String.valueOf(ttlSeconds));
     }
 
     public UUID createJobRun(String jobType, UUID businessId, Map<String, Object> payload) {
@@ -73,54 +73,60 @@ public class GovernanceService {
                 jobId,
                 jobType,
                 businessId,
-                toJson(payload)
-        );
+                toJson(payload));
         return jobId;
     }
 
     public void markJobRunning(UUID jobId) {
-        db.update("update job_runs set status='RUNNING',started_at=coalesce(started_at,now()),updated_at=now() where id=?", jobId);
+        db.update(
+                "update job_runs set status='RUNNING',started_at=coalesce(started_at,now()),updated_at=now() where id=?",
+                jobId);
     }
 
     public void markJobSucceeded(UUID jobId, Map<String, Object> result) {
         db.update(
                 "update job_runs set status='SUCCEEDED',result=?::jsonb,error_message=null,finished_at=now(),updated_at=now() where id=?",
                 toJson(result),
-                jobId
-        );
+                jobId);
     }
 
     public void markJobFailed(UUID jobId, String errorMessage) {
         db.update(
                 "update job_runs set status='FAILED',error_message=?,finished_at=now(),updated_at=now() where id=?",
                 errorMessage,
-                jobId
-        );
+                jobId);
     }
 
     public void markJobDeadLetter(UUID jobId, String errorMessage) {
         db.update(
                 "update job_runs set status='DEAD_LETTER',error_message=?,finished_at=now(),updated_at=now() where id=?",
                 errorMessage,
-                jobId
-        );
+                jobId);
     }
 
-    public void audit(UUID actorId, String actorRole, String action, String resourceType, String resourceId, String traceId) {
+    /** M-07: 审计日志含 IP 记录 */
+    public void audit(UUID actorId, String actorRole, String action, String resourceType, String resourceId,
+            String traceId, String ip) {
         db.update(
-                "insert into audit_logs(id,actor_id,actor_role,action,resource_type,resource_id,detail) values (?,?,?,?,?,?,?::jsonb)",
+                "insert into audit_logs(id,actor_id,actor_role,action,resource_type,resource_id,ip,detail) values (?,?,?,?,?,?,?,?::jsonb)",
                 db.newId(),
                 actorId,
                 actorRole,
                 action,
                 resourceType,
                 resourceId,
-                toJson(Map.of("traceId", traceId == null ? "" : traceId))
-        );
+                ip,
+                toJson(Map.of("traceId", traceId == null ? "" : traceId)));
+    }
+
+    /** 向后兼容：不传 IP 的重载 */
+    public void audit(UUID actorId, String actorRole, String action, String resourceType, String resourceId,
+            String traceId) {
+        audit(actorId, actorRole, action, resourceType, resourceId, traceId, null);
     }
 
     public String requestHash(Object requestPayload) {
-        return sha256(toJson(requestPayload));
+        return CryptoUtil.sha256(toJson(requestPayload));
     }
 
     private String toJson(Object value) {
@@ -131,17 +137,4 @@ public class GovernanceService {
         }
     }
 
-    private String sha256(String payload) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(payload.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
 }

@@ -64,24 +64,27 @@ class LLMService:
                 remaining = deadline - time.perf_counter()
                 if remaining <= 0:
                     timeout_seen = True
-                    error_messages.append(f"{provider}:timeout:budget_exhausted")
+                    error_messages.append(f"{provider}:timeout:budget_exhausted trace_id={trace_id}")
                     break
 
                 request_timeout = max(1.0, min(timeout_budget, remaining))
                 try:
-                    text = await self._complete_by_provider(
-                        provider,
-                        decision.model,
-                        scene,
-                        prompt,
-                        timeout_seconds=request_timeout,
+                    text, usage = await asyncio.wait_for(
+                        self._complete_by_provider(
+                            provider,
+                            decision.model,
+                            scene,
+                            prompt,
+                            timeout_seconds=request_timeout,
+                        ),
+                        timeout=request_timeout,
                     )
                     break
-                except (httpx.ReadTimeout, httpx.ConnectTimeout, asyncio.TimeoutError) as ex:
+                except asyncio.TimeoutError:
+                    text, usage = "", {}
                     timeout_seen = True
-                    error_messages.append(f"{provider}:timeout:attempt={attempt + 1}:{ex}")
+                    error_messages.append(f"{provider}:timeout:attempt={attempt + 1} trace_id={trace_id}")
                     if attempt >= 1:
-                        text = ""
                         break
 
                     delay = retry_base_delay * (attempt + 1)
@@ -98,8 +101,8 @@ class LLMService:
                     )
                     await asyncio.sleep(delay)
                 except Exception as ex:  # noqa: BLE001
-                    error_messages.append(f"{provider}:error:attempt={attempt + 1}:{ex}")
-                    text = ""
+                    error_messages.append(f"{provider}:error:attempt={attempt + 1}:{ex} trace_id={trace_id}")
+                    text, usage = "", {}
                     break
 
             cleaned_text = text.strip()
@@ -113,8 +116,8 @@ class LLMService:
                 model=decision.model,
                 reason=decision.reason,
                 latency_ms=latency_ms,
-                prompt_tokens=max(1, len(prompt) // 4),
-                completion_tokens=max(1, len(cleaned_text) // 4),
+                prompt_tokens=usage.get("prompt_tokens") or max(1, len(prompt) // 4),
+                completion_tokens=usage.get("completion_tokens") or max(1, len(cleaned_text) // 4),
             )
             logger.info(
                 "llm_call provider=%s model=%s scene=%s latency_ms=%s prompt_tokens=%s completion_tokens=%s hit_kb=%s chunk_ids=%s trace_id=%s",
@@ -131,9 +134,9 @@ class LLMService:
             return result
 
         if timeout_seen:
-            raise timeout_error("all provider calls timed out")
-        message = "; ".join(error_messages[-4:]) if error_messages else "all provider calls failed"
-        raise model_unavailable(message)
+            raise timeout_error(f"all provider calls timed out trace_id={trace_id}")
+        details = "; ".join(error_messages[-4:]) if error_messages else "all provider calls failed"
+        raise model_unavailable(f"{details} trace_id={trace_id}")
 
     async def embed(self, text: str) -> list[float]:
         cleaned = text.strip()
@@ -160,6 +163,13 @@ class LLMService:
         target = self.settings.embedding_dim
         if len(vector) == target:
             return vector
+        action = "truncate" if len(vector) > target else "zero_pad"
+        logger.warning(
+            "embedding_dimension_mismatch expected=%d actual=%d action=%s",
+            target,
+            len(vector),
+            action,
+        )
         if len(vector) > target:
             return vector[:target]
         return vector + [0.0 for _ in range(target - len(vector))]
@@ -172,7 +182,7 @@ class LLMService:
         prompt: str,
         *,
         timeout_seconds: float,
-    ) -> str:
+    ) -> tuple[str, dict[str, int]]:
         if provider == "ollama":
             return await self._call_ollama(prompt, model, scene, timeout_seconds=timeout_seconds)
         if provider == "openai":
@@ -197,7 +207,7 @@ class LLMService:
             return await self._call_gemini(prompt, model, scene, timeout_seconds=timeout_seconds)
         raise ValueError(f"unsupported provider: {provider}")
 
-    async def _call_ollama(self, prompt: str, model: str, scene: str, *, timeout_seconds: float) -> str:
+    async def _call_ollama(self, prompt: str, model: str, scene: str, *, timeout_seconds: float) -> tuple[str, dict[str, int]]:
         cfg = scene_params(scene)
         payload = {
             "model": model,
@@ -213,7 +223,11 @@ class LLMService:
             response = await client.post(f"{self.settings.ollama_base_url}/api/generate", json=payload)
             response.raise_for_status()
             data = response.json()
-        return str(data.get("response", ""))
+        usage = {
+            "prompt_tokens": data.get("prompt_eval_count", 0) or 0,
+            "completion_tokens": data.get("eval_count", 0) or 0,
+        }
+        return str(data.get("response", "")), usage
 
     async def _call_openai_compatible(
         self,
@@ -224,7 +238,7 @@ class LLMService:
         prompt: str,
         scene: str,
         timeout_seconds: float,
-    ) -> str:
+    ) -> tuple[str, dict[str, int]]:
         if not api_key:
             raise RuntimeError("missing api key")
         cfg = scene_params(scene)
@@ -243,13 +257,18 @@ class LLMService:
             response = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
+        raw_usage = data.get("usage", {})
+        usage = {
+            "prompt_tokens": raw_usage.get("prompt_tokens", 0) or 0,
+            "completion_tokens": raw_usage.get("completion_tokens", 0) or 0,
+        }
         choices = data.get("choices", [])
         if not choices:
-            return ""
+            return "", usage
         message = choices[0].get("message", {})
-        return str(message.get("content", ""))
+        return str(message.get("content", "")), usage
 
-    async def _call_gemini(self, prompt: str, model: str, scene: str, *, timeout_seconds: float) -> str:
+    async def _call_gemini(self, prompt: str, model: str, scene: str, *, timeout_seconds: float) -> tuple[str, dict[str, int]]:
         key = self.settings.gemini_api_key
         if not key:
             raise RuntimeError("missing gemini api key")
@@ -263,15 +282,25 @@ class LLMService:
             },
         }
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+        except Exception as ex:
+            # M-06: 脱敏——确保异常堆栈中不包含 API Key
+            sanitized_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key=***"
+            raise RuntimeError(f"gemini call failed: {type(ex).__name__} url={sanitized_url}") from None
+        raw_usage = data.get("usageMetadata", {})
+        usage = {
+            "prompt_tokens": raw_usage.get("promptTokenCount", 0) or 0,
+            "completion_tokens": raw_usage.get("candidatesTokenCount", 0) or 0,
+        }
         candidates = data.get("candidates", [])
         if not candidates:
-            return ""
+            return "", usage
         parts = candidates[0].get("content", {}).get("parts", [])
-        return "".join(str(part.get("text", "")) for part in parts)
+        return "".join(str(part.get("text", "")) for part in parts), usage
 
     async def _embed_with_ollama(self, text: str) -> list[float]:
         payload = {"model": self.settings.ollama_embed_model, "prompt": text}

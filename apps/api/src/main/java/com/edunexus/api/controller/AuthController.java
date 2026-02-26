@@ -5,6 +5,7 @@ import com.edunexus.api.auth.JwtUtil;
 import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.ConflictException;
+import com.edunexus.api.common.CryptoUtil;
 import com.edunexus.api.common.UnauthorizedException;
 import com.edunexus.api.service.DbService;
 import com.edunexus.api.service.GovernanceService;
@@ -25,8 +26,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -42,7 +41,8 @@ public class AuthController implements ControllerSupport {
     private final JwtUtil jwtUtil;
     private final GovernanceService governance;
 
-    public AuthController(DbService db, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, GovernanceService governance) {
+    public AuthController(DbService db, PasswordEncoder passwordEncoder, JwtUtil jwtUtil,
+            GovernanceService governance) {
         this.db = db;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
@@ -63,8 +63,7 @@ public class AuthController implements ControllerSupport {
                 passwordEncoder.encode(req.password()),
                 req.email(),
                 req.phone(),
-                req.role()
-        );
+                req.role());
 
         Map<String, Object> user = db.one("select * from users where id=?", userId);
         governance.audit(userId, req.role(), "REGISTER", "USER", userId.toString(), trace(request));
@@ -74,7 +73,8 @@ public class AuthController implements ControllerSupport {
     @PostMapping("/login")
     @Transactional
     public ResponseEntity<ApiResponse> login(@Valid @RequestBody LoginReq req, HttpServletRequest request) {
-        Map<String, Object> user = db.oneOrNull("select * from users where username=? and deleted_at is null", req.username());
+        Map<String, Object> user = db.oneOrNull("select * from users where username=? and deleted_at is null",
+                req.username());
         if (user == null) {
             throw new UnauthorizedException("用户名或密码错误");
         }
@@ -105,8 +105,7 @@ public class AuthController implements ControllerSupport {
     @Transactional
     public ResponseEntity<ApiResponse> logout(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            HttpServletRequest request
-    ) {
+            HttpServletRequest request) {
         AuthUser user = currentUser();
         if (authorization != null && authorization.startsWith("Bearer ")) {
             String accessToken = authorization.substring(7);
@@ -117,7 +116,18 @@ public class AuthController implements ControllerSupport {
                 // Logout should be idempotent even with an invalid access token.
             }
         }
-        db.update("update refresh_tokens set revoked_at=now() where user_id=? and revoked_at is null", user.userId());
+        // M-03: 精确吊销当前 session 的 refresh token，而非批量吊销所有 session
+        String currentRefreshToken = request.getHeader("X-Refresh-Token");
+        if (currentRefreshToken != null && !currentRefreshToken.isBlank()) {
+            String tokenHash = CryptoUtil.sha256(currentRefreshToken);
+            db.update(
+                    "update refresh_tokens set revoked_at=now() where user_id=? and token_hash=? and revoked_at is null",
+                    user.userId(), tokenHash);
+        } else {
+            // 兜底：无法定位当前 session 时仍批量吊销
+            db.update("update refresh_tokens set revoked_at=now() where user_id=? and revoked_at is null",
+                    user.userId());
+        }
         governance.audit(user.userId(), user.role(), "LOGOUT", "USER", user.userId().toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(null, trace(request)));
     }
@@ -132,13 +142,12 @@ public class AuthController implements ControllerSupport {
             throw new UnauthorizedException("refresh token 无效");
         }
         UUID userId = UUID.fromString(claims.getSubject());
-        String tokenHash = sha256(req.refreshToken());
+        String tokenHash = CryptoUtil.sha256(req.refreshToken());
 
         Map<String, Object> tokenRow = db.oneOrNull(
                 "select id from refresh_tokens where user_id=? and token_hash=? and revoked_at is null and expires_at > now()",
                 userId,
-                tokenHash
-        );
+                tokenHash);
         if (tokenRow == null) {
             throw new UnauthorizedException("refresh token 无效");
         }
@@ -155,11 +164,11 @@ public class AuthController implements ControllerSupport {
         Map<String, String> tokenPair = issueTokenPair(user);
         upsertRefreshToken(userId, tokenPair.get("refreshToken"), false);
 
-        governance.audit(userId, String.valueOf(user.get("role")), "REFRESH_TOKEN", "USER", userId.toString(), trace(request));
+        governance.audit(userId, String.valueOf(user.get("role")), "REFRESH_TOKEN", "USER", userId.toString(),
+                trace(request));
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "accessToken", tokenPair.get("accessToken"),
-                "refreshToken", tokenPair.get("refreshToken")
-        ), trace(request)));
+                "refreshToken", tokenPair.get("refreshToken")), trace(request)));
     }
 
     @GetMapping("/me")
@@ -210,14 +219,15 @@ public class AuthController implements ControllerSupport {
                 db.newId(),
                 jti,
                 UUID.fromString(subject),
-                Timestamp.from(expiresAt)
-        );
+                Timestamp.from(expiresAt));
     }
 
     private void upsertRefreshToken(UUID userId, String token, boolean revoke) {
-        String hash = sha256(token);
+        String hash = CryptoUtil.sha256(token);
         if (revoke) {
-            db.update("update refresh_tokens set revoked_at=now() where user_id=? and token_hash=? and revoked_at is null", userId, hash);
+            db.update(
+                    "update refresh_tokens set revoked_at=now() where user_id=? and token_hash=? and revoked_at is null",
+                    userId, hash);
             return;
         }
         Instant expiresAt;
@@ -231,22 +241,7 @@ public class AuthController implements ControllerSupport {
                 db.newId(),
                 userId,
                 hash,
-                Timestamp.from(expiresAt)
-        );
-    }
-
-    private String sha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder builder = new StringBuilder();
-            for (byte item : hash) {
-                builder.append(String.format("%02x", item));
-            }
-            return builder.toString();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
+                Timestamp.from(expiresAt));
     }
 
     public record RegisterReq(
@@ -254,8 +249,7 @@ public class AuthController implements ControllerSupport {
             @NotBlank @Size(min = 8, max = 64) String password,
             @Email String email,
             @Size(max = 20) String phone,
-            @NotBlank @Pattern(regexp = "STUDENT|TEACHER") String role
-    ) {
+            @NotBlank @Pattern(regexp = "STUDENT|TEACHER") String role) {
     }
 
     public record LoginReq(@NotBlank String username, @NotBlank String password) {

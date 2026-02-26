@@ -39,8 +39,12 @@ if is_port_in_use "${AI_PORT}"; then
 else
   (
     cd "$(dirname "$0")/../apps/ai-service" &&
-    conda run --no-capture-output -n edunexus-ai uv sync --project . --python 3.12 &&
-    conda run --no-capture-output -n edunexus-ai uv run --project . --python 3.12 uvicorn ai_service.app:app --host "${HOST_BIND}" --port "${AI_PORT}"
+    if [ ! -f ".venv/pyvenv.cfg" ]; then
+      rm -rf .venv
+      conda run --no-capture-output -n edunexus-ai uv venv --python 3.12 .venv
+    fi &&
+    UV_LINK_MODE=copy conda run --no-capture-output -n edunexus-ai uv sync --project . &&
+    conda run --no-capture-output -n edunexus-ai uv run --project . uvicorn ai_service.app:app --host "${HOST_BIND}" --port "${AI_PORT}"
   ) &
 fi
 

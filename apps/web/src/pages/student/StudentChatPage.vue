@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import MarkdownPreview from "../../components/common/MarkdownPreview.vue";
 import PaginationBar from "../../components/common/PaginationBar.vue";
 import { useChatStore } from "../../stores/chat";
 
@@ -152,7 +153,8 @@ onMounted(async () => {
             :class="message.role === 'USER' ? 'user' : 'assistant'"
           >
             <p class="chat-message-role">{{ message.role === "USER" ? "我" : "AI 助教" }}</p>
-            <p class="chat-message-content">{{ message.content }}</p>
+            <MarkdownPreview v-if="message.role !== 'USER'" :content="message.content || ''" />
+            <p v-else class="chat-message-content">{{ message.content }}</p>
             <div v-if="message.citations && message.citations.length > 0" class="citation-list">
               <article v-for="(citation, citationIndex) in message.citations" :key="citationIndex" class="citation-item">
                 <p class="citation-title">{{ citation.filename || "未知来源" }} · {{ Number(citation.score || 0).toFixed(2) }}</p>

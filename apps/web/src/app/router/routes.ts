@@ -34,8 +34,8 @@ export const roleHomePath: Record<Role, string> = {
 
 export const routes: RouteRecordRaw[] = [
   { path: "/", redirect: "/login" },
-  { path: "/login", component: LoginPage, meta: { requiresAuth: false, requirementId: "R-AUTH-03" } },
-  { path: "/register", component: RegisterPage, meta: { requiresAuth: false, requirementId: "R-AUTH-01" } },
+  { path: "/login", component: LoginPage, meta: { requiresAuth: false, requirementId: "R-AUTH-03", title: "登录" } },
+  { path: "/register", component: RegisterPage, meta: { requiresAuth: false, requirementId: "R-AUTH-01", title: "注册" } },
   { path: "/403", component: ForbiddenPage, meta: { requiresAuth: false } },
   { path: "/404", component: NotFoundPage, meta: { requiresAuth: false } },
 
@@ -48,32 +48,32 @@ export const routes: RouteRecordRaw[] = [
       {
         path: "chat",
         component: StudentChatPage,
-        meta: { requiresAuth: true, roles: ["STUDENT"], section: "chat", requirementId: "R-CHAT-01" }
+        meta: { requiresAuth: true, roles: ["STUDENT"], section: "chat", requirementId: "R-CHAT-01", title: "智能问答" }
       },
       {
         path: "exercise",
         component: StudentExercisePage,
-        meta: { requiresAuth: true, roles: ["STUDENT"], section: "exercise", requirementId: "R-EX-01" }
+        meta: { requiresAuth: true, roles: ["STUDENT"], section: "exercise", requirementId: "R-EX-01", title: "题目练习" }
       },
       {
         path: "exercise/records",
         component: StudentRecordsPage,
-        meta: { requiresAuth: true, roles: ["STUDENT"], section: "records", requirementId: "R-EX-08" }
+        meta: { requiresAuth: true, roles: ["STUDENT"], section: "records", requirementId: "R-EX-08", title: "做题记录" }
       },
       {
         path: "wrong-book",
         component: StudentWrongBookPage,
-        meta: { requiresAuth: true, roles: ["STUDENT"], section: "wrong-book", requirementId: "R-EX-06" }
+        meta: { requiresAuth: true, roles: ["STUDENT"], section: "wrong-book", requirementId: "R-EX-06", title: "错题本" }
       },
       {
         path: "ai-questions",
         component: StudentAiQuestionsPage,
-        meta: { requiresAuth: true, roles: ["STUDENT"], section: "ai-questions", requirementId: "R-AIQ-01" }
+        meta: { requiresAuth: true, roles: ["STUDENT"], section: "ai-questions", requirementId: "R-AIQ-01", title: "AI 出题" }
       },
       {
         path: "profile",
         component: StudentProfilePage,
-        meta: { requiresAuth: true, roles: ["STUDENT"], section: "profile", requirementId: "R-AUTH-07" }
+        meta: { requiresAuth: true, roles: ["STUDENT"], section: "profile", requirementId: "R-AUTH-07", title: "个人资料" }
       }
     ]
   },
@@ -87,22 +87,22 @@ export const routes: RouteRecordRaw[] = [
       {
         path: "knowledge",
         component: TeacherKnowledgePage,
-        meta: { requiresAuth: true, roles: ["TEACHER"], section: "knowledge", requirementId: "R-TCH-01" }
+        meta: { requiresAuth: true, roles: ["TEACHER"], section: "knowledge", requirementId: "R-TCH-01", title: "知识库管理" }
       },
       {
         path: "plans",
         component: TeacherPlansPage,
-        meta: { requiresAuth: true, roles: ["TEACHER"], section: "plans", requirementId: "R-TCH-05" }
+        meta: { requiresAuth: true, roles: ["TEACHER"], section: "plans", requirementId: "R-TCH-05", title: "教案管理" }
       },
       {
         path: "analytics",
         component: TeacherAnalyticsPage,
-        meta: { requiresAuth: true, roles: ["TEACHER"], section: "analytics", requirementId: "R-TCH-07" }
+        meta: { requiresAuth: true, roles: ["TEACHER"], section: "analytics", requirementId: "R-TCH-07", title: "学情分析" }
       },
       {
         path: "suggestions",
         component: TeacherSuggestionsPage,
-        meta: { requiresAuth: true, roles: ["TEACHER"], section: "suggestions", requirementId: "R-TCH-08" }
+        meta: { requiresAuth: true, roles: ["TEACHER"], section: "suggestions", requirementId: "R-TCH-08", title: "教师建议" }
       }
     ]
   },
@@ -116,22 +116,22 @@ export const routes: RouteRecordRaw[] = [
       {
         path: "users",
         component: AdminUsersPage,
-        meta: { requiresAuth: true, roles: ["ADMIN"], section: "users", requirementId: "R-ADM-01" }
+        meta: { requiresAuth: true, roles: ["ADMIN"], section: "users", requirementId: "R-ADM-01", title: "用户管理" }
       },
       {
         path: "resources",
         component: AdminResourcesPage,
-        meta: { requiresAuth: true, roles: ["ADMIN"], section: "resources", requirementId: "R-ADM-03" }
+        meta: { requiresAuth: true, roles: ["ADMIN"], section: "resources", requirementId: "R-ADM-03", title: "资源管理" }
       },
       {
         path: "dashboard",
         component: AdminDashboardPage,
-        meta: { requiresAuth: true, roles: ["ADMIN"], section: "dashboard", requirementId: "R-ADM-04" }
+        meta: { requiresAuth: true, roles: ["ADMIN"], section: "dashboard", requirementId: "R-ADM-04", title: "数据看板" }
       },
       {
         path: "audits",
         component: AdminAuditsPage,
-        meta: { requiresAuth: true, roles: ["ADMIN"], section: "audits", requirementId: "R-ADM-02" }
+        meta: { requiresAuth: true, roles: ["ADMIN"], section: "audits", requirementId: "R-ADM-02", title: "审计日志" }
       }
     ]
   },
