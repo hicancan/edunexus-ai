@@ -9,13 +9,9 @@ spring:
     url: jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DB:edunexus}
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
-    properties:
-      hibernate:
-        format_sql: false
+  threads:
+    virtual:
+      enabled: true
   flyway:
     enabled: true
     locations: classpath:db/migration

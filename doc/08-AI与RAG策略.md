@@ -30,9 +30,10 @@
 
 ## 3.3 向量模型
 
-- 云端推荐：Gemini embedding / OpenAI embedding 模型。
-- 本地推荐：`bge-m3`。
-- 距离函数：Cosine Similarity。
+- 本地推荐（Ollama）：`qwen3-embedding:0.6b`（MTEB 多语言排行榜 #1 系列，639MB）
+- 云端备选：OpenAI text-embedding-3-small / Gemini embedding
+- 输出维度：1024（默认）
+- 距离函数：Cosine Similarity
 
 ## 4. 检索与生成策略（RAG）
 
@@ -106,24 +107,30 @@
 
 ## 6.1 Provider 级路由
 
-- `LLM_PROVIDER=auto`：自动路由（简单问题走本地 Ollama，复杂问题优先云端 DeepSeek）。
-- `LLM_PROVIDER=gemini`：优先 Google AI Studio / Gemini。
-- `LLM_PROVIDER=openai`：优先 OpenAI。
-- `LLM_PROVIDER=deepseek`：优先 DeepSeek API。
+- `LLM_PROVIDER=auto`：自动路由（见 6.2 场景级路由）。
 - `LLM_PROVIDER=ollama`：本地模型。
+- `LLM_PROVIDER=gemini|openai|deepseek`：云端模型。
 
-## 6.2 场景级路由
+## 6.2 场景级路由（4 层模型矩阵）
 
-1. 在 `auto` 模式下，先做复杂度判定（关键词 + 输入长度）：
-   - `simple`：优先 `ollama`（本地低成本快速响应）
-   - `complex`：优先 `deepseek`（云端推理能力更强）
-2. 聊天 RAG 场景在 provider 内继续做模型细分（simple/complex 模型名分流）。
-3. 错题解析、AI 出题、教案生成按场景参数模板执行，优先使用当前 provider 的默认模型。
-4. 所有场景都必须保留可观测字段：provider/model/latency/tokens/hit_kb/chunk_ids/traceId。
+模型配置的完整环境变量见 `09-配置与环境变量规范.md`。
+
+| 场景 | Ollama 模型 | 环境变量 | 理由 |
+|---|---|---|---|
+| **嵌入** | `qwen3-embedding:0.6b` | `OLLAMA_EMBED_MODEL` | MTEB 多语言 #1 系列，639MB 轻量 |
+| **快速问答** | `qwen3:4b` | `OLLAMA_MODEL` | 低延迟，简单场景 |
+| **RAG 主力** | `qwen3:8b` | `OLLAMA_RAG_MODEL` | 中文最强 8B，速度优于 deepseek-r1 |
+| **深度推理** | `deepseek-r1:8b` | `OLLAMA_COMPLEX_MODEL` | CoT 推理，出题/教案 |
+
+场景分派规则：
+1. 文档嵌入、查询嵌入 → `OLLAMA_EMBED_MODEL`
+2. 聊天 RAG 问答 → `OLLAMA_RAG_MODEL`
+3. 错题解析、AI 出题、教案生成 → `OLLAMA_COMPLEX_MODEL`
+4. 简单问答/分类路由 → `OLLAMA_MODEL`
 
 ## 6.3 降级策略
 
-1. `auto` 模式主路径：`complex -> deepseek`，`simple -> ollama`。
+1. `auto` 模式主路径：按场景分派到对应 Ollama 模型。
 2. 主 provider 超时/限流/鉴权失败：按可用性回退到其他 provider（优先 ollama）。
 3. 备用 provider 仍失败：返回“服务繁忙”并保留重试按钮。
 
@@ -162,4 +169,4 @@
 - 请求 traceId
 
 ---
-文档状态：`v1.0.0`
+文档状态：`v1.1.0`（2026-02-26 嵌入模型更新、模型矩阵对齐 doc 09）
