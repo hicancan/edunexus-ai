@@ -1,12 +1,13 @@
 openapi: 3.1.0
 info:
   title: EduNexus AI API Contract
-  version: 1.0.0
+  version: 1.2.0
   description: |
     EduNexus AI MVP 接口契约（v1.2.0）。
     本文件是前端、后端、AI 服务联调与代码生成的唯一接口基线。
     所有响应均遵循 ApiResponse 包装，data 字段类型见各接口描述与 schemas 定义。
     枚举值权威定义见 04-领域模型 §5，本文件仅做引用。
+    API -> AI Service 的内部契约不在本文件定义，见 12-内部服务契约与异步任务规范。
     
     ## 接口 → data 类型速查
     | 接口 | data 类型 |
@@ -296,6 +297,8 @@ paths:
       tags: [Student-Exercise]
       summary: 提交练习答案并自动判分
       operationId: submitExerciseAnswers
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -397,6 +400,8 @@ paths:
       tags: [Student-AIQuestions]
       summary: 生成 AI 个性化题目
       operationId: generateAiQuestions
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -436,6 +441,8 @@ paths:
       tags: [Student-AIQuestions]
       summary: 提交 AI 题目答案
       operationId: submitAiQuestions
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -470,6 +477,8 @@ paths:
       tags: [Teacher-Knowledge]
       summary: 上传知识库文档
       operationId: uploadKnowledgeDocument
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -526,6 +535,8 @@ paths:
       tags: [Teacher-Plan]
       summary: 生成 AI 教案
       operationId: generateLessonPlan
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -901,6 +912,15 @@ components:
       schema:
         type: string
         format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: 幂等键（建议 UUID），用于防止重复提交导致的重复写入
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
 
   responses:
     BadRequest:
@@ -1702,9 +1722,9 @@ components:
 
     PlanUpdateRequest:
       type: object
-      required: [content]
+      required: [contentMd]
       properties:
-        content:
+        contentMd:
           type: string
 
     TeacherSuggestionRequest:

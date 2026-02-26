@@ -1,7 +1,18 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import api from "../services/api";
+import {
+  createUser as createAdminUser,
+  downloadResource,
+  getDashboardMetrics,
+  listAudits,
+  listResources,
+  listUsers,
+  patchUser
+} from "../services/admin.service";
+import { logout as logoutApi } from "../services/auth.service";
+import { adminCreateUserSchema } from "../schemas/admin.schemas";
+import { toErrorMessage } from "../services/error-message";
 import { useAuthStore } from "../stores/auth";
 
 const route = useRoute();
@@ -37,12 +48,12 @@ async function loadAll() {
   loading.value = true;
   error.value = "";
   try {
-    users.value = (await api.get("/admin/users")).data.data.list || [];
-    metrics.value = (await api.get("/admin/dashboard/metrics")).data.data || {};
-    resources.value = (await api.get("/admin/resources", { params: { resourceType: resourceType.value } })).data.data.list || [];
-    audits.value = (await api.get("/admin/audits")).data.data.list || [];
+    users.value = (await listUsers()).content || [];
+    metrics.value = await getDashboardMetrics();
+    resources.value = (await listResources({ resourceType: resourceType.value })).content || [];
+    audits.value = (await listAudits()).content || [];
   } catch (e) {
-    error.value = e?.response?.data?.message || "加载失败";
+    error.value = toErrorMessage(e, "加载失败");
   } finally {
     loading.value = false;
   }
@@ -51,41 +62,59 @@ async function loadAll() {
 async function reloadResources() {
   localStorage.setItem("admin_resource_type", resourceType.value);
   try {
-    resources.value = (await api.get("/admin/resources", { params: { resourceType: resourceType.value } })).data.data.list || [];
+    resources.value = (await listResources({ resourceType: resourceType.value })).content || [];
   } catch (e) {
-    error.value = e?.response?.data?.message || "加载资源失败";
+    error.value = toErrorMessage(e, "加载资源失败");
   }
 }
 
 async function createUser() {
-  await api.post("/admin/users", createForm.value);
-  createForm.value.username = "";
-  await loadAll();
+  const parsed = adminCreateUserSchema.safeParse(createForm.value);
+  if (!parsed.success) {
+    error.value = parsed.error.issues[0]?.message || "创建用户参数不合法";
+    return;
+  }
+
+  try {
+    await createAdminUser(parsed.data);
+    createForm.value.username = "";
+    await loadAll();
+  } catch (e) {
+    error.value = toErrorMessage(e, "创建用户失败");
+  }
 }
 
 async function toggleStatus(u) {
   const next = u.status === "ACTIVE" ? "DISABLED" : "ACTIVE";
-  await api.patch(`/admin/users/${u.id}`, { status: next });
-  await loadAll();
+  try {
+    await patchUser(u.id, { status: next });
+    await loadAll();
+  } catch (e) {
+    error.value = toErrorMessage(e, "更新用户失败");
+  }
 }
 
 async function download(resourceId) {
-  const res = await api.get(`/admin/resources/${resourceId}/download`, { responseType: "blob" });
-  const blob = new Blob([res.data], { type: res.headers["content-type"] || "application/octet-stream" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const filenameHeader = res.headers["content-disposition"] || "";
-  const match = filenameHeader.match(/filename="?([^";]+)"?/);
-  a.href = url;
-  a.download = match?.[1] || `resource-${resourceId}`;
-  a.click();
-  URL.revokeObjectURL(url);
-  downloadResult.value = { filename: a.download, size: blob.size };
+  try {
+    const response = await downloadResource(resourceId);
+    const blob = new Blob([response.data], { type: response.headers["content-type"] || "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const disposition = response.headers["content-disposition"] || "";
+    const fileNameMatch = disposition.match(/filename="?([^";]+)"?/);
+    a.href = url;
+    a.download = fileNameMatch?.[1] || `resource-${resourceId}`;
+    a.click();
+    URL.revokeObjectURL(url);
+    downloadResult.value = { filename: a.download, size: blob.size };
+  } catch (e) {
+    error.value = toErrorMessage(e, "下载资源失败");
+  }
 }
 
 async function logout() {
   try {
-    await api.post("/auth/logout");
+    await logoutApi();
   } catch (_) {
     // ignore and clear local session
   }
@@ -172,12 +201,12 @@ onMounted(loadAll);
 
       <p v-if="!resources.length" class="muted">暂无资源。</p>
       <div class="list-table" v-else>
-        <article v-for="r in resources" :key="r.id" class="list-row">
+        <article v-for="r in resources" :key="r.resourceId" class="list-row">
           <div>
-            <p class="row-title">{{ r.name }}</p>
-            <p class="muted row-meta">{{ r.type }} · 资源 ID：{{ r.id }}</p>
+            <p class="row-title">{{ r.title }}</p>
+            <p class="muted row-meta">{{ r.resourceType }} · 资源 ID：{{ r.resourceId }}</p>
           </div>
-          <button class="btn-secondary btn-sm" @click="download(r.id)">下载</button>
+          <button class="btn-secondary btn-sm" @click="download(r.resourceId)">下载</button>
         </article>
       </div>
 

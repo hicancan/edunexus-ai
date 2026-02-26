@@ -10,6 +10,8 @@ apps/api/.settings/
 
 # Python
 apps/ai-service/__pycache__/
+apps/ai-service/.venv/
+apps/ai-service/*.egg-info/
 *.pyc
 
 # Web

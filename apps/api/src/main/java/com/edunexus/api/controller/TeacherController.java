@@ -3,6 +3,7 @@ package com.edunexus.api.controller;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.DbService;
+import com.edunexus.api.service.GovernanceService;
 import com.edunexus.api.service.ObjectStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -30,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -39,15 +41,18 @@ public class TeacherController implements ControllerSupport {
     private final DbService db;
     private final AiClient aiClient;
     private final ObjectStorageService storage;
+    private final GovernanceService governance;
 
-    public TeacherController(DbService db, AiClient aiClient, ObjectStorageService storage) {
+    public TeacherController(DbService db, AiClient aiClient, ObjectStorageService storage, GovernanceService governance) {
         this.db = db;
         this.aiClient = aiClient;
         this.storage = storage;
+        this.governance = governance;
     }
 
     @PostMapping("/knowledge/documents")
-    public ResponseEntity<ApiResponse> uploadDocument(@RequestParam("file") MultipartFile file,
+    public ResponseEntity<ApiResponse> uploadDocument(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                      @RequestParam("file") MultipartFile file,
                                                       HttpServletRequest request) throws IOException {
         requireRole("TEACHER");
         if (file.isEmpty()) throw new IllegalArgumentException("文件不能为空");
@@ -59,7 +64,24 @@ public class TeacherController implements ControllerSupport {
         String fileType = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
         long fileSize = file.getSize();
         byte[] fileBytes = file.getBytes();
+        String requestHash = governance.requestHash(Map.of(
+                "teacherId", currentUser().userId(),
+                "filename", fileName,
+                "fileType", fileType,
+                "fileSize", fileSize,
+                "contentSha256", sha256Hex(fileBytes)
+        ));
+        Map<String, Object> replay = governance.getIdempotentReplay("teacher.kb.upload", idempotencyKey, requestHash);
+        if (replay != null) {
+            return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
+        }
         UUID docId = db.newId();
+        UUID jobId = governance.createJobRun("DOCUMENT_INGEST", docId, Map.of(
+                "teacherId", currentUser().userId().toString(),
+                "filename", fileName,
+                "fileType", fileType,
+                "fileSize", fileSize
+        ));
         String storagePath = storage.upload(fileName, fileType, fileBytes);
         Path tempPath = Files.createTempFile("edunexus-kb-" + docId, "-" + safeFilename(fileName));
         Files.write(tempPath, fileBytes);
@@ -67,6 +89,7 @@ public class TeacherController implements ControllerSupport {
         db.update("insert into documents(id,teacher_id,filename,file_type,file_size,storage_path,status) values (?,?,?,?,?,?,?)",
                 docId, currentUser().userId(), fileName, fileType, fileSize, storagePath, "UPLOADING");
         try {
+            governance.markJobRunning(jobId);
             db.update("update documents set status='PARSING',updated_at=now() where id=?", docId);
             db.update("update documents set status='EMBEDDING',updated_at=now() where id=?", docId);
             Map<String, Object> ingestResp = aiClient.ingestKb(Map.of(
@@ -74,17 +97,25 @@ public class TeacherController implements ControllerSupport {
                     "teacher_id", currentUser().userId().toString(),
                     "filename", fileName,
                     "file_path", tempPath.toAbsolutePath().toString(),
-                    "trace_id", trace(request)
+                    "trace_id", trace(request),
+                    "idempotency_key", idempotencyKey == null ? "" : idempotencyKey
             ));
             db.update("update documents set status='READY',updated_at=now() where id=?", docId);
-            return ResponseEntity.status(202).body(ApiResponse.accepted(Map.of(
+            Map<String, Object> data = Map.of(
                     "id", docId,
+                    "jobId", jobId,
                     "filename", fileName,
                     "status", "READY",
                     "chunks", ingestResp.getOrDefault("chunks", 0)
-            ), trace(request)));
+            );
+            governance.markJobSucceeded(jobId, data);
+            governance.storeIdempotency("teacher.kb.upload", idempotencyKey, requestHash, data, Duration.ofHours(24));
+            governance.audit(currentUser().userId(), currentUser().role(), "UPLOAD_DOCUMENT", "DOCUMENT", docId.toString(), trace(request));
+            return ResponseEntity.status(202).body(ApiResponse.accepted(data, trace(request)));
         } catch (Exception ex) {
             db.update("update documents set status='FAILED',error_message=?,updated_at=now() where id=?", ex.getMessage(), docId);
+            governance.markJobFailed(jobId, ex.getMessage());
+            governance.audit(currentUser().userId(), currentUser().role(), "UPLOAD_DOCUMENT_FAILED", "DOCUMENT", docId.toString(), trace(request));
             throw ex;
         } finally {
             Files.deleteIfExists(tempPath);
@@ -109,7 +140,7 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<ApiResponse> deleteDocument(@PathVariable("documentId") UUID documentId, HttpServletRequest request) {
         requireRole("TEACHER");
         Map<String, Object> doc = ensureDocOwner(documentId);
-        aiClient.deleteKb(Map.of("document_id", documentId.toString()));
+        aiClient.deleteKb(Map.of("document_id", documentId.toString(), "trace_id", trace(request)));
         String storagePath = String.valueOf(doc.get("storage_path"));
         if (storagePath.startsWith("s3://")) {
             storage.delete(storagePath);
@@ -121,25 +152,38 @@ public class TeacherController implements ControllerSupport {
             }
         }
         db.update("update documents set deleted_at=now(),updated_at=now() where id=?", documentId);
+        governance.audit(currentUser().userId(), currentUser().role(), "DELETE_DOCUMENT", "DOCUMENT", documentId.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(null, trace(request)));
     }
 
     @PostMapping("/plans/generate")
     @Transactional
-    public ResponseEntity<ApiResponse> generatePlan(@Valid @RequestBody PlanGenerateReq req, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> generatePlan(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                    @Valid @RequestBody PlanGenerateReq req,
+                                                    HttpServletRequest request) {
         requireRole("TEACHER");
+        String requestHash = governance.requestHash(Map.of("teacherId", currentUser().userId(), "payload", req));
+        Map<String, Object> replay = governance.getIdempotentReplay("teacher.plan.generate", idempotencyKey, requestHash);
+        if (replay != null) {
+            return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
+        }
         Map<String, Object> aiResp = aiClient.generatePlan(Map.of(
                 "topic", req.topic(),
                 "grade_level", req.gradeLevel(),
                 "duration_mins", req.durationMins(),
                 "trace_id", trace(request),
-                "scene", "lesson_plan"
+                "scene", "lesson_plan",
+                "teacher_id", currentUser().userId().toString(),
+                "idempotency_key", idempotencyKey == null ? "" : idempotencyKey
         ));
-        String content = String.valueOf(aiResp.getOrDefault("content", "# Lesson Plan\n生成失败"));
+        String content = String.valueOf(aiResp.getOrDefault("contentMd", aiResp.getOrDefault("content", "# Lesson Plan\n生成失败")));
         UUID planId = db.newId();
         db.update("insert into lesson_plans(id,teacher_id,topic,grade_level,duration_mins,content_md) values (?,?,?,?,?,?)",
                 planId, currentUser().userId(), req.topic(), req.gradeLevel(), req.durationMins(), content);
-        return ResponseEntity.ok(ApiResponse.ok(Map.of("id", planId, "topic", req.topic(), "content", content, "createdAt", Instant.now().toString()), trace(request)));
+        Map<String, Object> data = Map.of("id", planId, "topic", req.topic(), "content", content, "createdAt", Instant.now().toString());
+        governance.storeIdempotency("teacher.plan.generate", idempotencyKey, requestHash, data, Duration.ofHours(24));
+        governance.audit(currentUser().userId(), currentUser().role(), "GENERATE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
+        return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
     @GetMapping("/plans")
@@ -157,7 +201,12 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<ApiResponse> updatePlan(@PathVariable("planId") UUID planId, @Valid @RequestBody PlanUpdateReq req, HttpServletRequest request) {
         requireRole("TEACHER");
         ensurePlanOwner(planId);
-        db.update("update lesson_plans set content_md=?,updated_at=now() where id=?", req.content(), planId);
+        String content = req.contentMd() == null || req.contentMd().isBlank() ? req.content() : req.contentMd();
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("contentMd 不能为空");
+        }
+        db.update("update lesson_plans set content_md=?,updated_at=now() where id=?", content, planId);
+        governance.audit(currentUser().userId(), currentUser().role(), "UPDATE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(Map.of("id", planId), trace(request)));
     }
 
@@ -166,6 +215,7 @@ public class TeacherController implements ControllerSupport {
         requireRole("TEACHER");
         ensurePlanOwner(planId);
         db.update("update lesson_plans set deleted_at=now(),updated_at=now() where id=?", planId);
+        governance.audit(currentUser().userId(), currentUser().role(), "DELETE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(null, trace(request)));
     }
 
@@ -184,6 +234,7 @@ public class TeacherController implements ControllerSupport {
         byte[] bytes = "pdf".equals(format)
                 ? renderPdf(String.valueOf(row.get("topic")), content)
                 : content.getBytes(StandardCharsets.UTF_8);
+        governance.audit(currentUser().userId(), currentUser().role(), "EXPORT_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
         MediaType mediaType = "pdf".equals(format)
                 ? MediaType.APPLICATION_PDF
                 : MediaType.parseMediaType("text/markdown; charset=UTF-8");
@@ -200,6 +251,7 @@ public class TeacherController implements ControllerSupport {
         ensurePlanOwner(planId);
         String token = UUID.randomUUID().toString().replace("-", "").substring(0, 24);
         db.update("update lesson_plans set is_shared=true,share_token=?,shared_at=now(),updated_at=now() where id=?", token, planId);
+        governance.audit(currentUser().userId(), currentUser().role(), "SHARE_PLAN", "LESSON_PLAN", planId.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
                 "planId", planId,
                 "shareToken", token,
@@ -249,6 +301,7 @@ public class TeacherController implements ControllerSupport {
                 req.questionId() == null || req.questionId().isBlank() ? null : UUID.fromString(req.questionId()),
                 req.knowledgePoint(),
                 req.suggestion());
+        governance.audit(currentUser().userId(), currentUser().role(), "CREATE_SUGGESTION", "TEACHER_SUGGESTION", id.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(Map.of("id", id), trace(request)));
     }
 
@@ -265,7 +318,14 @@ public class TeacherController implements ControllerSupport {
 
     private void ensureStudentLinked(UUID studentId) {
         boolean linked = db.exists(
-                "select 1 from student_teacher_relations where teacher_id=? and student_id=?",
+                """
+                select 1
+                from teacher_student_bindings
+                where teacher_id=?
+                  and student_id=?
+                  and status='ACTIVE'
+                  and (revoked_at is null or revoked_at > now())
+                """,
                 currentUser().userId(),
                 studentId
         );
@@ -274,6 +334,20 @@ public class TeacherController implements ControllerSupport {
 
     private String safeFilename(String name) {
         return name.replaceAll("[^a-zA-Z0-9._-\\u4e00-\\u9fa5]", "_");
+    }
+
+    private String sha256Hex(byte[] payload) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(payload);
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     private byte[] renderPdf(String title, String markdown) {
@@ -353,6 +427,6 @@ public class TeacherController implements ControllerSupport {
     }
 
     public record PlanGenerateReq(@NotBlank String topic, @NotBlank String gradeLevel, @Min(10) @Max(180) int durationMins) {}
-    public record PlanUpdateReq(@NotBlank String content) {}
+    public record PlanUpdateReq(String contentMd, String content) {}
     public record SuggestionReq(@NotBlank String studentId, String questionId, String knowledgePoint, @NotBlank String suggestion) {}
 }

@@ -6,6 +6,7 @@ import com.edunexus.api.auth.JwtUtil;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.TraceFilter;
 import com.edunexus.api.service.DbService;
+import com.edunexus.api.service.GovernanceService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Email;
@@ -32,11 +33,13 @@ public class AuthController {
     private final DbService db;
     private final PasswordEncoder encoder;
     private final JwtUtil jwt;
+    private final GovernanceService governance;
 
-    public AuthController(DbService db, PasswordEncoder encoder, JwtUtil jwt) {
+    public AuthController(DbService db, PasswordEncoder encoder, JwtUtil jwt, GovernanceService governance) {
         this.db = db;
         this.encoder = encoder;
         this.jwt = jwt;
+        this.governance = governance;
     }
 
     @PostMapping("/register")
@@ -50,6 +53,7 @@ public class AuthController {
         UUID id = db.newId();
         db.update("insert into users(id,username,password_hash,email,phone,role,status) values (?,?,?,?,?,?, 'ACTIVE')",
                 id, req.username(), encoder.encode(req.password()), req.email(), req.phone(), req.role());
+        governance.audit(id, req.role(), "REGISTER", "USER", id.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(Map.of("userId", id), trace(request)));
     }
 
@@ -82,6 +86,7 @@ public class AuthController {
                 "refreshToken", refresh,
                 "user", Map.of("id", userId, "username", username, "role", role)
         );
+        governance.audit(UUID.fromString(userId), role, "LOGIN", "USER", userId, trace(request));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -98,6 +103,7 @@ public class AuthController {
             }
         }
         db.update("update refresh_tokens set revoked_at=now() where user_id=? and revoked_at is null", user.userId());
+        governance.audit(user.userId(), user.role(), "LOGOUT", "USER", user.userId().toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(null, trace(request)));
     }
 
@@ -119,6 +125,7 @@ public class AuthController {
         String refresh = jwt.generateRefreshToken(String.valueOf(userId));
         upsertRefreshToken(userId, req.refreshToken(), true);
         upsertRefreshToken(userId, refresh, false);
+        governance.audit(userId, String.valueOf(user.get("role")), "REFRESH_TOKEN", "USER", userId.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(Map.of("accessToken", access, "refreshToken", refresh), trace(request)));
     }
 

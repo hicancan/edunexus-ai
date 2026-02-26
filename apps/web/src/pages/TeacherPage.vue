@@ -1,7 +1,22 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import api from "../services/api";
+import { logout as logoutApi } from "../services/auth.service";
+import { toErrorMessage } from "../services/error-message";
+import { teacherPlanSchema, teacherSuggestionSchema } from "../schemas/teacher.schemas";
+import {
+  createTeacherSuggestion,
+  deleteKnowledgeDocument,
+  deletePlan,
+  exportPlan as requestExportPlan,
+  generatePlan,
+  getStudentAnalytics,
+  listKnowledgeDocuments,
+  listPlans,
+  sharePlan as sharePlanRequest,
+  updatePlan,
+  uploadKnowledgeDocument
+} from "../services/teacher.service";
 import { useAuthStore } from "../stores/auth";
 
 const route = useRoute();
@@ -41,10 +56,10 @@ let docsTimer = null;
 
 async function loadDocs() {
   try {
-    const res = await api.get("/teacher/knowledge/documents");
-    docs.value = res.data.data.list || [];
+    const data = await listKnowledgeDocuments();
+    docs.value = data.content || [];
   } catch (e) {
-    error.value = e?.response?.data?.message || "加载文档失败";
+    error.value = toErrorMessage(e, "加载文档失败");
   }
 }
 
@@ -56,13 +71,11 @@ async function upload() {
   loading.value = true;
   error.value = "";
   try {
-    const form = new FormData();
-    form.append("file", selectedFile.value);
-    await api.post("/teacher/knowledge/documents", form, { headers: { "Content-Type": "multipart/form-data" } });
+    await uploadKnowledgeDocument(selectedFile.value);
     selectedFile.value = null;
     await loadDocs();
   } catch (e) {
-    error.value = e?.response?.data?.message || "上传失败";
+    error.value = toErrorMessage(e, "上传失败");
   } finally {
     loading.value = false;
   }
@@ -76,25 +89,31 @@ function onFileChange(event) {
 async function removeDoc(id) {
   if (!window.confirm("确认删除该知识文档吗？")) return;
   try {
-    await api.delete(`/teacher/knowledge/documents/${id}`);
+    await deleteKnowledgeDocument(id);
     await loadDocs();
   } catch (e) {
-    error.value = e?.response?.data?.message || "删除文档失败";
+    error.value = toErrorMessage(e, "删除文档失败");
   }
 }
 
 async function genPlan() {
+  const parsed = teacherPlanSchema.safeParse(planForm.value);
+  if (!parsed.success) {
+    error.value = parsed.error.issues[0]?.message || "教案参数不合法";
+    return;
+  }
+
   loading.value = true;
   error.value = "";
   try {
-    const created = await api.post("/teacher/plans/generate", planForm.value);
-    planEditorId.value = created.data.data.id;
-    planEditorTopic.value = created.data.data.topic || "";
-    planEditorContent.value = created.data.data.content || "";
-    const res = await api.get("/teacher/plans");
-    plans.value = res.data.data.list || [];
+    const created = await generatePlan(parsed.data);
+    planEditorId.value = created.id;
+    planEditorTopic.value = created.topic || "";
+    planEditorContent.value = created.contentMd || "";
+    const listData = await listPlans();
+    plans.value = listData.content || [];
   } catch (e) {
-    error.value = e?.response?.data?.message || "教案生成失败";
+    error.value = toErrorMessage(e, "教案生成失败");
   } finally {
     loading.value = false;
   }
@@ -102,38 +121,34 @@ async function genPlan() {
 
 async function sharePlan(id) {
   try {
-    const res = await api.post(`/teacher/plans/${id}/share`);
-    shareInfo.value = res.data.data;
+    shareInfo.value = await sharePlanRequest(id);
   } catch (e) {
-    error.value = e?.response?.data?.message || "分享教案失败";
+    error.value = toErrorMessage(e, "分享教案失败");
   }
 }
 
 async function exportPlan(id) {
   try {
-    const res = await api.get(`/teacher/plans/${id}/export`, {
-      params: { format: exportFormat.value },
-      responseType: "blob"
-    });
-    const blob = new Blob([res.data], { type: res.headers["content-type"] || "application/octet-stream" });
+    const response = await requestExportPlan(id, exportFormat.value);
+    const blob = new Blob([response.data], { type: response.headers["content-type"] || "application/octet-stream" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    const filenameHeader = res.headers["content-disposition"] || "";
-    const match = filenameHeader.match(/filename="?([^";]+)"?/);
+    const disposition = response.headers["content-disposition"] || "";
+    const fileNameMatch = disposition.match(/filename="?([^";]+)"?/);
     a.href = url;
-    a.download = match?.[1] || `lesson-plan-${id}.${exportFormat.value}`;
+    a.download = fileNameMatch?.[1] || `lesson-plan-${id}.${exportFormat.value}`;
     a.click();
     URL.revokeObjectURL(url);
     shareInfo.value = { exportedFile: a.download };
   } catch (e) {
-    error.value = e?.response?.data?.message || "导出教案失败";
+    error.value = toErrorMessage(e, "导出教案失败");
   }
 }
 
 function openPlanEditor(plan) {
   planEditorId.value = plan.id;
   planEditorTopic.value = plan.topic || "";
-  planEditorContent.value = plan.content || "";
+  planEditorContent.value = plan.contentMd || "";
 }
 
 async function savePlan() {
@@ -141,12 +156,12 @@ async function savePlan() {
   loading.value = true;
   error.value = "";
   try {
-    await api.put(`/teacher/plans/${planEditorId.value}`, { content: planEditorContent.value });
+    await updatePlan(planEditorId.value, planEditorContent.value);
     shareInfo.value = { savedPlanId: planEditorId.value };
-    const res = await api.get("/teacher/plans");
-    plans.value = res.data.data.list || [];
+    const listData = await listPlans();
+    plans.value = listData.content || [];
   } catch (e) {
-    error.value = e?.response?.data?.message || "保存教案失败";
+    error.value = toErrorMessage(e, "保存教案失败");
   } finally {
     loading.value = false;
   }
@@ -157,29 +172,39 @@ async function removePlan(id) {
   loading.value = true;
   error.value = "";
   try {
-    await api.delete(`/teacher/plans/${id}`);
+    await deletePlan(id);
     if (planEditorId.value === id) {
       planEditorId.value = "";
       planEditorTopic.value = "";
       planEditorContent.value = "";
     }
-    const res = await api.get("/teacher/plans");
-    plans.value = res.data.data.list || [];
+    const listData = await listPlans();
+    plans.value = listData.content || [];
   } catch (e) {
-    error.value = e?.response?.data?.message || "删除教案失败";
+    error.value = toErrorMessage(e, "删除教案失败");
   } finally {
     loading.value = false;
   }
 }
 
 async function createSuggestion() {
+  const parsed = teacherSuggestionSchema.safeParse(suggestion.value);
+  if (!parsed.success) {
+    error.value = parsed.error.issues[0]?.message || "建议参数不合法";
+    return;
+  }
+
   loading.value = true;
   error.value = "";
   try {
-    await api.post("/teacher/suggestions", suggestion.value);
+    await createTeacherSuggestion({
+      ...parsed.data,
+      questionId: parsed.data.questionId || undefined,
+      knowledgePoint: parsed.data.knowledgePoint || undefined
+    });
     await loadAnalytics();
   } catch (e) {
-    error.value = e?.response?.data?.message || "提交建议失败";
+    error.value = toErrorMessage(e, "提交建议失败");
   } finally {
     loading.value = false;
   }
@@ -188,16 +213,15 @@ async function createSuggestion() {
 async function loadAnalytics() {
   try {
     localStorage.setItem("teacher_analytics_student_id", analyticsStudentId.value);
-    const res = await api.get(`/teacher/students/${analyticsStudentId.value}/analytics`);
-    analytics.value = res.data.data;
+    analytics.value = await getStudentAnalytics(analyticsStudentId.value);
   } catch (e) {
-    error.value = e?.response?.data?.message || "加载学情失败";
+    error.value = toErrorMessage(e, "加载学情失败");
   }
 }
 
 async function logout() {
   try {
-    await api.post("/auth/logout");
+    await logoutApi();
   } catch (_) {
     // ignore and clear local session
   }
@@ -220,10 +244,10 @@ function docStatusClass(status) {
 onMounted(async () => {
   await loadDocs();
   try {
-    const res = await api.get("/teacher/plans");
-    plans.value = res.data.data.list || [];
+    const listData = await listPlans();
+    plans.value = listData.content || [];
   } catch (e) {
-    error.value = e?.response?.data?.message || "加载教案失败";
+    error.value = toErrorMessage(e, "加载教案失败");
   }
   await loadAnalytics();
   docsTimer = setInterval(() => {

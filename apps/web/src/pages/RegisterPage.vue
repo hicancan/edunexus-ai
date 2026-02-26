@@ -1,12 +1,14 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import api from "../services/api";
+import { register as registerApi } from "../services/auth.service";
+import { toErrorMessage } from "../services/error-message";
+import { getFirstIssueMessage, registerSchema } from "../schemas/auth.schemas";
 
 const router = useRouter();
 const username = ref("");
 const password = ref("");
-const role = ref("STUDENT");
+const role = ref<"STUDENT" | "TEACHER">("STUDENT");
 const email = ref("");
 const phone = ref("");
 const loading = ref(false);
@@ -16,19 +18,33 @@ const success = ref("");
 async function submit() {
   error.value = "";
   success.value = "";
+
+  const parsed = registerSchema.safeParse({
+    username: username.value,
+    password: password.value,
+    role: role.value,
+    email: email.value,
+    phone: phone.value
+  });
+
+  if (!parsed.success) {
+    error.value = getFirstIssueMessage(parsed);
+    return;
+  }
+
   loading.value = true;
   try {
-    await api.post("/auth/register", {
-      username: username.value,
-      password: password.value,
-      role: role.value,
-      email: email.value || undefined,
-      phone: phone.value || undefined
+    await registerApi({
+      username: parsed.data.username,
+      password: parsed.data.password,
+      role: parsed.data.role,
+      email: parsed.data.email || undefined,
+      phone: parsed.data.phone || undefined
     });
     success.value = "注册成功，请登录。";
     setTimeout(() => router.push("/login"), 600);
-  } catch (e) {
-    error.value = e?.response?.data?.message || "注册失败";
+  } catch (e: unknown) {
+    error.value = toErrorMessage(e, "注册失败");
   } finally {
     loading.value = false;
   }
@@ -46,7 +62,7 @@ async function submit() {
       <div class="row">
         <div>
           <label>用户名</label>
-          <input v-model="username" placeholder="3-50 位，支持字母数字" />
+          <input v-model="username" autocomplete="username" placeholder="3-50 位，支持字母数字" />
         </div>
         <div>
           <label>身份类型</label>
@@ -60,7 +76,7 @@ async function submit() {
       <div class="row">
         <div>
           <label>密码</label>
-          <input v-model="password" type="password" placeholder="至少 8 位" />
+          <input v-model="password" autocomplete="new-password" type="password" placeholder="至少 8 位" />
         </div>
         <div>
           <label>手机号（可选）</label>
@@ -74,7 +90,7 @@ async function submit() {
       </div>
 
       <div class="action-row">
-        <button :disabled="loading" @click="submit">{{ loading ? "提交中..." : "立即注册" }}</button>
+        <button aria-label="立即注册" :disabled="loading" @click="submit">{{ loading ? "提交中..." : "立即注册" }}</button>
         <button class="btn-secondary" @click="router.push('/login')">返回登录</button>
       </div>
 

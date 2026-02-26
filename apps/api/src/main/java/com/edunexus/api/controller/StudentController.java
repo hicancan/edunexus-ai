@@ -4,6 +4,7 @@ import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.DbService;
+import com.edunexus.api.service.GovernanceService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -26,11 +28,13 @@ import java.util.*;
 public class StudentController implements ControllerSupport {
     private final DbService db;
     private final AiClient aiClient;
+    private final GovernanceService governance;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
-    public StudentController(DbService db, AiClient aiClient) {
+    public StudentController(DbService db, AiClient aiClient, GovernanceService governance) {
         this.db = db;
         this.aiClient = aiClient;
+        this.governance = governance;
     }
 
     @PostMapping("/chat/session")
@@ -38,6 +42,7 @@ public class StudentController implements ControllerSupport {
         requireRole("STUDENT");
         UUID id = db.newId();
         db.update("insert into chat_sessions(id,student_id,title) values (?,?,?)", id, currentUser().userId(), "新建对话");
+        governance.audit(currentUser().userId(), currentUser().role(), "CREATE_CHAT_SESSION", "CHAT_SESSION", id.toString(), trace(request));
         return ResponseEntity.status(201).body(ApiResponse.created(Map.of("sessionId", id), trace(request)));
     }
 
@@ -85,7 +90,15 @@ public class StudentController implements ControllerSupport {
         aiReq.put("message", req.message());
         aiReq.put("trace_id", trace(request));
         aiReq.put("scene", "chat_rag");
-        List<Map<String, Object>> rel = db.list("select teacher_id from student_teacher_relations where student_id=? order by created_at asc limit 1", currentUser().userId());
+        List<Map<String, Object>> rel = db.list("""
+                select teacher_id
+                from teacher_student_bindings
+                where student_id=?
+                  and status='ACTIVE'
+                  and (revoked_at is null or revoked_at > now())
+                order by coalesce(effective_from, created_at) asc
+                limit 1
+                """, currentUser().userId());
         if (!rel.isEmpty()) {
             aiReq.put("teacher_id", String.valueOf(rel.getFirst().get("teacher_id")));
         }
@@ -141,9 +154,16 @@ public class StudentController implements ControllerSupport {
 
     @PostMapping("/exercise/submit")
     @Transactional
-    public ResponseEntity<ApiResponse> submitExercise(@Valid @RequestBody ExerciseSubmitReq req, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> submitExercise(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                      @Valid @RequestBody ExerciseSubmitReq req,
+                                                      HttpServletRequest request) {
         requireRole("STUDENT");
         if (req.answers() == null || req.answers().isEmpty()) throw new IllegalArgumentException("answers 不能为空");
+        String requestHash = governance.requestHash(Map.of("studentId", currentUser().userId(), "payload", req));
+        Map<String, Object> replay = governance.getIdempotentReplay("student.exercise.submit", idempotencyKey, requestHash);
+        if (replay != null) {
+            return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
+        }
         UUID recordId = db.newId();
         int totalScore = 0;
         int correctCount = 0;
@@ -195,6 +215,8 @@ public class StudentController implements ControllerSupport {
                 "correctCount", correctCount,
                 "totalCount", req.answers().size()
         );
+        governance.storeIdempotency("student.exercise.submit", idempotencyKey, requestHash, data, Duration.ofHours(24));
+        governance.audit(currentUser().userId(), currentUser().role(), "SUBMIT_EXERCISE", "EXERCISE_RECORD", recordId.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -290,8 +312,15 @@ public class StudentController implements ControllerSupport {
 
     @PostMapping("/ai-questions/generate")
     @Transactional
-    public ResponseEntity<ApiResponse> generateAiQuestions(@Valid @RequestBody AiGenerateReq req, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> generateAiQuestions(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                           @Valid @RequestBody AiGenerateReq req,
+                                                           HttpServletRequest request) {
         requireRole("STUDENT");
+        String requestHash = governance.requestHash(Map.of("studentId", currentUser().userId(), "payload", req));
+        Map<String, Object> replay = governance.getIdempotentReplay("student.aiq.generate", idempotencyKey, requestHash);
+        if (replay != null) {
+            return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
+        }
         String difficulty = req.difficulty() == null || req.difficulty().isBlank() ? "MEDIUM" : req.difficulty();
         List<Map<String, Object>> wrong = db.list("""
                 select q.knowledge_points from wrong_book w join questions q on w.question_id=q.id
@@ -315,6 +344,7 @@ public class StudentController implements ControllerSupport {
         aiReq.put("teacher_suggestions", suggestions);
         aiReq.put("trace_id", trace(request));
         aiReq.put("scene", "ai_question");
+        aiReq.put("student_id", currentUser().userId().toString());
         Map<String, Object> aiResp = aiClient.generateQuestions(aiReq);
         List<Map<String, Object>> questions = (List<Map<String, Object>>) aiResp.getOrDefault("questions", List.of());
         List<Map<String, Object>> out = new ArrayList<>();
@@ -342,7 +372,10 @@ public class StudentController implements ControllerSupport {
                     "knowledgePoints", q.getOrDefault("knowledge_points", List.of())
             ));
         }
-        return ResponseEntity.ok(ApiResponse.ok(Map.of("sessionId", sessionId, "generatedCount", out.size(), "questions", out), trace(request)));
+        Map<String, Object> data = Map.of("sessionId", sessionId, "generatedCount", out.size(), "questions", out);
+        governance.storeIdempotency("student.aiq.generate", idempotencyKey, requestHash, data, Duration.ofHours(24));
+        governance.audit(currentUser().userId(), currentUser().role(), "GENERATE_AIQ", "AIQ_SESSION", sessionId.toString(), trace(request));
+        return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
     @GetMapping("/ai-questions")
@@ -367,8 +400,15 @@ public class StudentController implements ControllerSupport {
 
     @PostMapping("/ai-questions/submit")
     @Transactional
-    public ResponseEntity<ApiResponse> submitAiQuestions(@Valid @RequestBody AiSubmitReq req, HttpServletRequest request) {
+    public ResponseEntity<ApiResponse> submitAiQuestions(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                         @Valid @RequestBody AiSubmitReq req,
+                                                         HttpServletRequest request) {
         requireRole("STUDENT");
+        String requestHash = governance.requestHash(Map.of("studentId", currentUser().userId(), "payload", req));
+        Map<String, Object> replay = governance.getIdempotentReplay("student.aiq.submit", idempotencyKey, requestHash);
+        if (replay != null) {
+            return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
+        }
         Map<String, Object> session = db.one("select id,student_id from ai_question_sessions where id=?", UUID.fromString(req.sessionId()));
         if (!currentUser().userId().equals(session.get("student_id"))) throw new SecurityException("无权访问该会话");
 
@@ -402,7 +442,7 @@ public class StudentController implements ControllerSupport {
         db.update("update ai_question_sessions set completed=true,correct_rate=?,score=?,updated_at=now() where id=?",
                 rate, totalScore, UUID.fromString(req.sessionId()));
 
-        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+        Map<String, Object> data = Map.of(
                 "recordId", recordId,
                 "sessionId", req.sessionId(),
                 "submitTime", Instant.now().toString(),
@@ -410,7 +450,10 @@ public class StudentController implements ControllerSupport {
                 "totalScore", totalScore,
                 "correctCount", correct,
                 "totalCount", req.answers().size()
-        ), trace(request)));
+        );
+        governance.storeIdempotency("student.aiq.submit", idempotencyKey, requestHash, data, Duration.ofHours(24));
+        governance.audit(currentUser().userId(), currentUser().role(), "SUBMIT_AIQ", "AIQ_RECORD", recordId.toString(), trace(request));
+        return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
     @GetMapping("/ai-questions/{recordId}/analysis")

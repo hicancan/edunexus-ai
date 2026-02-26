@@ -1,7 +1,27 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import api from "../services/api";
+import { logout as logoutApi } from "../services/auth.service";
+import { toErrorMessage } from "../services/error-message";
+import { aiGenerateSchema } from "../schemas/student.schemas";
+import {
+  createChatSession,
+  deleteChatSession,
+  generateAiQuestions as requestAiQuestions,
+  getAiQuestionAnalysis,
+  getChatSessionDetail,
+  getCurrentUserProfile,
+  getExerciseAnalysis,
+  listAiQuestionHistory,
+  listChatSessions,
+  listExerciseQuestions,
+  listExerciseRecords,
+  listWrongQuestions,
+  removeWrongQuestion,
+  sendChatMessage,
+  submitAiQuestions as submitAiAnswers,
+  submitExercise as submitExerciseAnswers
+} from "../services/student.service";
 import { useAuthStore } from "../stores/auth";
 
 const route = useRoute();
@@ -67,15 +87,16 @@ const aiHistoryLoading = ref(false);
 
 const me = ref(null);
 const profileLoading = ref(false);
+const profileError = ref("");
 
 async function loadSessions() {
   chatLoading.value = true;
   chatError.value = "";
   try {
-    const res = await api.get("/student/chat/sessions");
-    sessions.value = res.data.data.list || [];
+    const data = await listChatSessions();
+    sessions.value = data.content || [];
   } catch (e) {
-    chatError.value = e?.response?.data?.message || "加载会话失败";
+    chatError.value = toErrorMessage(e, "加载会话失败");
   } finally {
     chatLoading.value = false;
   }
@@ -84,12 +105,12 @@ async function loadSessions() {
 async function newSession() {
   chatError.value = "";
   try {
-    const res = await api.post("/student/chat/session");
-    activeSessionId.value = res.data.data.sessionId;
+    const session = await createChatSession();
+    activeSessionId.value = session.id;
     messages.value = [];
     await loadSessions();
   } catch (e) {
-    chatError.value = e?.response?.data?.message || "新建会话失败";
+    chatError.value = toErrorMessage(e, "新建会话失败");
   }
 }
 
@@ -98,11 +119,11 @@ async function openSession(id) {
   chatLoading.value = true;
   chatError.value = "";
   try {
-    const res = await api.get(`/student/chat/session/${id}`);
-    messages.value = res.data.data.messages || [];
+    const detail = await getChatSessionDetail(id);
+    messages.value = detail.messages || [];
     localStorage.setItem("student_active_session", id);
   } catch (e) {
-    chatError.value = e?.response?.data?.message || "读取会话失败";
+    chatError.value = toErrorMessage(e, "读取会话失败");
   } finally {
     chatLoading.value = false;
   }
@@ -111,7 +132,7 @@ async function openSession(id) {
 async function deleteSession(id) {
   if (!window.confirm("确认删除该会话吗？")) return;
   try {
-    await api.delete(`/student/chat/session/${id}`);
+    await deleteChatSession(id);
     if (activeSessionId.value === id) {
       activeSessionId.value = "";
       messages.value = [];
@@ -119,7 +140,7 @@ async function deleteSession(id) {
     }
     await loadSessions();
   } catch (e) {
-    chatError.value = e?.response?.data?.message || "删除会话失败";
+    chatError.value = toErrorMessage(e, "删除会话失败");
   }
 }
 
@@ -132,11 +153,11 @@ async function send() {
     const message = input.value;
     input.value = "";
     messages.value.push({ role: "USER", content: message });
-    const res = await api.post(`/student/chat/session/${activeSessionId.value}/message`, { message });
-    messages.value.push({ role: "ASSISTANT", content: res.data.data.aiResponse, citations: res.data.data.sources });
+    const reply = await sendChatMessage(activeSessionId.value, message);
+    messages.value.push(reply.assistantMessage);
     await loadSessions();
   } catch (e) {
-    chatError.value = e?.response?.data?.message || "发送失败";
+    chatError.value = toErrorMessage(e, "发送失败");
   } finally {
     chatLoading.value = false;
   }
@@ -147,10 +168,10 @@ async function loadQuestions() {
   exerciseError.value = "";
   try {
     localStorage.setItem("student_question_filter", JSON.stringify(questionFilter.value));
-    const res = await api.get("/student/exercise/questions", { params: questionFilter.value });
-    questions.value = res.data.data.list || [];
+    const data = await listExerciseQuestions(questionFilter.value);
+    questions.value = data.content || [];
   } catch (e) {
-    exerciseError.value = e?.response?.data?.message || "加载题目失败";
+    exerciseError.value = toErrorMessage(e, "加载题目失败");
   } finally {
     exerciseLoading.value = false;
   }
@@ -160,14 +181,14 @@ async function submitExercise() {
   exerciseLoading.value = true;
   exerciseError.value = "";
   try {
-    const payload = (questions.value || []).map((q) => ({ questionId: q.questionId, userAnswer: answers.value[q.questionId] || "" }));
-    const res = await api.post("/student/exercise/submit", { answers: payload, timeSpent: 600 });
-    submitResult.value = res.data.data;
-    await viewExerciseAnalysis(res.data.data.recordId);
+    const payload = (questions.value || []).map((q) => ({ questionId: q.id, userAnswer: answers.value[q.id] || "" }));
+    const data = await submitExerciseAnswers(payload);
+    submitResult.value = data;
+    await viewExerciseAnalysis(data.recordId);
     await loadWrong();
     await loadRecords();
   } catch (e) {
-    exerciseError.value = e?.response?.data?.message || "提交失败";
+    exerciseError.value = toErrorMessage(e, "提交失败");
   } finally {
     exerciseLoading.value = false;
   }
@@ -178,10 +199,10 @@ async function loadWrong() {
   wrongError.value = "";
   try {
     localStorage.setItem("student_wrong_filter", JSON.stringify(wrongFilter.value));
-    const res = await api.get("/student/exercise/wrong-questions", { params: wrongFilter.value });
-    wrongList.value = res.data.data.list || [];
+    const data = await listWrongQuestions(wrongFilter.value);
+    wrongList.value = data.content || [];
   } catch (e) {
-    wrongError.value = e?.response?.data?.message || "加载错题失败";
+    wrongError.value = toErrorMessage(e, "加载错题失败");
   } finally {
     wrongLoading.value = false;
   }
@@ -189,8 +210,12 @@ async function loadWrong() {
 
 async function removeWrong(questionId) {
   if (!window.confirm("确认将该题标记为已掌握吗？")) return;
-  await api.delete(`/student/exercise/wrong-questions/${questionId}`);
-  await loadWrong();
+  try {
+    await removeWrongQuestion(questionId);
+    await loadWrong();
+  } catch (e) {
+    wrongError.value = toErrorMessage(e, "移除错题失败");
+  }
 }
 
 async function loadRecords() {
@@ -198,33 +223,38 @@ async function loadRecords() {
   recordsError.value = "";
   try {
     localStorage.setItem("student_record_filter", JSON.stringify(recordFilter.value));
-    const res = await api.get("/student/exercise/records", { params: recordFilter.value });
-    records.value = res.data.data.list || [];
+    const data = await listExerciseRecords(recordFilter.value);
+    records.value = data.content || [];
   } catch (e) {
-    recordsError.value = e?.response?.data?.message || "加载记录失败";
+    recordsError.value = toErrorMessage(e, "加载记录失败");
   } finally {
     recordsLoading.value = false;
   }
 }
 
 async function viewExerciseAnalysis(recordId) {
-  const res = await api.get(`/student/exercise/${recordId}/analysis`);
-  exerciseAnalysis.value = res.data.data;
+  exerciseAnalysis.value = await getExerciseAnalysis(recordId);
 }
 
 async function generateAiQuestions() {
+  const parsed = aiGenerateSchema.safeParse(aiForm.value);
+  if (!parsed.success) {
+    aiError.value = parsed.error.issues[0]?.message || "生成参数不合法";
+    return;
+  }
+
   aiLoading.value = true;
   aiError.value = "";
   try {
-    const res = await api.post("/student/ai-questions/generate", aiForm.value);
-    aiSessionId.value = res.data.data.sessionId;
-    aiGenerated.value = res.data.data.questions || [];
+    const data = await requestAiQuestions(parsed.data);
+    aiSessionId.value = data.sessionId;
+    aiGenerated.value = data.questions || [];
     aiAnswers.value = {};
     aiSubmitResult.value = null;
     aiAnalysis.value = null;
     await loadAiHistory();
   } catch (e) {
-    aiError.value = e?.response?.data?.message || "生成题目失败";
+    aiError.value = toErrorMessage(e, "生成题目失败");
   } finally {
     aiLoading.value = false;
   }
@@ -234,14 +264,13 @@ async function submitAiQuestions() {
   aiLoading.value = true;
   aiError.value = "";
   try {
-    const payload = aiGenerated.value.map((q) => ({ questionId: q.questionId, userAnswer: aiAnswers.value[q.questionId] || "" }));
-    const res = await api.post("/student/ai-questions/submit", { sessionId: aiSessionId.value, answers: payload });
-    aiSubmitResult.value = res.data.data;
-    const analysis = await api.get(`/student/ai-questions/${res.data.data.recordId}/analysis`);
-    aiAnalysis.value = analysis.data.data;
+    const payload = aiGenerated.value.map((q) => ({ questionId: q.id, userAnswer: aiAnswers.value[q.id] || "" }));
+    const result = await submitAiAnswers(aiSessionId.value, payload);
+    aiSubmitResult.value = result;
+    aiAnalysis.value = await getAiQuestionAnalysis(result.recordId);
     await loadAiHistory();
   } catch (e) {
-    aiError.value = e?.response?.data?.message || "提交 AI 题目失败";
+    aiError.value = toErrorMessage(e, "提交 AI 题目失败");
   } finally {
     aiLoading.value = false;
   }
@@ -252,10 +281,10 @@ async function loadAiHistory() {
   aiError.value = "";
   try {
     localStorage.setItem("student_ai_history_filter", JSON.stringify(aiHistoryFilter.value));
-    const res = await api.get("/student/ai-questions", { params: aiHistoryFilter.value });
-    aiHistory.value = res.data.data.list || [];
+    const data = await listAiQuestionHistory(aiHistoryFilter.value);
+    aiHistory.value = data.content || [];
   } catch (e) {
-    aiError.value = e?.response?.data?.message || "加载 AI 出题历史失败";
+    aiError.value = toErrorMessage(e, "加载 AI 出题历史失败");
   } finally {
     aiHistoryLoading.value = false;
   }
@@ -263,9 +292,14 @@ async function loadAiHistory() {
 
 async function loadProfile() {
   profileLoading.value = true;
+  profileError.value = "";
   try {
-    const res = await api.get("/auth/me");
-    me.value = res.data.data;
+    me.value = await getCurrentUserProfile();
+    if (me.value) {
+      auth.setUser(me.value);
+    }
+  } catch (e) {
+    profileError.value = toErrorMessage(e, "加载个人信息失败");
   } finally {
     profileLoading.value = false;
   }
@@ -273,7 +307,7 @@ async function loadProfile() {
 
 async function logout() {
   try {
-    await api.post("/auth/logout");
+    await logoutApi();
   } catch (_) {
     // ignore and clear local session
   }
@@ -328,9 +362,9 @@ onMounted(async () => {
         <aside class="chat-sidebar">
           <p class="muted side-title">会话列表</p>
           <div class="session-list" v-if="sessions.length">
-            <div v-for="s in sessions" :key="s.sessionId" class="session-item" :class="{ active: activeSessionId === s.sessionId }">
-              <button class="btn-ghost btn-sm session-main" @click="openSession(s.sessionId)">{{ s.title || "新建对话" }}</button>
-              <button class="btn-danger btn-sm" @click="deleteSession(s.sessionId)">删除</button>
+            <div v-for="s in sessions" :key="s.id" class="session-item" :class="{ active: activeSessionId === s.id }">
+              <button class="btn-ghost btn-sm session-main" @click="openSession(s.id)">{{ s.title || "新建对话" }}</button>
+              <button class="btn-danger btn-sm" @click="deleteSession(s.id)">删除</button>
             </div>
           </div>
           <p v-else-if="!chatLoading" class="muted">暂无会话，点击右上方“新建会话”开始。</p>
@@ -344,7 +378,7 @@ onMounted(async () => {
               <header>{{ m.role === "USER" ? "我" : "AI 助教" }}</header>
               <p>{{ m.content }}</p>
               <div v-if="m.citations && m.citations.length" class="citation-wrap">
-                <span v-for="(c, ci) in m.citations" :key="ci" class="citation-tag">{{ c.title }} · {{ Number(c.score || 0).toFixed(2) }}</span>
+                <span v-for="(c, ci) in m.citations" :key="ci" class="citation-tag">{{ c.filename || "未知来源" }} · {{ Number(c.score || 0).toFixed(2) }}</span>
               </div>
             </article>
           </div>
@@ -383,10 +417,10 @@ onMounted(async () => {
       <p v-if="exerciseLoading" class="muted">题目加载中...</p>
       <p v-else-if="questions.length === 0" class="muted">暂无题目，请调整筛选条件后重试。</p>
 
-      <article v-for="q in questions" :key="q.questionId" class="question-card">
+      <article v-for="q in questions" :key="q.id" class="question-card">
         <p class="question-content">{{ q.content }}</p>
         <label>选择答案</label>
-        <select v-model="answers[q.questionId]">
+        <select v-model="answers[q.id]">
           <option value="">请选择答案</option>
           <option v-for="(v, k) in q.options || {}" :key="k" :value="k">{{ k }}. {{ v }}</option>
         </select>
@@ -430,14 +464,14 @@ onMounted(async () => {
       <p v-else-if="records.length === 0" class="muted">暂无记录。</p>
 
       <div class="list-table" v-else>
-        <article v-for="r in records" :key="r.recordId" class="list-row">
+        <article v-for="r in records" :key="r.id" class="list-row">
           <div>
             <p class="row-title">{{ r.subject || "未分类" }}</p>
-            <p class="muted row-meta">记录 ID：{{ r.recordId }}</p>
+            <p class="muted row-meta">记录 ID：{{ r.id }}</p>
           </div>
           <div class="row-right">
             <span class="score-pill">得分 {{ r.totalScore ?? "--" }}</span>
-            <button class="btn-secondary btn-sm" @click="viewExerciseAnalysis(r.recordId)">查看解析</button>
+            <button class="btn-secondary btn-sm" @click="viewExerciseAnalysis(r.id)">查看解析</button>
           </div>
         </article>
       </div>
@@ -475,7 +509,7 @@ onMounted(async () => {
       <div class="list-table" v-else>
         <article v-for="w in wrongList" :key="w.id" class="list-row">
           <div>
-            <p class="row-title">{{ w.content }}</p>
+            <p class="row-title">{{ w.question?.content || "--" }}</p>
             <p class="muted row-meta">累计错题次数：{{ w.wrongCount }}</p>
           </div>
           <button v-if="wrongFilter.status === 'ACTIVE'" class="btn-success btn-sm" @click="removeWrong(w.questionId)">标记掌握</button>
@@ -515,10 +549,10 @@ onMounted(async () => {
       <p class="muted" v-if="aiSessionId">当前会话 ID：{{ aiSessionId }}</p>
       <p v-if="!aiLoading && aiGenerated.length === 0" class="muted">尚未生成题目，填写参数后点击“生成题目”。</p>
 
-      <article v-for="q in aiGenerated" :key="q.questionId" class="question-card">
+      <article v-for="q in aiGenerated" :key="q.id" class="question-card">
         <p class="question-content">{{ q.content }}</p>
         <label>选择答案</label>
-        <select v-model="aiAnswers[q.questionId]">
+        <select v-model="aiAnswers[q.id]">
           <option value="">请选择答案</option>
           <option v-for="(v, k) in q.options || {}" :key="k" :value="k">{{ k }}. {{ v }}</option>
         </select>
@@ -552,10 +586,10 @@ onMounted(async () => {
         </div>
         <p v-if="!aiHistoryLoading && aiHistory.length === 0" class="muted">暂无历史记录。</p>
         <div class="list-table" v-else>
-          <article v-for="h in aiHistory" :key="h.sessionId" class="list-row">
+          <article v-for="h in aiHistory" :key="h.id" class="list-row">
             <div>
               <p class="row-title">{{ h.subject || "未分类" }}</p>
-              <p class="muted row-meta">会话 ID：{{ h.sessionId }}</p>
+              <p class="muted row-meta">会话 ID：{{ h.id }}</p>
             </div>
             <div class="row-right">
               <span class="badge">完成：{{ h.completed ? "是" : "否" }}</span>
@@ -570,6 +604,7 @@ onMounted(async () => {
     <section v-if="section === 'profile'" class="card fade-up">
       <h3>个人信息</h3>
       <p v-if="profileLoading" class="muted">资料加载中...</p>
+      <p v-if="profileError" class="status-error">{{ profileError }}</p>
       <div v-else-if="me" class="profile-grid">
         <article class="profile-item">
           <h4>账号</h4>

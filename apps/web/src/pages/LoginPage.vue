@@ -1,27 +1,44 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from "vue";
-import { useRouter } from "vue-router";
-import api from "../services/api";
+import { useRoute, useRouter } from "vue-router";
+import { roleHomePath } from "../app/router/routes";
+import { loginSchema, getFirstIssueMessage } from "../schemas/auth.schemas";
+import { login as loginApi } from "../services/auth.service";
+import { toErrorMessage } from "../services/error-message";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
-const username = ref("student01");
-const password = ref("12345678");
+const username = ref("");
+const password = ref("");
 const loading = ref(false);
 const error = ref("");
 
 async function login() {
   error.value = "";
+
+  const parsed = loginSchema.safeParse({
+    username: username.value,
+    password: password.value
+  });
+
+  if (!parsed.success) {
+    error.value = getFirstIssueMessage(parsed);
+    return;
+  }
+
   loading.value = true;
   try {
-    const res = await api.post("/auth/login", { username: username.value, password: password.value });
-    const data = res.data.data;
-    auth.setAuth(data.accessToken, data.user);
-    const rolePath = { STUDENT: "/student", TEACHER: "/teacher", ADMIN: "/admin" }[data.user.role] || "/login";
-    router.push(rolePath);
-  } catch (e) {
-    error.value = e?.response?.data?.message || "登录失败";
+    const data = await loginApi(parsed.data);
+    auth.setSession(data);
+    const rolePath = data.user.role ? roleHomePath[data.user.role] : "/login";
+    const redirect = typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
+      ? route.query.redirect
+      : rolePath;
+    router.push(redirect);
+  } catch (e: unknown) {
+    error.value = toErrorMessage(e, "登录失败");
   } finally {
     loading.value = false;
   }
@@ -50,13 +67,13 @@ async function login() {
         <div class="form-stack">
           <div>
             <label>用户名</label>
-            <input v-model="username" placeholder="请输入用户名" />
+            <input v-model="username" autocomplete="username" placeholder="请输入用户名" @keyup.enter="login" />
           </div>
           <div>
             <label>密码</label>
-            <input v-model="password" type="password" placeholder="请输入密码" />
+            <input v-model="password" autocomplete="current-password" type="password" placeholder="请输入密码" @keyup.enter="login" />
           </div>
-          <button :disabled="loading" @click="login">{{ loading ? "登录中..." : "登录" }}</button>
+          <button aria-label="登录" :disabled="loading" @click="login">{{ loading ? "登录中..." : "登录" }}</button>
           <router-link to="/register">没有账号？立即注册</router-link>
         </div>
         <p v-if="error" class="status-error">{{ error }}</p>

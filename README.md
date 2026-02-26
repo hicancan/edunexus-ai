@@ -13,12 +13,12 @@
 ## 1) What is EduNexus AI? | 项目简介
 
 **EN**
-- Built from 12 SSOT documents (`doc/00` ~ `doc/11`) to ensure product, API, data, auth, and acceptance consistency.
+- Built from SSOT documents (`doc/00` ~ `doc/14` + OpenAPI) to ensure product, API, data, auth, and acceptance consistency.
 - Provides a full workflow loop: learning -> analysis -> recommendation -> governance.
 - Includes role-based workspaces for Student / Teacher / Admin.
 
 **中文**
-- 基于 12 份 SSOT 文档（`doc/00` ~ `doc/11`）落地，确保产品、接口、数据、鉴权与验收一致。
+- 基于 SSOT 文档集（`doc/00` ~ `doc/14` + OpenAPI）落地，确保产品、接口、数据、鉴权与验收一致。
 - 覆盖学习、分析、建议、治理的完整闭环。
 - 提供学生端、教师端、管理端分角色工作空间。
 
@@ -57,7 +57,9 @@ apps/api (Spring Boot 3, JWT, RBAC, Flyway)
 - Node.js 18+
 - Java 21+
 - Maven 3.9+
-- Python 3.10+
+- Conda (Miniforge/Anaconda)
+- Python 3.12 in conda env `edunexus-ai`
+- uv (must be executed via `conda run -n edunexus-ai uv ...`)
 - Docker / Docker Compose
 
 ### 5.2 Configure `.env` | 配置环境变量
@@ -89,8 +91,8 @@ docker compose up -d
 2) AI service
 ```bash
 cd apps/ai-service
-pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+conda run -n edunexus-ai uv sync --project . --python 3.12
+conda run -n edunexus-ai uv run --project . --python 3.12 uvicorn ai_service.app:app --host 0.0.0.0 --port 8000
 ```
 
 3) API service
@@ -112,6 +114,12 @@ npm run dev -- --host 0.0.0.0 --port 5173
 - API: `http://127.0.0.1:8080`
 - AI Service: `http://127.0.0.1:8000/docs`
 - MinIO Console: `http://127.0.0.1:9001`
+
+LAN access example (replace with your host IP):
+
+- Web: `http://192.168.x.x:5173`
+- API: `http://192.168.x.x:8080`
+- AI Service: `http://192.168.x.x:8000/docs`
 
 ## 6) AI Routing Strategy | AI 路由策略
 
@@ -147,7 +155,7 @@ apps/
   ai-service/   # FastAPI AI and RAG service
   web/          # Vue 3 frontend
 doc/
-  00-11*        # SSOT / PRD / API contract / acceptance docs
+  00-14*        # SSOT / PRD / API contract / internal-contract / quality docs
 scripts/
   run-dev.ps1
   run-dev.sh
@@ -160,10 +168,14 @@ scripts/
 cd apps/api && mvn test
 
 # Web
-cd apps/web && npm run build && npm run typecheck
+cd apps/web && npm run test && npm run build && npm run typecheck
 
-# AI service syntax
-cd apps/ai-service && python -m py_compile main.py
+# AI service tests
+conda run -n edunexus-ai uv sync --project apps/ai-service --python 3.12 --group dev
+conda run -n edunexus-ai uv run --project apps/ai-service --python 3.12 pytest -q
+
+# Acceptance smoke (requires services up)
+bash scripts/acceptance-smoke.sh
 ```
 
 ## 10) API Contract & Docs | 接口与文档
