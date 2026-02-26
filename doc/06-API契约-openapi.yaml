@@ -1,0 +1,1091 @@
+openapi: 3.1.0
+info:
+  title: EduNexus AI API Contract
+  version: 1.0.0
+  description: |
+    EduNexus AI MVP 接口契约。
+    本文件是前端、后端、AI 服务联调与代码生成的唯一接口基线。
+servers:
+  - url: /api/v1
+    description: Base URL
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Student-Chat
+  - name: Student-Exercise
+  - name: Student-AIQuestions
+  - name: Teacher-Knowledge
+  - name: Teacher-Plan
+  - name: Teacher-Analytics
+  - name: Admin
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: 用户注册（学生/教师）
+      security: []
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 用户登录
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: 登录成功
+                    data:
+                      accessToken: token
+                      refreshToken: refresh
+                      user:
+                        id: 00000000-0000-0000-0000-000000000001
+                        username: student01
+                        role: STUDENT
+                    traceId: trace-xxx
+                    timestamp: '2026-02-26T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: 退出登录
+      operationId: logout
+      responses:
+        '200':
+          description: 退出成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新 Access Token
+      security: []
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: 获取当前用户信息
+      operationId: getMe
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /student/chat/session:
+    post:
+      tags: [Student-Chat]
+      summary: 新建聊天会话
+      operationId: createChatSession
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/chat/sessions:
+    get:
+      tags: [Student-Chat]
+      summary: 获取聊天会话列表
+      operationId: listChatSessions
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/chat/session/{sessionId}:
+    get:
+      tags: [Student-Chat]
+      summary: 获取会话详情
+      operationId: getChatSessionDetail
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Student-Chat]
+      summary: 删除会话（软删除）
+      operationId: deleteChatSession
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /student/chat/session/{sessionId}/message:
+    post:
+      tags: [Student-Chat]
+      summary: 向会话发送消息（支持 SSE）
+      operationId: sendChatMessage
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatSendRequest'
+      responses:
+        '200':
+          description: 响应成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  data: {"delta":"力的公式是 F=ma","citations":[{"title":"physics_ch3.pdf","score":0.92}]}
+                  data: [DONE]
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /student/exercise/questions:
+    get:
+      tags: [Student-Exercise]
+      summary: 获取练习题列表
+      operationId: listExerciseQuestions
+      parameters:
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - name: difficulty
+          in: query
+          schema:
+            type: string
+            enum: [EASY, MEDIUM, HARD]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/exercise/submit:
+    post:
+      tags: [Student-Exercise]
+      summary: 提交练习答案并自动判分
+      operationId: submitExerciseAnswers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExerciseSubmitRequest'
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/exercise/{recordId}/analysis:
+    get:
+      tags: [Student-Exercise]
+      summary: 查看练习解析
+      operationId: getExerciseAnalysis
+      parameters:
+        - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/exercise/wrong-questions:
+    get:
+      tags: [Student-Exercise]
+      summary: 获取错题本
+      operationId: listWrongQuestions
+      parameters:
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, MASTERED]
+            default: ACTIVE
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/exercise/wrong-questions/{questionId}:
+    delete:
+      tags: [Student-Exercise]
+      summary: 从错题本移除（标记已掌握）
+      operationId: removeWrongQuestion
+      parameters:
+        - $ref: '#/components/parameters/QuestionId'
+      responses:
+        '200':
+          description: 移除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/exercise/records:
+    get:
+      tags: [Student-Exercise]
+      summary: 获取做题记录
+      operationId: listExerciseRecords
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/ai-questions/generate:
+    post:
+      tags: [Student-AIQuestions]
+      summary: 生成 AI 个性化题目
+      operationId: generateAiQuestions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiQuestionGenerateRequest'
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/ai-questions:
+    get:
+      tags: [Student-AIQuestions]
+      summary: 获取 AI 出题历史
+      operationId: listAiQuestionSessions
+      parameters:
+        - name: subject
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/ai-questions/submit:
+    post:
+      tags: [Student-AIQuestions]
+      summary: 提交 AI 题目答案
+      operationId: submitAiQuestions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiQuestionSubmitRequest'
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/ai-questions/{recordId}/analysis:
+    get:
+      tags: [Student-AIQuestions]
+      summary: 获取 AI 题目解析
+      operationId: getAiQuestionAnalysis
+      parameters:
+        - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/knowledge/documents:
+    post:
+      tags: [Teacher-Knowledge]
+      summary: 上传知识库文档
+      operationId: uploadKnowledgeDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '202':
+          description: 已接收并进入处理
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    get:
+      tags: [Teacher-Knowledge]
+      summary: 获取知识库文档列表
+      operationId: listKnowledgeDocuments
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [UPLOADING, PARSING, EMBEDDING, READY, FAILED]
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/knowledge/documents/{documentId}:
+    delete:
+      tags: [Teacher-Knowledge]
+      summary: 删除知识库文档并级联删除向量
+      operationId: deleteKnowledgeDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/plans/generate:
+    post:
+      tags: [Teacher-Plan]
+      summary: 生成 AI 教案
+      operationId: generateLessonPlan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanGenerateRequest'
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/plans:
+    get:
+      tags: [Teacher-Plan]
+      summary: 获取教案列表
+      operationId: listLessonPlans
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/plans/{planId}:
+    put:
+      tags: [Teacher-Plan]
+      summary: 更新教案
+      operationId: updateLessonPlan
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    delete:
+      tags: [Teacher-Plan]
+      summary: 删除教案
+      operationId: deleteLessonPlan
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/plans/{planId}/export:
+    get:
+      tags: [Teacher-Plan]
+      summary: 导出教案
+      operationId: exportLessonPlan
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [md, pdf]
+      responses:
+        '200':
+          description: 导出成功
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /teacher/plans/{planId}/share:
+    post:
+      tags: [Teacher-Plan]
+      summary: 生成教案分享链接
+      operationId: shareLessonPlan
+      parameters:
+        - $ref: '#/components/parameters/PlanId'
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 200
+                message: success
+                data:
+                  planId: 00000000-0000-0000-0000-000000000100
+                  shareToken: abcdef123456
+                  shareUrl: /api/v1/teacher/plans/shared/abcdef123456
+                traceId: trace-xxx
+                timestamp: '2026-02-26T10:00:00Z'
+
+  /teacher/plans/shared/{shareToken}:
+    get:
+      tags: [Teacher-Plan]
+      summary: 通过分享令牌访问教案
+      security: []
+      operationId: getSharedLessonPlan
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /teacher/students/{studentId}/analytics:
+    get:
+      tags: [Teacher-Analytics]
+      summary: 获取学生学情分析
+      operationId: getStudentAnalytics
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/suggestions:
+    post:
+      tags: [Teacher-Analytics]
+      summary: 创建教师建议
+      operationId: createTeacherSuggestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeacherSuggestionRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: 获取用户列表
+      operationId: listUsers
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [STUDENT, TEACHER, ADMIN]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, DISABLED]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: [Admin]
+      summary: 创建用户
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserCreateRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /admin/users/{userId}:
+    patch:
+      tags: [Admin]
+      summary: 更新用户状态或角色
+      operationId: patchUser
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserPatchRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /admin/resources:
+    get:
+      tags: [Admin]
+      summary: 获取资源列表（教案/题库/文档）
+      operationId: listResources
+      parameters:
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+            enum: [LESSON_PLAN, QUESTION, DOCUMENT]
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /admin/resources/{resourceId}/download:
+    get:
+      tags: [Admin]
+      summary: 下载资源
+      operationId: downloadResource
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: 下载成功
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /admin/audits:
+    get:
+      tags: [Admin]
+      summary: 获取审计日志
+      operationId: listAudits
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /admin/dashboard/metrics:
+    get:
+      tags: [Admin]
+      summary: 平台指标看板
+      operationId: getAdminDashboardMetrics
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RecordId:
+      name: recordId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    QuestionId:
+      name: questionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PlanId:
+      name: planId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StudentId:
+      name: studentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ResourceId:
+      name: resourceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 400
+            message: 参数错误
+            data: null
+            traceId: trace-xxx
+            timestamp: '2026-02-26T10:00:00Z'
+    Unauthorized:
+      description: 未认证或 token 失效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 401
+            message: 未认证
+            data: null
+            traceId: trace-xxx
+            timestamp: '2026-02-26T10:00:00Z'
+    Forbidden:
+      description: 无权限
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 403
+            message: 无权限访问
+            data: null
+            traceId: trace-xxx
+            timestamp: '2026-02-26T10:00:00Z'
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 404
+            message: 资源不存在
+            data: null
+            traceId: trace-xxx
+            timestamp: '2026-02-26T10:00:00Z'
+
+  schemas:
+    ApiResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          description: 具体业务数据
+        traceId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    RegisterRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          minLength: 8
+          maxLength: 64
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 20
+        role:
+          type: string
+          enum: [STUDENT, TEACHER]
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    ChatSendRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    ExerciseSubmitRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [questionId, userAnswer]
+            properties:
+              questionId:
+                type: string
+                format: uuid
+              userAnswer:
+                type: string
+
+    AiQuestionGenerateRequest:
+      type: object
+      required: [count, subject]
+      properties:
+        count:
+          type: integer
+          minimum: 1
+          maximum: 20
+        subject:
+          type: string
+        difficulty:
+          type: string
+          enum: [EASY, MEDIUM, HARD]
+        conceptTags:
+          type: array
+          items:
+            type: string
+
+    AiQuestionSubmitRequest:
+      type: object
+      required: [sessionId, answers]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        answers:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [questionId, userAnswer]
+            properties:
+              questionId:
+                type: string
+                format: uuid
+              userAnswer:
+                type: string
+
+    PlanGenerateRequest:
+      type: object
+      required: [topic, gradeLevel, durationMins]
+      properties:
+        topic:
+          type: string
+        gradeLevel:
+          type: string
+        durationMins:
+          type: integer
+          minimum: 10
+          maximum: 180
+
+    PlanUpdateRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+
+    TeacherSuggestionRequest:
+      type: object
+      required: [studentId, suggestion]
+      properties:
+        studentId:
+          type: string
+          format: uuid
+        questionId:
+          type: string
+          format: uuid
+        knowledgePoint:
+          type: string
+        suggestion:
+          type: string
+          minLength: 1
+          maxLength: 2000
+
+    AdminUserCreateRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [STUDENT, TEACHER, ADMIN]
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+
+    AdminUserPatchRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [STUDENT, TEACHER, ADMIN]
+        status:
+          type: string
+          enum: [ACTIVE, DISABLED]

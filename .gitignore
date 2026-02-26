@@ -1,0 +1,22 @@
+.env
+
+# Java
+apps/api/target/
+apps/api/data/
+apps/api/.classpath
+apps/api/.project
+apps/api/.settings/
+*.log
+
+# Python
+apps/ai-service/__pycache__/
+*.pyc
+
+# Web
+apps/web/node_modules/
+apps/web/dist/
+
+# IDE
+.idea/
+.vscode/
+*.iml
