@@ -2,6 +2,7 @@ package com.edunexus.api.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -60,7 +61,9 @@ public class AiClient {
                 RestClient.RequestBodySpec req = client.post()
                         .uri(baseUrl + path)
                         .header("X-Service-Token", serviceToken)
-                        .header("X-Trace-Id", traceId);
+                        .header("X-Trace-Id", traceId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON);
                 if (!idemKey.isBlank()) {
                     req = req.header("Idempotency-Key", idemKey);
                 }

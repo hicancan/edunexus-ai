@@ -39,8 +39,8 @@ if is_port_in_use "${AI_PORT}"; then
 else
   (
     cd "$(dirname "$0")/../apps/ai-service" &&
-    conda run -n edunexus-ai uv sync --project . --python 3.12 &&
-    conda run -n edunexus-ai uv run --project . --python 3.12 uvicorn ai_service.app:app --host "${HOST_BIND}" --port "${AI_PORT}"
+    conda run --no-capture-output -n edunexus-ai uv sync --project . --python 3.12 &&
+    conda run --no-capture-output -n edunexus-ai uv run --project . --python 3.12 uvicorn ai_service.app:app --host "${HOST_BIND}" --port "${AI_PORT}"
   ) &
 fi
 
