@@ -106,6 +106,7 @@
 
 ## 6.1 Provider 级路由
 
+- `LLM_PROVIDER=auto`：自动路由（简单问题走本地 Ollama，复杂问题优先云端 DeepSeek）。
 - `LLM_PROVIDER=gemini`：优先 Google AI Studio / Gemini。
 - `LLM_PROVIDER=openai`：优先 OpenAI。
 - `LLM_PROVIDER=deepseek`：优先 DeepSeek API。
@@ -113,16 +114,18 @@
 
 ## 6.2 场景级路由
 
-1. 聊天 RAG：优先高稳定模型（如 `gemini-2.0-flash`）。
-2. 错题解析：优先推理能力更强模型（如 `gemini-1.5-pro` 或等价）。
-3. AI 出题：优先结构化输出稳定模型。
-4. 教案生成：优先长文本组织能力强模型。
+1. 在 `auto` 模式下，先做复杂度判定（关键词 + 输入长度）：
+   - `simple`：优先 `ollama`（本地低成本快速响应）
+   - `complex`：优先 `deepseek`（云端推理能力更强）
+2. 聊天 RAG 场景在 provider 内继续做模型细分（simple/complex 模型名分流）。
+3. 错题解析、AI 出题、教案生成按场景参数模板执行，优先使用当前 provider 的默认模型。
+4. 所有场景都必须保留可观测字段：provider/model/latency/tokens/hit_kb/chunk_ids/traceId。
 
 ## 6.3 降级策略
 
-1. 云模型超时/限流：切到备用云模型。
-2. 备用云仍失败：切到本地 Ollama（若可用）。
-3. 最终兜底：返回“服务繁忙”且保留重试按钮。
+1. `auto` 模式主路径：`complex -> deepseek`，`simple -> ollama`。
+2. 主 provider 超时/限流/鉴权失败：按可用性回退到其他 provider（优先 ollama）。
+3. 备用 provider 仍失败：返回“服务繁忙”并保留重试按钮。
 
 ## 7. 安全与防护
 

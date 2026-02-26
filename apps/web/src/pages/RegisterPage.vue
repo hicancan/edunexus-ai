@@ -36,24 +36,85 @@ async function submit() {
 </script>
 
 <template>
-  <div class="container" style="max-width: 560px; padding-top: 48px">
-    <div class="card">
-      <h2>注册账号</h2>
-      <p>仅支持学生/教师注册，管理员由平台创建。</p>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <input v-model="username" placeholder="用户名（3-50位）" />
-        <input v-model="password" type="password" placeholder="密码（至少8位）" />
-        <select v-model="role">
-          <option value="STUDENT">STUDENT</option>
-          <option value="TEACHER">TEACHER</option>
-        </select>
-        <input v-model="email" placeholder="邮箱（可选）" />
-        <input v-model="phone" placeholder="手机号（可选）" />
-        <button :disabled="loading" @click="submit">{{ loading ? "提交中..." : "注册" }}</button>
-        <button style="background:#495057" @click="router.push('/login')">返回登录</button>
+  <div class="container register-wrap">
+    <section class="card register-card fade-up">
+      <div class="register-header">
+        <h2>创建 EduNexus 账号</h2>
+        <p class="muted">学生和教师可自助注册，管理员账号由平台统一创建。</p>
       </div>
-      <p v-if="error" style="color:#e03131">{{ error }}</p>
-      <p v-if="success" style="color:#2f9e44">{{ success }}</p>
-    </div>
+
+      <div class="row">
+        <div>
+          <label>用户名</label>
+          <input v-model="username" placeholder="3-50 位，支持字母数字" />
+        </div>
+        <div>
+          <label>身份类型</label>
+          <select v-model="role">
+            <option value="STUDENT">学生 STUDENT</option>
+            <option value="TEACHER">教师 TEACHER</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>密码</label>
+          <input v-model="password" type="password" placeholder="至少 8 位" />
+        </div>
+        <div>
+          <label>手机号（可选）</label>
+          <input v-model="phone" placeholder="用于找回账号" />
+        </div>
+      </div>
+
+      <div>
+        <label>邮箱（可选）</label>
+        <input v-model="email" placeholder="例如：name@school.edu.cn" />
+      </div>
+
+      <div class="action-row">
+        <button :disabled="loading" @click="submit">{{ loading ? "提交中..." : "立即注册" }}</button>
+        <button class="btn-secondary" @click="router.push('/login')">返回登录</button>
+      </div>
+
+      <p v-if="error" class="status-error">{{ error }}</p>
+      <p v-if="success" class="status-success">{{ success }}</p>
+    </section>
   </div>
 </template>
+
+<style scoped>
+.register-wrap {
+  max-width: 860px;
+  padding-top: 34px;
+}
+
+.register-card {
+  padding: 24px;
+}
+
+.register-header h2 {
+  margin: 0;
+}
+
+.register-header p {
+  margin: 8px 0 14px;
+}
+
+.action-row {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .register-wrap {
+    padding-top: 10px;
+  }
+
+  .action-row {
+    flex-direction: column;
+  }
+}
+</style>

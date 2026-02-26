@@ -1,4 +1,5 @@
 server:
+  address: ${APP_HOST:0.0.0.0}
   port: ${APP_PORT:8080}
 
 spring:
@@ -30,6 +31,14 @@ app:
   jwt-expires-in: ${JWT_EXPIRES_IN:15m}
   refresh-token-expires-in: ${REFRESH_TOKEN_EXPIRES_IN:14d}
   ai-service-base-url: http://127.0.0.1:${AI_SERVICE_PORT:8000}
+  cors-allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://127.0.0.1:5173,http://localhost:5173,http://*:5173}
+  s3:
+    endpoint: ${S3_ENDPOINT:http://127.0.0.1:9000}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    bucket: ${S3_BUCKET:edunexus-kb}
+    force-path-style: ${S3_FORCE_PATH_STYLE:true}
 
 logging:
   level:

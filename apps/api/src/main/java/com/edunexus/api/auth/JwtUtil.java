@@ -46,6 +46,7 @@ public class JwtUtil {
     public String generateRefreshToken(String subject) {
         Instant now = Instant.now();
         return Jwts.builder()
+                .claim("jti", UUID.randomUUID().toString())
                 .subject(subject)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(refreshDays, ChronoUnit.DAYS)))

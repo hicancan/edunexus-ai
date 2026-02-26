@@ -1,5 +1,6 @@
 package com.edunexus.api.service;
 
+import com.edunexus.api.common.ResourceNotFoundException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,7 @@ public class DbService {
 
     public Map<String, Object> one(String sql, Object... args) {
         List<Map<String, Object>> rows = list(sql, args);
-        if (rows.isEmpty()) throw new IllegalArgumentException("资源不存在");
+        if (rows.isEmpty()) throw new ResourceNotFoundException("资源不存在");
         return rows.getFirst();
     }
 

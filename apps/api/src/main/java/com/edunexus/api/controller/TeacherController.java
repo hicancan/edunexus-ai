@@ -3,9 +3,20 @@ package com.edunexus.api.controller;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.DbService;
+import com.edunexus.api.service.ObjectStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,10 +38,12 @@ import java.util.*;
 public class TeacherController implements ControllerSupport {
     private final DbService db;
     private final AiClient aiClient;
+    private final ObjectStorageService storage;
 
-    public TeacherController(DbService db, AiClient aiClient) {
+    public TeacherController(DbService db, AiClient aiClient, ObjectStorageService storage) {
         this.db = db;
         this.aiClient = aiClient;
+        this.storage = storage;
     }
 
     @PostMapping("/knowledge/documents")
@@ -44,14 +58,14 @@ public class TeacherController implements ControllerSupport {
         }
         String fileType = Optional.ofNullable(file.getContentType()).orElse("application/octet-stream");
         long fileSize = file.getSize();
+        byte[] fileBytes = file.getBytes();
         UUID docId = db.newId();
-        Path uploadDir = Paths.get("data", "uploads");
-        Files.createDirectories(uploadDir);
-        Path storage = uploadDir.resolve(docId + "-" + fileName);
-        file.transferTo(storage);
+        String storagePath = storage.upload(fileName, fileType, fileBytes);
+        Path tempPath = Files.createTempFile("edunexus-kb-" + docId, "-" + safeFilename(fileName));
+        Files.write(tempPath, fileBytes);
 
         db.update("insert into documents(id,teacher_id,filename,file_type,file_size,storage_path,status) values (?,?,?,?,?,?,?)",
-                docId, currentUser().userId(), fileName, fileType, fileSize, storage.toAbsolutePath().toString(), "UPLOADING");
+                docId, currentUser().userId(), fileName, fileType, fileSize, storagePath, "UPLOADING");
         try {
             db.update("update documents set status='PARSING',updated_at=now() where id=?", docId);
             db.update("update documents set status='EMBEDDING',updated_at=now() where id=?", docId);
@@ -59,7 +73,8 @@ public class TeacherController implements ControllerSupport {
                     "document_id", docId.toString(),
                     "teacher_id", currentUser().userId().toString(),
                     "filename", fileName,
-                    "file_path", storage.toAbsolutePath().toString()
+                    "file_path", tempPath.toAbsolutePath().toString(),
+                    "trace_id", trace(request)
             ));
             db.update("update documents set status='READY',updated_at=now() where id=?", docId);
             return ResponseEntity.status(202).body(ApiResponse.accepted(Map.of(
@@ -71,6 +86,8 @@ public class TeacherController implements ControllerSupport {
         } catch (Exception ex) {
             db.update("update documents set status='FAILED',error_message=?,updated_at=now() where id=?", ex.getMessage(), docId);
             throw ex;
+        } finally {
+            Files.deleteIfExists(tempPath);
         }
     }
 
@@ -91,8 +108,18 @@ public class TeacherController implements ControllerSupport {
     @DeleteMapping("/knowledge/documents/{documentId}")
     public ResponseEntity<ApiResponse> deleteDocument(@PathVariable("documentId") UUID documentId, HttpServletRequest request) {
         requireRole("TEACHER");
-        ensureDocOwner(documentId);
+        Map<String, Object> doc = ensureDocOwner(documentId);
         aiClient.deleteKb(Map.of("document_id", documentId.toString()));
+        String storagePath = String.valueOf(doc.get("storage_path"));
+        if (storagePath.startsWith("s3://")) {
+            storage.delete(storagePath);
+        } else {
+            try {
+                Files.deleteIfExists(Paths.get(storagePath));
+            } catch (IOException ignored) {
+                // ignore local cleanup failure
+            }
+        }
         db.update("update documents set deleted_at=now(),updated_at=now() where id=?", documentId);
         return ResponseEntity.ok(ApiResponse.ok(null, trace(request)));
     }
@@ -105,6 +132,7 @@ public class TeacherController implements ControllerSupport {
                 "topic", req.topic(),
                 "grade_level", req.gradeLevel(),
                 "duration_mins", req.durationMins(),
+                "trace_id", trace(request),
                 "scene", "lesson_plan"
         ));
         String content = String.valueOf(aiResp.getOrDefault("content", "# Lesson Plan\n生成失败"));
@@ -120,7 +148,7 @@ public class TeacherController implements ControllerSupport {
                                                  HttpServletRequest request) {
         requireRole("TEACHER");
         int offset = (page - 1) * size;
-        List<Map<String, Object>> list = db.list("select id,topic,grade_level as \"gradeLevel\",duration_mins as \"durationMins\",updated_at as \"updatedAt\",is_shared as \"isShared\" from lesson_plans where teacher_id=? and deleted_at is null order by updated_at desc limit ? offset ?",
+        List<Map<String, Object>> list = db.list("select id,topic,grade_level as \"gradeLevel\",duration_mins as \"durationMins\",content_md as content,updated_at as \"updatedAt\",is_shared as \"isShared\" from lesson_plans where teacher_id=? and deleted_at is null order by updated_at desc limit ? offset ?",
                 currentUser().userId(), size, offset);
         return ResponseEntity.ok(ApiResponse.ok(Map.of("list", list, "page", page, "size", size), trace(request)));
     }
@@ -152,7 +180,10 @@ public class TeacherController implements ControllerSupport {
         }
         Map<String, Object> row = db.one("select id,topic,content_md from lesson_plans where id=?", planId);
         String filename = safeFilename(String.valueOf(row.get("topic"))) + "." + format;
-        byte[] bytes = String.valueOf(row.get("content_md")).getBytes(StandardCharsets.UTF_8);
+        String content = String.valueOf(row.get("content_md"));
+        byte[] bytes = "pdf".equals(format)
+                ? renderPdf(String.valueOf(row.get("topic")), content)
+                : content.getBytes(StandardCharsets.UTF_8);
         MediaType mediaType = "pdf".equals(format)
                 ? MediaType.APPLICATION_PDF
                 : MediaType.parseMediaType("text/markdown; charset=UTF-8");
@@ -205,6 +236,9 @@ public class TeacherController implements ControllerSupport {
     @PostMapping("/suggestions")
     public ResponseEntity<ApiResponse> createSuggestion(@Valid @RequestBody SuggestionReq req, HttpServletRequest request) {
         requireRole("TEACHER");
+        if ((req.questionId() == null || req.questionId().isBlank()) && (req.knowledgePoint() == null || req.knowledgePoint().isBlank())) {
+            throw new IllegalArgumentException("questionId 与 knowledgePoint 至少填写一个");
+        }
         UUID studentId = UUID.fromString(req.studentId());
         ensureStudentLinked(studentId);
         UUID id = db.newId();
@@ -218,9 +252,10 @@ public class TeacherController implements ControllerSupport {
         return ResponseEntity.ok(ApiResponse.ok(Map.of("id", id), trace(request)));
     }
 
-    private void ensureDocOwner(UUID docId) {
-        Map<String, Object> row = db.one("select teacher_id from documents where id=?", docId);
+    private Map<String, Object> ensureDocOwner(UUID docId) {
+        Map<String, Object> row = db.one("select teacher_id,storage_path from documents where id=?", docId);
         if (!currentUser().userId().equals(row.get("teacher_id"))) throw new SecurityException("无权限");
+        return row;
     }
 
     private void ensurePlanOwner(UUID planId) {
@@ -241,7 +276,83 @@ public class TeacherController implements ControllerSupport {
         return name.replaceAll("[^a-zA-Z0-9._-\\u4e00-\\u9fa5]", "_");
     }
 
-    public record PlanGenerateReq(@NotBlank String topic, @NotBlank String gradeLevel, int durationMins) {}
+    private byte[] renderPdf(String title, String markdown) {
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+
+            float margin = 50;
+            float y = page.getMediaBox().getHeight() - margin;
+            float leading = 16;
+            PDFont titleFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+            PDFont bodyFont = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+            Path cjkFont = Paths.get("C:/Windows/Fonts/simsun.ttc");
+            if (Files.exists(cjkFont)) {
+                try (var in = Files.newInputStream(cjkFont)) {
+                    bodyFont = PDType0Font.load(document, in, true);
+                    titleFont = bodyFont;
+                }
+            }
+
+            PDPageContentStream stream = new PDPageContentStream(document, page);
+            try {
+                stream.setFont(titleFont, 14);
+                stream.beginText();
+                stream.newLineAtOffset(margin, y);
+                stream.showText(safePdfText(title, bodyFont instanceof PDType0Font));
+                stream.endText();
+
+                stream.setFont(bodyFont, 11);
+                y -= leading * 2;
+                for (String line : wrapLines(markdown, 95)) {
+                    if (y < margin) {
+                        stream.close();
+                        page = new PDPage(PDRectangle.A4);
+                        document.addPage(page);
+                        stream = new PDPageContentStream(document, page);
+                        stream.setFont(bodyFont, 11);
+                        y = page.getMediaBox().getHeight() - margin;
+                    }
+                    stream.beginText();
+                    stream.newLineAtOffset(margin, y);
+                    stream.showText(safePdfText(line, bodyFont instanceof PDType0Font));
+                    stream.endText();
+                    y -= leading;
+                }
+            } finally {
+                stream.close();
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            document.save(out);
+            return out.toByteArray();
+        } catch (IOException ex) {
+            throw new RuntimeException("PDF 导出失败", ex);
+        }
+    }
+
+    private List<String> wrapLines(String text, int width) {
+        List<String> lines = new ArrayList<>();
+        for (String raw : text.replace("\r", "").split("\n")) {
+            if (raw.isEmpty()) {
+                lines.add(" ");
+                continue;
+            }
+            int start = 0;
+            while (start < raw.length()) {
+                int end = Math.min(raw.length(), start + width);
+                lines.add(raw.substring(start, end));
+                start = end;
+            }
+        }
+        return lines;
+    }
+
+    private String safePdfText(String text, boolean cjkEnabled) {
+        return cjkEnabled ? text : text.replaceAll("[^\\x20-\\x7E]", "?");
+    }
+
+    public record PlanGenerateReq(@NotBlank String topic, @NotBlank String gradeLevel, @Min(10) @Max(180) int durationMins) {}
     public record PlanUpdateReq(@NotBlank String content) {}
     public record SuggestionReq(@NotBlank String studentId, String questionId, String knowledgePoint, @NotBlank String suggestion) {}
 }

@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 import App from "./App.vue";
 import { useAuthStore } from "./stores/auth";
 import LoginPage from "./pages/LoginPage.vue";
@@ -11,7 +11,7 @@ import AdminPage from "./pages/AdminPage.vue";
 import ForbiddenPage from "./pages/ForbiddenPage.vue";
 import NotFoundPage from "./pages/NotFoundPage.vue";
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   { path: "/", redirect: "/login" },
   { path: "/login", component: LoginPage },
   { path: "/register", component: RegisterPage },
@@ -53,7 +53,7 @@ app.use(pinia);
 router.beforeEach((to) => {
   const auth = useAuthStore();
   const publicPaths = new Set(["/login", "/register", "/403", "/404"]);
-  const roleHome = {
+  const roleHome: Record<string, string> = {
     STUDENT: "/student/chat",
     TEACHER: "/teacher/knowledge",
     ADMIN: "/admin/users"

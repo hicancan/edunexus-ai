@@ -2,6 +2,7 @@ package com.edunexus.api.controller;
 
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.service.DbService;
+import com.edunexus.api.service.ObjectStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -23,10 +24,12 @@ import java.util.UUID;
 public class AdminController implements ControllerSupport {
     private final DbService db;
     private final PasswordEncoder encoder;
+    private final ObjectStorageService storage;
 
-    public AdminController(DbService db, PasswordEncoder encoder) {
+    public AdminController(DbService db, PasswordEncoder encoder, ObjectStorageService storage) {
         this.db = db;
         this.encoder = encoder;
+        this.storage = storage;
     }
 
     @GetMapping("/users")
@@ -61,6 +64,7 @@ public class AdminController implements ControllerSupport {
         UUID id = db.newId();
         db.update("insert into users(id,username,password_hash,email,phone,role,status) values (?,?,?,?,?,?,?)",
                 id, req.username(), encoder.encode(req.password()), req.email(), req.phone(), req.role(), "ACTIVE");
+        audit("CREATE_USER", "USER", id.toString());
         return ResponseEntity.status(201).body(ApiResponse.created(Map.of("id", id), trace(request)));
     }
 
@@ -71,6 +75,7 @@ public class AdminController implements ControllerSupport {
         String role = req.role() == null || req.role().isBlank() ? String.valueOf(user.get("role")) : req.role();
         String status = req.status() == null || req.status().isBlank() ? String.valueOf(user.get("status")) : req.status();
         db.update("update users set role=?,status=?,updated_at=now() where id=?", role, status, userId);
+        audit("PATCH_USER", "USER", userId.toString());
         return ResponseEntity.ok(ApiResponse.ok(Map.of("id", userId, "role", role, "status", status), trace(request)));
     }
 
@@ -103,14 +108,18 @@ public class AdminController implements ControllerSupport {
         } else if (db.exists("select 1 from documents where id=?", resourceId)) {
             Map<String, Object> data = db.one("select filename,storage_path from documents where id=?", resourceId);
             String path = String.valueOf(data.get("storage_path"));
-            java.nio.file.Path file = java.nio.file.Paths.get(path);
-            if (!java.nio.file.Files.exists(file)) {
-                throw new IllegalArgumentException("资源文件不存在");
-            }
-            try {
-                bytes = java.nio.file.Files.readAllBytes(file);
-            } catch (java.io.IOException e) {
-                throw new RuntimeException(e);
+            if (path.startsWith("s3://")) {
+                bytes = storage.download(path);
+            } else {
+                java.nio.file.Path file = java.nio.file.Paths.get(path);
+                if (!java.nio.file.Files.exists(file)) {
+                    throw new IllegalArgumentException("资源文件不存在");
+                }
+                try {
+                    bytes = java.nio.file.Files.readAllBytes(file);
+                } catch (java.io.IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
             filename = safeFilename(String.valueOf(data.get("filename")));
             contentType = MediaType.APPLICATION_OCTET_STREAM;

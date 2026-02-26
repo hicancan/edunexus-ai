@@ -11,6 +11,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -70,7 +72,7 @@ public class StudentController implements ControllerSupport {
 
     @PostMapping("/chat/session/{sessionId}/message")
     @Transactional
-    public ResponseEntity<ApiResponse> sendMessage(@PathVariable("sessionId") UUID sessionId, @Valid @RequestBody ChatSendReq req, HttpServletRequest request) {
+    public ResponseEntity<?> sendMessage(@PathVariable("sessionId") UUID sessionId, @Valid @RequestBody ChatSendReq req, HttpServletRequest request) {
         requireRole("STUDENT");
         ensureSessionOwner(sessionId, currentUser());
         UUID userMsgId = db.newId();
@@ -81,6 +83,7 @@ public class StudentController implements ControllerSupport {
         aiReq.put("student_id", currentUser().userId().toString());
         aiReq.put("session_id", sessionId.toString());
         aiReq.put("message", req.message());
+        aiReq.put("trace_id", trace(request));
         aiReq.put("scene", "chat_rag");
         List<Map<String, Object>> rel = db.list("select teacher_id from student_teacher_relations where student_id=? order by created_at asc limit 1", currentUser().userId());
         if (!rel.isEmpty()) {
@@ -101,6 +104,14 @@ public class StudentController implements ControllerSupport {
                 "timestamp", Instant.now().toString()
         );
         updateSessionTitleIfNeeded(sessionId);
+
+        String accept = Optional.ofNullable(request.getHeader("Accept")).orElse("");
+        if (accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
+            String streamPayload = "data: " + toJson(Map.of("delta", answer, "citations", citations)) + "\n\n"
+                    + "data: [DONE]\n\n";
+            return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(streamPayload);
+        }
+
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -139,6 +150,9 @@ public class StudentController implements ControllerSupport {
         String subject = null;
         List<Map<String, Object>> results = new ArrayList<>();
 
+        db.update("insert into exercise_records(id,student_id,subject,total_questions,correct_count,total_score,time_spent) values (?,?,?,?,?,?,?)",
+                recordId, currentUser().userId(), null, req.answers().size(), 0, 0, req.timeSpent() == null ? 0 : req.timeSpent());
+
         for (AnswerItem ans : req.answers()) {
             Map<String, Object> q = db.one("select id,subject,correct_answer,analysis,score from questions where id=?", UUID.fromString(ans.questionId()));
             if (subject == null) subject = String.valueOf(q.get("subject"));
@@ -170,8 +184,8 @@ public class StudentController implements ControllerSupport {
             ));
         }
 
-        db.update("insert into exercise_records(id,student_id,subject,total_questions,correct_count,total_score,time_spent) values (?,?,?,?,?,?,?)",
-                recordId, currentUser().userId(), subject, req.answers().size(), correctCount, totalScore, req.timeSpent() == null ? 0 : req.timeSpent());
+        db.update("update exercise_records set subject=?,correct_count=?,total_score=? where id=?",
+                subject, correctCount, totalScore, recordId);
 
         Map<String, Object> data = Map.of(
                 "recordId", recordId,
@@ -192,7 +206,10 @@ public class StudentController implements ControllerSupport {
         List<Map<String, Object>> items = db.list("""
                 select i.question_id as \"questionId\", q.content, q.options, i.user_answer as \"userAnswer\", i.correct_answer as \"correctAnswer\",
                        i.is_correct as \"isCorrect\", coalesce(i.analysis,q.analysis) as analysis, q.knowledge_points as \"knowledgePoints\",
-                       (select suggestion from teacher_suggestions s where s.student_id=? and (s.question_id=i.question_id or s.knowledge_point is not null)
+                       (select suggestion from teacher_suggestions s where s.student_id=? and (
+                            s.question_id=i.question_id
+                            or (s.knowledge_point is not null and jsonb_exists(q.knowledge_points, s.knowledge_point))
+                        )
                           order by s.created_at desc limit 1) as \"teacherSuggestion\"
                 from exercise_record_items i join questions q on i.question_id=q.id
                 where i.record_id=? order by i.created_at
@@ -217,7 +234,10 @@ public class StudentController implements ControllerSupport {
         String sql = """
                 select w.id, w.question_id as \"questionId\", q.subject, q.content, w.wrong_count as \"wrongCount\", w.last_wrong_time as \"lastWrongTime\",
                        q.knowledge_points as \"knowledgePoints\",
-                       (select suggestion from teacher_suggestions s where s.student_id=w.student_id and (s.question_id=w.question_id or s.knowledge_point is not null)
+                       (select suggestion from teacher_suggestions s where s.student_id=w.student_id and (
+                            s.question_id=w.question_id
+                            or (s.knowledge_point is not null and jsonb_exists(q.knowledge_points, s.knowledge_point))
+                        )
                           order by s.created_at desc limit 1) as \"teacherSuggestion\"
                 from wrong_book w join questions q on w.question_id=q.id
                 where w.student_id=? and w.status=?
@@ -273,14 +293,19 @@ public class StudentController implements ControllerSupport {
     public ResponseEntity<ApiResponse> generateAiQuestions(@Valid @RequestBody AiGenerateReq req, HttpServletRequest request) {
         requireRole("STUDENT");
         String difficulty = req.difficulty() == null || req.difficulty().isBlank() ? "MEDIUM" : req.difficulty();
-        UUID sessionId = db.newId();
-        db.update("insert into ai_question_sessions(id,student_id,subject,difficulty,question_count,context_snapshot) values (?,?,?,?,?,?::jsonb)",
-                sessionId, currentUser().userId(), req.subject(), difficulty, req.count(), "{}");
         List<Map<String, Object>> wrong = db.list("""
                 select q.knowledge_points from wrong_book w join questions q on w.question_id=q.id
                 where w.student_id=? and w.status='ACTIVE' order by w.last_wrong_time desc limit 20
                 """, currentUser().userId());
         List<Map<String, Object>> suggestions = db.list("select suggestion,knowledge_point from teacher_suggestions where student_id=? order by created_at desc limit 10", currentUser().userId());
+        UUID sessionId = db.newId();
+        String contextSnapshot = toJson(Map.of(
+                "wrong_context", wrong,
+                "teacher_suggestions", suggestions,
+                "concept_tags", req.conceptTags() == null ? List.of() : req.conceptTags()
+        ));
+        db.update("insert into ai_question_sessions(id,student_id,subject,difficulty,question_count,context_snapshot) values (?,?,?,?,?,?::jsonb)",
+                sessionId, currentUser().userId(), req.subject(), difficulty, req.count(), contextSnapshot);
         Map<String, Object> aiReq = new HashMap<>();
         aiReq.put("subject", req.subject());
         aiReq.put("difficulty", difficulty);
@@ -288,6 +313,7 @@ public class StudentController implements ControllerSupport {
         aiReq.put("concept_tags", req.conceptTags());
         aiReq.put("wrong_context", wrong);
         aiReq.put("teacher_suggestions", suggestions);
+        aiReq.put("trace_id", trace(request));
         aiReq.put("scene", "ai_question");
         Map<String, Object> aiResp = aiClient.generateQuestions(aiReq);
         List<Map<String, Object>> questions = (List<Map<String, Object>>) aiResp.getOrDefault("questions", List.of());
@@ -431,7 +457,7 @@ public class StudentController implements ControllerSupport {
         }
     }
 
-    public record ChatSendReq(@NotBlank String message) {}
+    public record ChatSendReq(@NotBlank @Size(max = 4000) String message) {}
     public record ExerciseSubmitReq(@NotNull List<@Valid AnswerItem> answers, Integer timeSpent) {}
     public record AiGenerateReq(@Min(1) @Max(20) int count,
                                 @NotBlank String subject,

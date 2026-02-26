@@ -8,9 +8,11 @@ import com.edunexus.api.common.TraceFilter;
 import com.edunexus.api.service.DbService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -55,7 +57,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse> login(@Valid @RequestBody LoginReq req, HttpServletRequest request) {
         Map<String, Object> user = db.one("select id,username,password_hash,role,status from users where username=? and deleted_at is null", req.username());
         String pwd = String.valueOf(user.get("password_hash"));
-        boolean matched = pwd.startsWith("plain:") ? req.password().equals(pwd.substring(6)) : encoder.matches(req.password(), pwd);
+        boolean matched = encoder.matches(req.password(), pwd);
         if (!matched) {
             return ResponseEntity.status(401).body(ApiResponse.error(401, "用户名或密码错误", trace(request)));
         }
@@ -184,10 +186,10 @@ public class AuthController {
     }
 
     public record RegisterReq(
-            @NotBlank String username,
-            @NotBlank String password,
-            String email,
-            String phone,
+            @NotBlank @Size(min = 3, max = 50) String username,
+            @NotBlank @Size(min = 8, max = 64) String password,
+            @Email String email,
+            @Size(max = 20) String phone,
             @NotBlank @Pattern(regexp = "STUDENT|TEACHER") String role
     ) {}
 
