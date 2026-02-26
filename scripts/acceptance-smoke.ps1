@@ -26,7 +26,16 @@ Write-Host "[6/7] Teacher analytics"
 Invoke-RestMethod "$apiBase/api/v1/teacher/students/00000000-0000-0000-0000-000000000003/analytics" -Headers @{ Authorization = "Bearer $teacherToken" } | Out-Null
 
 Write-Host "[7/7] AI internal auth guard"
-$code = (Invoke-WebRequest "$aiBase/internal/v1/ping" -SkipHttpErrorCheck).StatusCode
+try {
+  Invoke-WebRequest "$aiBase/internal/v1/ping" -UseBasicParsing | Out-Null
+  $code = 200
+} catch {
+  if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+    $code = [int]$_.Exception.Response.StatusCode
+  } else {
+    throw
+  }
+}
 if ($code -ne 401) {
   throw "Expected 401 for missing X-Service-Token, got $code"
 }

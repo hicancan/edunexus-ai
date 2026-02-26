@@ -2,47 +2,29 @@ import { apiClient, unwrapResponse } from "./api-client";
 import {
   type AdminResourceVO,
   type AdminUserCreateRequest,
+  type AdminUserPatchRequest,
   type ApiEnvelope,
   type AuditLogVO,
   type DashboardMetricsVO,
   type PagedResult,
+  type ResourceType,
+  type Role,
+  type UserStatus,
   type UserVO,
   normalizePagedResult
 } from "./contracts";
 
-type ResourceType = "LESSON_PLAN" | "QUESTION" | "DOCUMENT";
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
-}
-
-function asString(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback;
-}
-
-function normalizeResource(raw: unknown): AdminResourceVO {
-  const row = asRecord(raw);
-  return {
-    resourceId: asString(row.resourceId || row.id),
-    resourceType: asString(row.resourceType || row.type, "QUESTION") as AdminResourceVO["resourceType"],
-    title: asString(row.title || row.name),
-    creatorId: asString(row.creatorId),
-    creatorUsername: asString(row.creatorUsername),
-    createdAt: asString(row.createdAt || row.updatedAt)
-  };
-}
-
 export interface UserListQuery {
   page?: number;
   size?: number;
-  role?: "STUDENT" | "TEACHER" | "ADMIN";
-  status?: "ACTIVE" | "DISABLED";
+  role?: Role;
+  status?: UserStatus;
 }
 
 export interface ResourceListQuery {
   page?: number;
   size?: number;
-  resourceType: ResourceType;
+  resourceType?: ResourceType;
 }
 
 export interface AuditListQuery {
@@ -60,22 +42,21 @@ export async function createUser(payload: AdminUserCreateRequest): Promise<UserV
   return unwrapResponse(response);
 }
 
-export async function patchUser(userId: string, payload: { role?: string; status?: "ACTIVE" | "DISABLED" }): Promise<UserVO> {
+export async function patchUser(userId: string, payload: AdminUserPatchRequest): Promise<UserVO> {
   const response = await apiClient.patch<ApiEnvelope<UserVO>>(`/admin/users/${userId}`, payload);
   return unwrapResponse(response);
 }
 
-export async function listResources(params: ResourceListQuery): Promise<PagedResult<AdminResourceVO>> {
+export async function listResources(params: ResourceListQuery = {}): Promise<PagedResult<AdminResourceVO>> {
   const response = await apiClient.get<ApiEnvelope<unknown>>("/admin/resources", { params });
-  const paged = normalizePagedResult<unknown>(unwrapResponse(response));
-  return {
-    ...paged,
-    content: paged.content.map(normalizeResource)
-  };
+  return normalizePagedResult<AdminResourceVO>(unwrapResponse(response));
 }
 
-export async function downloadResource(resourceId: string) {
-  return apiClient.get(`/admin/resources/${resourceId}/download`, { responseType: "blob" });
+export async function downloadResource(resourceId: string): Promise<Blob> {
+  const response = await apiClient.get<Blob>(`/admin/resources/${resourceId}/download`, {
+    responseType: "blob"
+  });
+  return response.data;
 }
 
 export async function listAudits(params: AuditListQuery = {}): Promise<PagedResult<AuditLogVO>> {

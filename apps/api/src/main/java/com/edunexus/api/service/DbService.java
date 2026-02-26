@@ -30,13 +30,31 @@ public class DbService {
     }
 
     public Map<String, Object> one(String sql, Object... args) {
+        Map<String, Object> row = oneOrNull(sql, args);
+        if (row == null) {
+            throw new ResourceNotFoundException("资源不存在");
+        }
+        return row;
+    }
+
+    public Map<String, Object> oneOrNull(String sql, Object... args) {
         List<Map<String, Object>> rows = list(sql, args);
-        if (rows.isEmpty()) throw new ResourceNotFoundException("资源不存在");
+        if (rows.isEmpty()) {
+            return null;
+        }
         return rows.getFirst();
     }
 
     public boolean exists(String sql, Object... args) {
         SqlRowSet rs = jdbc.queryForRowSet(sql, args);
         return rs.next();
+    }
+
+    public long count(String sql, Object... args) {
+        Number value = jdbc.queryForObject(sql, Number.class, args);
+        if (value == null) {
+            return 0L;
+        }
+        return value.longValue();
     }
 }

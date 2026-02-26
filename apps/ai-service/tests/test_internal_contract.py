@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from main import app
+from ai_service.app import app
 
 
 client = TestClient(app)
@@ -34,12 +34,65 @@ def test_internal_chat_requires_trace_id() -> None:
     assert response.json()["code"] == "VALIDATION_PARAM"
 
 
-def test_kb_ingest_allows_missing_idempotency_key_for_compatibility() -> None:
+def test_kb_ingest_requires_idempotency_key() -> None:
     response = client.post(
         "/internal/v1/kb/ingest",
         headers={
             "X-Service-Token": "change-this-in-local-too",
             "X-Trace-Id": "trace-1",
+        },
+        json={
+            "documentId": "doc-1",
+            "teacherId": "teacher-1",
+            "filename": "sample.txt",
+            "filePath": "./missing.txt",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "VALIDATION_PARAM"
+
+
+def test_kb_delete_requires_idempotency_key() -> None:
+    response = client.post(
+        "/internal/v1/kb/delete",
+        headers={
+            "X-Service-Token": "change-this-in-local-too",
+            "X-Trace-Id": "trace-1",
+        },
+        json={
+            "documentId": "doc-1",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "VALIDATION_PARAM"
+
+
+def test_kb_ingest_rejects_short_idempotency_key() -> None:
+    response = client.post(
+        "/internal/v1/kb/ingest",
+        headers={
+            "X-Service-Token": "change-this-in-local-too",
+            "X-Trace-Id": "trace-1",
+            "Idempotency-Key": "short",
+        },
+        json={
+            "documentId": "doc-1",
+            "teacherId": "teacher-1",
+            "filename": "sample.txt",
+            "filePath": "./missing.txt",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "VALIDATION_PARAM"
+
+
+def test_kb_ingest_validates_payload_after_idempotency_check() -> None:
+    response = client.post(
+        "/internal/v1/kb/ingest",
+        headers={
+            "X-Service-Token": "change-this-in-local-too",
+            "X-Trace-Id": "trace-1",
+            "Idempotency-Key": "idem-key-1",
         },
         json={
             "documentId": "doc-1",

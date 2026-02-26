@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
-import { storageKeys } from "../services/api-client";
-import type { LoginData, UserVO } from "../services/contracts";
+import { clearSessionStorage, storageKeys } from "../services/api-client";
+import type { LoginData, RefreshData, UserVO } from "../services/contracts";
 
 const legacyRefreshTokenKey = "refresh_token";
 
@@ -35,7 +35,8 @@ export const useAuthStore = defineStore("auth", {
     profileLoadedAt: 0
   }),
   getters: {
-    isAuthenticated: (state) => Boolean(state.token)
+    isAuthenticated: (state) => Boolean(state.token),
+    role: (state) => state.user?.role || null
   },
   actions: {
     setSession(payload: LoginData) {
@@ -50,6 +51,14 @@ export const useAuthStore = defineStore("auth", {
       localStorage.setItem(storageKeys.user, JSON.stringify(payload.user));
     },
 
+    setTokens(payload: RefreshData) {
+      this.token = payload.accessToken;
+      this.refreshToken = payload.refreshToken;
+      localStorage.setItem(storageKeys.accessToken, payload.accessToken);
+      localStorage.setItem(storageKeys.refreshToken, payload.refreshToken);
+      localStorage.removeItem(legacyRefreshTokenKey);
+    },
+
     setUser(user: AuthUser) {
       this.user = user;
       this.profileLoadedAt = Date.now();
@@ -61,10 +70,7 @@ export const useAuthStore = defineStore("auth", {
       this.refreshToken = "";
       this.user = null;
       this.profileLoadedAt = 0;
-      localStorage.removeItem(storageKeys.accessToken);
-      localStorage.removeItem(storageKeys.refreshToken);
-      localStorage.removeItem(legacyRefreshTokenKey);
-      localStorage.removeItem(storageKeys.user);
+      clearSessionStorage();
     }
   }
 });

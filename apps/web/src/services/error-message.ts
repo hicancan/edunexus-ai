@@ -1,4 +1,5 @@
-import type { AxiosError } from "axios";
+import axios, { type AxiosError } from "axios";
+import { ApiClientError } from "./api-client";
 
 const errorMessageMap: Record<string, string> = {
   AUTH_INVALID_CREDENTIALS: "用户名或密码错误",
@@ -17,6 +18,18 @@ const errorMessageMap: Record<string, string> = {
   SYSTEM_DEPENDENCY: "依赖服务不可用，请稍后再试"
 };
 
+const httpStatusMessageMap: Record<number, string> = {
+  400: "请求参数不合法，请检查输入",
+  401: "登录状态已失效，请重新登录",
+  403: "无权限访问该资源",
+  404: "请求资源不存在",
+  409: "资源冲突，请刷新后重试",
+  429: "请求过于频繁，请稍后再试",
+  500: "系统繁忙，请稍后重试",
+  502: "服务响应异常，请稍后重试",
+  503: "服务繁忙，请稍后重试"
+};
+
 type ApiErrorBody = {
   code?: string | number;
   message?: string;
@@ -24,22 +37,46 @@ type ApiErrorBody = {
 };
 
 export function toErrorMessage(error: unknown, fallback = "操作失败，请稍后重试"): string {
-  const axiosError = error as AxiosError<ApiErrorBody>;
-  const body = axiosError?.response?.data;
+  if (error instanceof ApiClientError) {
+    if (error.code) {
+      const codeText = String(error.code);
+      if (errorMessageMap[codeText]) {
+        return errorMessageMap[codeText];
+      }
+    }
+    if (error.status && httpStatusMessageMap[error.status]) {
+      return httpStatusMessageMap[error.status];
+    }
+    return error.message || fallback;
+  }
 
-  if (body?.code) {
-    const code = String(body.code);
-    if (errorMessageMap[code]) {
-      return errorMessageMap[code];
+  if (axios.isAxiosError<ApiErrorBody>(error)) {
+    const axiosError = error as AxiosError<ApiErrorBody>;
+    const body = axiosError.response?.data;
+
+    if (body?.code) {
+      const code = String(body.code);
+      if (errorMessageMap[code]) {
+        return errorMessageMap[code];
+      }
+    }
+
+    if (body?.message) {
+      return body.message;
+    }
+
+    const status = axiosError.response?.status;
+    if (status && httpStatusMessageMap[status]) {
+      return httpStatusMessageMap[status];
+    }
+
+    if (axiosError.message) {
+      return axiosError.message;
     }
   }
 
-  if (body?.message) {
-    return body.message;
-  }
-
-  if (axiosError?.message) {
-    return axiosError.message;
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
 
   return fallback;

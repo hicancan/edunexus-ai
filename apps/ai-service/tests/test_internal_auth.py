@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from main import app
+from ai_service.app import app
 
 
 client = TestClient(app)

@@ -1,22 +1,29 @@
 package com.edunexus.api.controller;
 
-import com.edunexus.api.auth.AuthContext;
 import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.auth.JwtUtil;
+import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
-import com.edunexus.api.common.TraceFilter;
+import com.edunexus.api.common.ConflictException;
+import com.edunexus.api.common.UnauthorizedException;
 import com.edunexus.api.service.DbService;
 import com.edunexus.api.service.GovernanceService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -29,77 +36,85 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/auth")
-public class AuthController {
+public class AuthController implements ControllerSupport {
     private final DbService db;
-    private final PasswordEncoder encoder;
-    private final JwtUtil jwt;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
     private final GovernanceService governance;
 
-    public AuthController(DbService db, PasswordEncoder encoder, JwtUtil jwt, GovernanceService governance) {
+    public AuthController(DbService db, PasswordEncoder passwordEncoder, JwtUtil jwtUtil, GovernanceService governance) {
         this.db = db;
-        this.encoder = encoder;
-        this.jwt = jwt;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
         this.governance = governance;
     }
 
     @PostMapping("/register")
+    @Transactional
     public ResponseEntity<ApiResponse> register(@Valid @RequestBody RegisterReq req, HttpServletRequest request) {
         if (db.exists("select 1 from users where username=? and deleted_at is null", req.username())) {
-            throw new IllegalArgumentException("用户名已存在");
+            throw new ConflictException("用户名已存在");
         }
-        if (!req.role().equals("STUDENT") && !req.role().equals("TEACHER")) {
-            throw new IllegalArgumentException("role 仅支持 STUDENT/TEACHER");
-        }
-        UUID id = db.newId();
-        db.update("insert into users(id,username,password_hash,email,phone,role,status) values (?,?,?,?,?,?, 'ACTIVE')",
-                id, req.username(), encoder.encode(req.password()), req.email(), req.phone(), req.role());
-        governance.audit(id, req.role(), "REGISTER", "USER", id.toString(), trace(request));
-        return ResponseEntity.ok(ApiResponse.ok(Map.of("userId", id), trace(request)));
+        UUID userId = db.newId();
+        db.update(
+                "insert into users(id,username,password_hash,email,phone,role,status) values (?,?,?,?,?,?, 'ACTIVE')",
+                userId,
+                req.username(),
+                passwordEncoder.encode(req.password()),
+                req.email(),
+                req.phone(),
+                req.role()
+        );
+
+        Map<String, Object> user = db.one("select * from users where id=?", userId);
+        governance.audit(userId, req.role(), "REGISTER", "USER", userId.toString(), trace(request));
+        return ResponseEntity.ok(ApiResponse.ok(toUserVo(user), trace(request)));
     }
 
     @PostMapping("/login")
+    @Transactional
     public ResponseEntity<ApiResponse> login(@Valid @RequestBody LoginReq req, HttpServletRequest request) {
-        Map<String, Object> user = db.one("select id,username,password_hash,role,status from users where username=? and deleted_at is null", req.username());
-        String pwd = String.valueOf(user.get("password_hash"));
-        boolean matched = encoder.matches(req.password(), pwd);
-        if (!matched) {
-            return ResponseEntity.status(401).body(ApiResponse.error(401, "用户名或密码错误", trace(request)));
+        Map<String, Object> user = db.oneOrNull("select * from users where username=? and deleted_at is null", req.username());
+        if (user == null) {
+            throw new UnauthorizedException("用户名或密码错误");
         }
+
+        String passwordHash = String.valueOf(user.get("password_hash"));
+        if (!passwordEncoder.matches(req.password(), passwordHash)) {
+            throw new UnauthorizedException("用户名或密码错误");
+        }
+
         String status = String.valueOf(user.get("status"));
         if (!"ACTIVE".equals(status)) {
-            return ResponseEntity.status(403).body(ApiResponse.error(403, "账号已禁用", trace(request)));
+            throw new SecurityException("账号已禁用");
         }
-        String userId = String.valueOf(user.get("id"));
-        String username = String.valueOf(user.get("username"));
-        String role = String.valueOf(user.get("role"));
 
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("username", username);
-        claims.put("role", role);
-        claims.put("status", status);
-        String access = jwt.generateAccessToken(claims, userId);
-        String refresh = jwt.generateRefreshToken(userId);
-        upsertRefreshToken(UUID.fromString(userId), refresh, false);
+        UUID userId = UUID.fromString(String.valueOf(user.get("id")));
+        Map<String, String> tokenPair = issueTokenPair(user);
+        upsertRefreshToken(userId, tokenPair.get("refreshToken"), false);
 
-        Map<String, Object> data = Map.of(
-                "accessToken", access,
-                "refreshToken", refresh,
-                "user", Map.of("id", userId, "username", username, "role", role)
-        );
-        governance.audit(UUID.fromString(userId), role, "LOGIN", "USER", userId, trace(request));
+        Map<String, Object> data = new HashMap<>();
+        data.put("accessToken", tokenPair.get("accessToken"));
+        data.put("refreshToken", tokenPair.get("refreshToken"));
+        data.put("user", toUserVo(user));
+        governance.audit(userId, String.valueOf(user.get("role")), "LOGIN", "USER", userId.toString(), trace(request));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse> logout(HttpServletRequest request) {
-        AuthUser user = requireAuth();
-        String token = parseBearerToken(request.getHeader("Authorization"));
-        if (token != null) {
+    @Transactional
+    public ResponseEntity<ApiResponse> logout(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            HttpServletRequest request
+    ) {
+        AuthUser user = currentUser();
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            String accessToken = authorization.substring(7);
             try {
-                Claims claims = jwt.parse(token);
+                Claims claims = jwtUtil.parse(accessToken);
                 revokeAccessToken(claims);
             } catch (Exception ignored) {
-                // ignore malformed token on logout, refresh tokens are still revoked
+                // Logout should be idempotent even with an invalid access token.
             }
         }
         db.update("update refresh_tokens set revoked_at=now() where user_id=? and revoked_at is null", user.userId());
@@ -108,43 +123,95 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
+    @Transactional
     public ResponseEntity<ApiResponse> refresh(@Valid @RequestBody RefreshReq req, HttpServletRequest request) {
-        Claims claims = jwt.parse(req.refreshToken());
+        Claims claims;
+        try {
+            claims = jwtUtil.parse(req.refreshToken());
+        } catch (Exception ex) {
+            throw new UnauthorizedException("refresh token 无效");
+        }
         UUID userId = UUID.fromString(claims.getSubject());
         String tokenHash = sha256(req.refreshToken());
-        if (!db.exists("select 1 from refresh_tokens where user_id=? and token_hash=? and revoked_at is null and expires_at > now()", userId, tokenHash)) {
-            return ResponseEntity.status(401).body(ApiResponse.error(401, "refresh token 无效", trace(request)));
-        }
-        Map<String, Object> user = db.one("select id,username,role,status from users where id=?", userId);
-        Map<String, Object> newClaims = Map.of(
-                "username", String.valueOf(user.get("username")),
-                "role", String.valueOf(user.get("role")),
-                "status", String.valueOf(user.get("status"))
+
+        Map<String, Object> tokenRow = db.oneOrNull(
+                "select id from refresh_tokens where user_id=? and token_hash=? and revoked_at is null and expires_at > now()",
+                userId,
+                tokenHash
         );
-        String access = jwt.generateAccessToken(newClaims, String.valueOf(userId));
-        String refresh = jwt.generateRefreshToken(String.valueOf(userId));
+        if (tokenRow == null) {
+            throw new UnauthorizedException("refresh token 无效");
+        }
+
+        Map<String, Object> user = db.oneOrNull("select * from users where id=? and deleted_at is null", userId);
+        if (user == null) {
+            throw new UnauthorizedException("refresh token 无效");
+        }
+        if (!"ACTIVE".equals(String.valueOf(user.get("status")))) {
+            throw new SecurityException("账号已禁用");
+        }
+
         upsertRefreshToken(userId, req.refreshToken(), true);
-        upsertRefreshToken(userId, refresh, false);
+        Map<String, String> tokenPair = issueTokenPair(user);
+        upsertRefreshToken(userId, tokenPair.get("refreshToken"), false);
+
         governance.audit(userId, String.valueOf(user.get("role")), "REFRESH_TOKEN", "USER", userId.toString(), trace(request));
-        return ResponseEntity.ok(ApiResponse.ok(Map.of("accessToken", access, "refreshToken", refresh), trace(request)));
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "accessToken", tokenPair.get("accessToken"),
+                "refreshToken", tokenPair.get("refreshToken")
+        ), trace(request)));
     }
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse> me(HttpServletRequest request) {
-        AuthUser user = requireAuth();
-        Map<String, Object> row = db.one("select id,username,role,status,created_at from users where id=?", user.userId());
-        return ResponseEntity.ok(ApiResponse.ok(row, trace(request)));
+        AuthUser authUser = currentUser();
+        Map<String, Object> user = db.one("select * from users where id=? and deleted_at is null", authUser.userId());
+        return ResponseEntity.ok(ApiResponse.ok(toUserVo(user), trace(request)));
     }
 
-    private AuthUser requireAuth() {
-        AuthUser user = AuthContext.get();
-        if (user == null) throw new SecurityException("未认证");
+    private Map<String, String> issueTokenPair(Map<String, Object> user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("username", String.valueOf(user.get("username")));
+        claims.put("role", String.valueOf(user.get("role")));
+        claims.put("status", String.valueOf(user.get("status")));
+
+        String subject = String.valueOf(user.get("id"));
+        String accessToken = jwtUtil.generateAccessToken(claims, subject);
+        String refreshToken = jwtUtil.generateRefreshToken(subject);
+
+        Map<String, String> pair = new HashMap<>();
+        pair.put("accessToken", accessToken);
+        pair.put("refreshToken", refreshToken);
+        return pair;
+    }
+
+    private Map<String, Object> toUserVo(Map<String, Object> row) {
+        Map<String, Object> user = new HashMap<>();
+        user.put("id", String.valueOf(row.get("id")));
+        user.put("username", String.valueOf(row.get("username")));
+        user.put("role", String.valueOf(row.get("role")));
+        user.put("status", String.valueOf(row.get("status")));
+        user.put("email", ApiDataMapper.asString(row.get("email")));
+        user.put("phone", ApiDataMapper.asString(row.get("phone")));
+        user.put("createdAt", ApiDataMapper.asIsoTime(row.get("created_at")));
+        user.put("updatedAt", ApiDataMapper.asIsoTime(row.get("updated_at")));
         return user;
     }
 
-    private String trace(HttpServletRequest request) {
-        Object o = request.getAttribute(TraceFilter.TRACE_ID);
-        return o == null ? "" : o.toString();
+    private void revokeAccessToken(Claims claims) {
+        String jti = claims.get("jti", String.class);
+        String subject = claims.getSubject();
+        Instant expiresAt = claims.getExpiration() == null ? null : claims.getExpiration().toInstant();
+        if (jti == null || jti.isBlank() || subject == null || subject.isBlank() || expiresAt == null) {
+            return;
+        }
+        db.update(
+                "insert into access_token_blacklist(id,jti,user_id,expires_at) values (?,?,?,?) on conflict (jti) do nothing",
+                db.newId(),
+                jti,
+                UUID.fromString(subject),
+                Timestamp.from(expiresAt)
+        );
     }
 
     private void upsertRefreshToken(UUID userId, String token, boolean revoke) {
@@ -153,40 +220,30 @@ public class AuthController {
             db.update("update refresh_tokens set revoked_at=now() where user_id=? and token_hash=? and revoked_at is null", userId, hash);
             return;
         }
-        db.update("insert into refresh_tokens(id,user_id,token_hash,expires_at) values (?,?,?,?)",
-                db.newId(), userId, hash, Timestamp.from(Instant.now().plus(14, ChronoUnit.DAYS)));
-    }
-
-    private void revokeAccessToken(Claims claims) {
-        String jti = claims.get("jti", String.class);
-        String sub = claims.getSubject();
-        java.util.Date exp = claims.getExpiration();
-        if (jti == null || jti.isBlank() || sub == null || sub.isBlank() || exp == null) {
-            return;
+        Instant expiresAt;
+        try {
+            expiresAt = jwtUtil.parse(token).getExpiration().toInstant();
+        } catch (Exception ex) {
+            expiresAt = Instant.now().plus(14, ChronoUnit.DAYS);
         }
         db.update(
-                "insert into access_token_blacklist(id,jti,user_id,expires_at) values (?,?,?,?) on conflict (jti) do nothing",
+                "insert into refresh_tokens(id,user_id,token_hash,expires_at) values (?,?,?,?)",
                 db.newId(),
-                jti,
-                UUID.fromString(sub),
-                Timestamp.from(exp.toInstant())
+                userId,
+                hash,
+                Timestamp.from(expiresAt)
         );
-    }
-
-    private String parseBearerToken(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return null;
-        }
-        return authHeader.substring(7);
     }
 
     private String sha256(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : bytes) sb.append(String.format("%02x", b));
-            return sb.toString();
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte item : hash) {
+                builder.append(String.format("%02x", item));
+            }
+            return builder.toString();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -198,8 +255,12 @@ public class AuthController {
             @Email String email,
             @Size(max = 20) String phone,
             @NotBlank @Pattern(regexp = "STUDENT|TEACHER") String role
-    ) {}
+    ) {
+    }
 
-    public record LoginReq(@NotBlank String username, @NotBlank String password) {}
-    public record RefreshReq(@NotBlank String refreshToken) {}
+    public record LoginReq(@NotBlank String username, @NotBlank String password) {
+    }
+
+    public record RefreshReq(@NotBlank String refreshToken) {
+    }
 }

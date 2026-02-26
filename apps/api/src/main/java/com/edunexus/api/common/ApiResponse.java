@@ -14,11 +14,11 @@ public record ApiResponse(
     }
 
     public static ApiResponse created(Object data, String traceId) {
-        return new ApiResponse(201, "created", data, traceId, Instant.now().toString());
+        return new ApiResponse(201, "success", data, traceId, Instant.now().toString());
     }
 
     public static ApiResponse accepted(Object data, String traceId) {
-        return new ApiResponse(202, "accepted", data, traceId, Instant.now().toString());
+        return new ApiResponse(202, "success", data, traceId, Instant.now().toString());
     }
 
     public static ApiResponse error(int code, String message, String traceId) {

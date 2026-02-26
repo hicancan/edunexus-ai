@@ -2,7 +2,7 @@ import type { Router } from "vue-router";
 import { getMe } from "../../services/auth.service";
 import { toErrorMessage } from "../../services/error-message";
 import { useAuthStore } from "../../stores/auth";
-import { roleHomePath } from "./routes";
+import { roleHomePath } from "../router/routes";
 
 const PROFILE_CACHE_MS = 2 * 60 * 1000;
 
@@ -32,13 +32,12 @@ async function ensureUserLoaded(): Promise<boolean> {
   }
 }
 
-export function registerRouterGuard(router: Router): void {
+export function registerAuthGuard(router: Router): void {
   router.beforeEach(async (to) => {
     const auth = useAuthStore();
     const requiresAuth = Boolean(to.meta.requiresAuth);
-    const isPublic = !requiresAuth;
 
-    if (isPublic) {
+    if (!requiresAuth) {
       if ((to.path === "/login" || to.path === "/register") && auth.token) {
         const loaded = await ensureUserLoaded();
         if (loaded && auth.user?.role) {

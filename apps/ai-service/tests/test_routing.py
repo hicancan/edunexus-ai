@@ -30,9 +30,9 @@ def _settings(provider: str = "auto") -> Settings:
         qdrant_collection="knowledge_chunks",
         embedding_dim=1024,
         service_token="token",
+        py_env_provider="conda",
         py_env_name="edunexus-ai",
         python_runner="uv",
-        enforce_conda_env=False,
     )
 
 

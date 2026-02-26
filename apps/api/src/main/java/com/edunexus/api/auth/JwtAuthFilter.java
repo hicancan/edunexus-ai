@@ -1,6 +1,7 @@
 package com.edunexus.api.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.edunexus.api.common.TraceFilter;
 import com.edunexus.api.service.DbService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -26,6 +27,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_PATHS = Set.of(
             "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh",
             "/actuator/health", "/api/v1/teacher/plans/shared"
+    );
+    private static final Set<String> PUBLIC_PREFIXES = Set.of(
+            "/api/v1/teacher/plans/shared/",
+            "/v3/api-docs",
+            "/swagger-ui",
+            "/swagger-ui.html"
     );
 
     public JwtAuthFilter(JwtUtil jwtUtil, DbService db) {
@@ -74,7 +81,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private boolean isPublic(String path, String method) {
         if (HttpMethod.OPTIONS.matches(method)) return true;
-        if (path.startsWith("/api/v1/teacher/plans/shared/")) return true;
+        for (String prefix : PUBLIC_PREFIXES) {
+            if (path.startsWith(prefix)) {
+                return true;
+            }
+        }
         return PUBLIC_PATHS.contains(path);
     }
 
@@ -91,7 +102,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     private void writeError(HttpServletRequest request, HttpServletResponse response, int status, String message) throws IOException {
-        String traceId = request.getHeader("X-Request-Id");
+        String traceId = request.getAttribute(TraceFilter.TRACE_ID) == null
+                ? null
+                : String.valueOf(request.getAttribute(TraceFilter.TRACE_ID));
+        if (traceId == null || traceId.isBlank()) {
+            traceId = request.getHeader("X-Request-Id");
+        }
         if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString();
         }

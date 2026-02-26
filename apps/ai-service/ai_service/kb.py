@@ -45,6 +45,8 @@ class KnowledgeBaseService:
 
     async def ingest(self, req: KbIngestRequest) -> dict[str, Any]:
         self.ensure_collection()
+        if not Path(req.file_path).exists():
+            raise bad_request("document file not found")
         text = extract_text(req.file_path)
         if not text.strip():
             raise bad_request("document content is empty")
@@ -92,12 +94,12 @@ class KnowledgeBaseService:
             return []
 
         vector = await self._embedder(question)
-        conditions: list[FieldCondition] = []
+        conditions: list[Any] = []
         if teacher_id:
             conditions.append(FieldCondition(key="teacher_id", match=MatchValue(value=teacher_id)))
         if class_id:
             conditions.append(FieldCondition(key="class_id", match=MatchValue(value=class_id)))
-        query_filter = Filter(must=conditions)
+        query_filter = Filter(must=cast(Any, conditions))
 
         try:
             query_points = getattr(self._qdrant, "query_points", None)
@@ -110,7 +112,10 @@ class KnowledgeBaseService:
                 )
                 points_raw = getattr(result, "points", result)
             else:
-                points_raw = self._qdrant.search(
+                search_points = getattr(cast(Any, self._qdrant), "search", None)
+                if not callable(search_points):
+                    raise RuntimeError("qdrant search API unavailable")
+                points_raw = search_points(
                     collection_name=self.settings.qdrant_collection,
                     query_vector=vector,
                     query_filter=query_filter,

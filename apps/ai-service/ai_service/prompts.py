@@ -5,8 +5,19 @@ import re
 from typing import Any
 
 
+PROMPT_INJECTION_PATTERNS = (
+    r"(?i)ignore\s+all\s+previous\s+instructions?",
+    r"(?i)ignore\s+previous\s+instructions?",
+    r"(?i)system\s+prompt",
+    r"(?i)developer\s+message",
+    r"忽略(所有)?(之前|上文)指令",
+)
+
+
 def sanitize_text(text: str, limit: int = 3000) -> str:
     compact = re.sub(r"\s+", " ", (text or "").replace("```", "")).strip()
+    for pattern in PROMPT_INJECTION_PATTERNS:
+        compact = re.sub(pattern, "[filtered]", compact)
     return compact[:limit]
 
 

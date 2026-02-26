@@ -5,6 +5,8 @@ import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.common.TraceFilter;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.Set;
+
 public interface ControllerSupport {
     default AuthUser currentUser() {
         AuthUser user = AuthContext.get();
@@ -14,7 +16,15 @@ public interface ControllerSupport {
 
     default void requireRole(String role) {
         AuthUser user = currentUser();
-        if (!role.equals(user.role())) throw new SecurityException("无权限");
+        if (!role.equals(user.role())) throw new SecurityException("无角色权限");
+    }
+
+    default void requireAnyRole(String... roles) {
+        AuthUser user = currentUser();
+        Set<String> allow = Set.of(roles);
+        if (!allow.contains(user.role())) {
+            throw new SecurityException("无角色权限");
+        }
     }
 
     default String trace(HttpServletRequest request) {

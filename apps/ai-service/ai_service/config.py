@@ -52,15 +52,9 @@ class Settings:
 
     service_token: str
 
+    py_env_provider: str
     py_env_name: str
     python_runner: str
-    enforce_conda_env: bool
-
-
-def _as_bool(value: str | None, default: bool = False) -> bool:
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def load_settings() -> Settings:
@@ -92,20 +86,20 @@ def load_settings() -> Settings:
         qdrant_collection=os.getenv("QDRANT_COLLECTION", "knowledge_chunks"),
         embedding_dim=int(os.getenv("EMBEDDING_DIM", "1024")),
         service_token=os.getenv("AI_SERVICE_TOKEN", "change-this-in-local-too").strip(),
+        py_env_provider=os.getenv("PY_ENV_PROVIDER", "conda").strip().lower(),
         py_env_name=os.getenv("PY_ENV_NAME", "edunexus-ai").strip(),
         python_runner=os.getenv("PYTHON_RUNNER", "uv").strip().lower(),
-        enforce_conda_env=_as_bool(os.getenv("EDUNEXUS_ENFORCE_CONDA_ENV"), default=False),
     )
 
 
 def validate_runtime_policy(settings: Settings) -> None:
+    if settings.py_env_provider != "conda":
+        raise RuntimeError("PY_ENV_PROVIDER must be conda")
     if settings.py_env_name != "edunexus-ai":
         raise RuntimeError("PY_ENV_NAME must be edunexus-ai")
     if settings.python_runner != "uv":
         raise RuntimeError("PYTHON_RUNNER must be uv")
 
     active_conda = os.getenv("CONDA_DEFAULT_ENV", "").strip()
-    if active_conda and active_conda != "edunexus-ai":
-        raise RuntimeError("CONDA_DEFAULT_ENV must be edunexus-ai")
-    if settings.enforce_conda_env and active_conda != "edunexus-ai":
+    if active_conda != "edunexus-ai":
         raise RuntimeError("Conda env edunexus-ai is required")

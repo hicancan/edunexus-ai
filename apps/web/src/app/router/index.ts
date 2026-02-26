@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { registerRouterGuard } from "./guard";
+import { registerAuthGuard } from "../guards/auth.guard";
 import { routes } from "./routes";
 
 export function createAppRouter() {
@@ -8,7 +8,7 @@ export function createAppRouter() {
     routes
   });
 
-  registerRouterGuard(router);
+  registerAuthGuard(router);
 
   return router;
 }

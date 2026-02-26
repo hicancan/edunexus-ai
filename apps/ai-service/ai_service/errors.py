@@ -17,10 +17,6 @@ def auth_failed() -> InternalServiceError:
     return InternalServiceError(401, "INTERNAL_AUTH_FAILED", "invalid service token")
 
 
-def forbidden(message: str = "forbidden") -> InternalServiceError:
-    return InternalServiceError(403, "INTERNAL_FORBIDDEN", message)
-
-
 def dependency_error(message: str = "dependency unavailable") -> InternalServiceError:
     return InternalServiceError(503, "INTERNAL_DEPENDENCY", message)
 

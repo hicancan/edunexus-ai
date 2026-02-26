@@ -58,7 +58,7 @@ def model_for_scene(settings: Settings, provider: str, scene: str) -> str:
     return settings.ollama_model
 
 
-def provider_candidates(settings: Settings, scene: str) -> list[str]:
+def provider_candidates(settings: Settings, _scene: str) -> list[str]:
     selected = settings.llm_provider
     if selected != "auto":
         ordered = [selected, "ollama", "deepseek", "openai", "gemini"]

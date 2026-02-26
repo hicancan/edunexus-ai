@@ -4,10 +4,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class AiClient {
@@ -49,11 +51,11 @@ public class AiClient {
         return post("/internal/v1/kb/delete", body, 2, 500);
     }
 
-    private Map<String, Object> post(String path, Map<String, Object> body, int attempts, long baseDelayMs) {
-        String traceId = String.valueOf(body.getOrDefault("trace_id", UUID.randomUUID().toString()));
-        String idemKey = String.valueOf(body.getOrDefault("idempotency_key", "")).trim();
+    private Map<String, Object> post(String path, Map<String, Object> body, int maxAttempts, long baseDelayMs) {
+        String traceId = Objects.toString(body.getOrDefault("traceId", body.getOrDefault("trace_id", UUID.randomUUID().toString())));
+        String idemKey = Objects.toString(body.getOrDefault("idempotencyKey", body.getOrDefault("idempotency_key", ""))).trim();
         RuntimeException last = null;
-        for (int i = 0; i < attempts; i++) {
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 RestClient.RequestBodySpec req = client.post()
                         .uri(baseUrl + path)
@@ -66,19 +68,38 @@ public class AiClient {
                         .body(body)
                         .retrieve()
                         .body(new ParameterizedTypeReference<>() {});
-            } catch (RuntimeException ex) {
+            } catch (RestClientResponseException ex) {
                 last = ex;
-                if (i >= attempts - 1) {
+                if (!isRetryableStatus(ex.getStatusCode().value()) || attempt >= maxAttempts) {
                     break;
                 }
-                try {
-                    TimeUnit.MILLISECONDS.sleep(baseDelayMs * (i + 1));
-                } catch (InterruptedException interruptedException) {
-                    Thread.currentThread().interrupt();
-                    throw ex;
+                sleep(baseDelayMs, attempt, true);
+            } catch (RuntimeException ex) {
+                last = ex;
+                if (attempt >= maxAttempts) {
+                    break;
                 }
+                sleep(baseDelayMs, attempt, path.startsWith("/internal/v1/kb/"));
             }
         }
         throw last == null ? new RuntimeException("调用 AI 服务失败") : last;
+    }
+
+    private boolean isRetryableStatus(int status) {
+        return status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
+    }
+
+    private void sleep(long baseDelayMs, int attempt, boolean withJitter) {
+        long multiplier = 1L << Math.max(0, attempt - 1);
+        long delay = baseDelayMs * multiplier;
+        if (withJitter) {
+            long jitter = ThreadLocalRandom.current().nextLong(50, 301);
+            delay += jitter;
+        }
+        try {
+            Thread.sleep(delay);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

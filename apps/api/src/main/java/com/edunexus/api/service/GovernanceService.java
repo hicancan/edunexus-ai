@@ -98,6 +98,14 @@ public class GovernanceService {
         );
     }
 
+    public void markJobDeadLetter(UUID jobId, String errorMessage) {
+        db.update(
+                "update job_runs set status='DEAD_LETTER',error_message=?,finished_at=now(),updated_at=now() where id=?",
+                errorMessage,
+                jobId
+        );
+    }
+
     public void audit(UUID actorId, String actorRole, String action, String resourceType, String resourceId, String traceId) {
         db.update(
                 "insert into audit_logs(id,actor_id,actor_role,action,resource_type,resource_id,detail) values (?,?,?,?,?,?,?::jsonb)",

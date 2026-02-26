@@ -1,0 +1,32 @@
+:root {
+  --color-bg: #f3f8fc;
+  --color-bg-soft: #e7f1f9;
+  --color-surface: #ffffff;
+  --color-surface-strong: #f7fbff;
+  --color-border: #d7e3ef;
+  --color-border-strong: #c2d5e8;
+  --color-text: #1d3042;
+  --color-text-muted: #4e647a;
+  --color-primary: #1767ad;
+  --color-primary-strong: #13558f;
+  --color-success: #2d8b43;
+  --color-warning: #e07b1a;
+  --color-danger: #cb3b66;
+  --color-danger-strong: #ac2e55;
+  --shadow-soft: 0 16px 34px rgba(23, 70, 114, 0.1);
+  --shadow-focus: 0 0 0 3px rgba(23, 103, 173, 0.22);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --font-title: "HarmonyOS Sans SC", "Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-body: "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --font-code: "JetBrains Mono", "Consolas", monospace;
+  --breakpoint-mobile: 767px;
+  --breakpoint-tablet: 1279px;
+}

@@ -14,6 +14,20 @@ from .routing import provider_candidates, route_decision, scene_params
 
 logger = logging.getLogger("edunexus.ai.llm")
 
+SCENE_TIMEOUT_SECONDS: dict[str, float] = {
+    "chat_rag": 25.0,
+    "wrong_analysis": 30.0,
+    "ai_question": 45.0,
+    "lesson_plan": 60.0,
+}
+
+SCENE_RETRY_DELAY_SECONDS: dict[str, float] = {
+    "chat_rag": 0.5,
+    "wrong_analysis": 0.8,
+    "ai_question": 1.0,
+    "lesson_plan": 1.2,
+}
+
 
 @dataclass(frozen=True, slots=True)
 class LLMResult:
@@ -35,31 +49,72 @@ class LLMService:
         if not candidates:
             raise model_unavailable("no provider available")
 
+        timeout_budget = SCENE_TIMEOUT_SECONDS.get(scene, 45.0)
+        deadline = time.perf_counter() + timeout_budget
+        retry_base_delay = SCENE_RETRY_DELAY_SECONDS.get(scene, 1.0)
         timeout_seen = False
         error_messages: list[str] = []
         started = time.perf_counter()
 
         for provider in candidates:
             decision = route_decision(self.settings, provider, scene)
-            try:
-                text = await self._complete_by_provider(provider, decision.model, scene, prompt)
-            except (httpx.ReadTimeout, httpx.ConnectTimeout, asyncio.TimeoutError) as ex:
-                timeout_seen = True
-                error_messages.append(f"{provider}:timeout:{ex}")
-                continue
-            except Exception as ex:  # noqa: BLE001
-                error_messages.append(f"{provider}:error:{ex}")
+
+            text = ""
+            for attempt in range(2):
+                remaining = deadline - time.perf_counter()
+                if remaining <= 0:
+                    timeout_seen = True
+                    error_messages.append(f"{provider}:timeout:budget_exhausted")
+                    break
+
+                request_timeout = max(1.0, min(timeout_budget, remaining))
+                try:
+                    text = await self._complete_by_provider(
+                        provider,
+                        decision.model,
+                        scene,
+                        prompt,
+                        timeout_seconds=request_timeout,
+                    )
+                    break
+                except (httpx.ReadTimeout, httpx.ConnectTimeout, asyncio.TimeoutError) as ex:
+                    timeout_seen = True
+                    error_messages.append(f"{provider}:timeout:attempt={attempt + 1}:{ex}")
+                    if attempt >= 1:
+                        text = ""
+                        break
+
+                    delay = retry_base_delay * (attempt + 1)
+                    if deadline - time.perf_counter() <= delay:
+                        break
+                    logger.warning(
+                        "llm_timeout_retry provider=%s model=%s scene=%s attempt=%s delay=%s trace_id=%s",
+                        provider,
+                        decision.model,
+                        scene,
+                        attempt + 1,
+                        delay,
+                        trace_id,
+                    )
+                    await asyncio.sleep(delay)
+                except Exception as ex:  # noqa: BLE001
+                    error_messages.append(f"{provider}:error:attempt={attempt + 1}:{ex}")
+                    text = ""
+                    break
+
+            cleaned_text = text.strip()
+            if not cleaned_text:
                 continue
 
             latency_ms = int((time.perf_counter() - started) * 1000)
             result = LLMResult(
-                text=text.strip(),
+                text=cleaned_text,
                 provider=provider,
                 model=decision.model,
                 reason=decision.reason,
                 latency_ms=latency_ms,
                 prompt_tokens=max(1, len(prompt) // 4),
-                completion_tokens=max(1, len(text) // 4) if text else 0,
+                completion_tokens=max(1, len(cleaned_text) // 4),
             )
             logger.info(
                 "llm_call provider=%s model=%s scene=%s latency_ms=%s prompt_tokens=%s completion_tokens=%s hit_kb=%s chunk_ids=%s trace_id=%s",
@@ -109,9 +164,17 @@ class LLMService:
             return vector[:target]
         return vector + [0.0 for _ in range(target - len(vector))]
 
-    async def _complete_by_provider(self, provider: str, model: str, scene: str, prompt: str) -> str:
+    async def _complete_by_provider(
+        self,
+        provider: str,
+        model: str,
+        scene: str,
+        prompt: str,
+        *,
+        timeout_seconds: float,
+    ) -> str:
         if provider == "ollama":
-            return await self._call_ollama(prompt, model, scene)
+            return await self._call_ollama(prompt, model, scene, timeout_seconds=timeout_seconds)
         if provider == "openai":
             return await self._call_openai_compatible(
                 base_url=self.settings.openai_base_url,
@@ -119,6 +182,7 @@ class LLMService:
                 model=model,
                 prompt=prompt,
                 scene=scene,
+                timeout_seconds=timeout_seconds,
             )
         if provider == "deepseek":
             return await self._call_openai_compatible(
@@ -127,12 +191,13 @@ class LLMService:
                 model=model,
                 prompt=prompt,
                 scene=scene,
+                timeout_seconds=timeout_seconds,
             )
         if provider == "gemini":
-            return await self._call_gemini(prompt, model, scene)
+            return await self._call_gemini(prompt, model, scene, timeout_seconds=timeout_seconds)
         raise ValueError(f"unsupported provider: {provider}")
 
-    async def _call_ollama(self, prompt: str, model: str, scene: str) -> str:
+    async def _call_ollama(self, prompt: str, model: str, scene: str, *, timeout_seconds: float) -> str:
         cfg = scene_params(scene)
         payload = {
             "model": model,
@@ -144,13 +209,22 @@ class LLMService:
                 "num_predict": int(cfg["max_tokens"]),
             },
         }
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             response = await client.post(f"{self.settings.ollama_base_url}/api/generate", json=payload)
             response.raise_for_status()
             data = response.json()
         return str(data.get("response", ""))
 
-    async def _call_openai_compatible(self, *, base_url: str, api_key: str, model: str, prompt: str, scene: str) -> str:
+    async def _call_openai_compatible(
+        self,
+        *,
+        base_url: str,
+        api_key: str,
+        model: str,
+        prompt: str,
+        scene: str,
+        timeout_seconds: float,
+    ) -> str:
         if not api_key:
             raise RuntimeError("missing api key")
         cfg = scene_params(scene)
@@ -165,7 +239,7 @@ class LLMService:
             "max_tokens": int(cfg["max_tokens"]),
         }
         headers = {"Authorization": f"Bearer {api_key}"}
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             response = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
@@ -175,7 +249,7 @@ class LLMService:
         message = choices[0].get("message", {})
         return str(message.get("content", ""))
 
-    async def _call_gemini(self, prompt: str, model: str, scene: str) -> str:
+    async def _call_gemini(self, prompt: str, model: str, scene: str, *, timeout_seconds: float) -> str:
         key = self.settings.gemini_api_key
         if not key:
             raise RuntimeError("missing gemini api key")
@@ -189,7 +263,7 @@ class LLMService:
             },
         }
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()

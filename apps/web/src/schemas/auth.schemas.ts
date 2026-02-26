@@ -10,7 +10,7 @@ const usernameSchema = z
 const passwordSchema = z
   .string({ message: "请输入密码" })
   .min(8, "密码至少 8 位")
-  .max(100, "密码最多 100 位");
+  .max(64, "密码最多 64 位");
 
 export const loginSchema = z.object({
   username: usernameSchema,

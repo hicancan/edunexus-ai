@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -16,6 +15,7 @@ from .idempotency import IdempotencyStore
 from .kb import KnowledgeBaseService
 from .llm import LLMService
 from .models import (
+    AIQuestionItem,
     AIQGenerateRequest,
     ChatRequest,
     KbDeleteRequest,
@@ -41,6 +41,10 @@ logger = logging.getLogger("edunexus.ai")
 
 PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 INTERNAL_OPEN_PATHS = {"/internal/v1/ping"}
+IDEMPOTENCY_REQUIRED_PATHS = {
+    "/internal/v1/kb/ingest",
+    "/internal/v1/kb/delete",
+}
 
 
 def create_app() -> FastAPI:
@@ -95,13 +99,45 @@ def create_app() -> FastAPI:
             token = request.headers.get("X-Service-Token", "")
             if token != settings.service_token:
                 error = auth_failed()
-                return JSONResponse(status_code=error.status_code, content={"code": error.code, "message": error.message})
+                return JSONResponse(
+                    status_code=error.status_code,
+                    content={
+                        "code": error.code,
+                        "message": error.message,
+                        "traceId": request.headers.get("X-Trace-Id", ""),
+                    },
+                )
 
             if path not in INTERNAL_OPEN_PATHS and not request.headers.get("X-Trace-Id", "").strip():
                 return JSONResponse(
                     status_code=400,
-                    content={"code": "VALIDATION_PARAM", "message": "X-Trace-Id is required"},
+                    content={
+                        "code": "VALIDATION_PARAM",
+                        "message": "X-Trace-Id is required",
+                        "traceId": "",
+                    },
                 )
+
+            if path in IDEMPOTENCY_REQUIRED_PATHS:
+                idem_key = request.headers.get("Idempotency-Key", "").strip()
+                if not idem_key:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "code": "VALIDATION_PARAM",
+                            "message": "Idempotency-Key is required",
+                            "traceId": request.headers.get("X-Trace-Id", ""),
+                        },
+                    )
+                if len(idem_key) < 8 or len(idem_key) > 128:
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "code": "VALIDATION_PARAM",
+                            "message": "Idempotency-Key length must be between 8 and 128",
+                            "traceId": request.headers.get("X-Trace-Id", ""),
+                        },
+                    )
 
         return await call_next(request)
 
@@ -295,26 +331,8 @@ def _build_citations(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _validate_wrong_analysis(payload: dict[str, Any]) -> WrongAnalyzeResponse:
-    steps = payload.get("steps", [])
-    if isinstance(steps, str):
-        steps = [steps]
-    if not isinstance(steps, list):
-        raise output_invalid("steps must be a list")
-    clean_steps = [str(step).strip() for step in steps if str(step).strip()]
-    if not clean_steps:
-        raise output_invalid("steps cannot be empty")
-
     try:
-        response = WrongAnalyzeResponse(
-            encourage=str(payload.get("encourage", "")).strip(),
-            concept=str(payload.get("concept", "")).strip(),
-            steps=clean_steps,
-            rootCause=str(payload.get("rootCause", payload.get("root_cause", ""))).strip(),
-            nextPractice=str(payload.get("nextPractice", payload.get("next_practice", ""))).strip(),
-        )
-        if not response.encourage or not response.concept or not response.rootCause or not response.nextPractice:
-            raise output_invalid("wrong analysis fields cannot be empty")
-        return response
+        return WrongAnalyzeResponse.model_validate(payload)
     except ValidationError as ex:
         raise output_invalid(str(ex)) from ex
 
@@ -322,56 +340,16 @@ def _validate_wrong_analysis(payload: dict[str, Any]) -> WrongAnalyzeResponse:
 def _validate_questions(rows: list[dict[str, Any]], count: int) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for row in rows:
-        content = str(row.get("content", "")).strip()
-        if not content:
+        try:
+            question = AIQuestionItem.model_validate(row)
+        except ValidationError:
             continue
 
-        options_raw = row.get("options", {})
-        if isinstance(options_raw, str):
-            try:
-                options_raw = json.loads(options_raw)
-            except Exception:  # noqa: BLE001
-                options_raw = {}
-        if not isinstance(options_raw, dict):
-            continue
-
-        options: dict[str, str] = {}
-        for key, value in options_raw.items():
-            option_key = str(key).strip().upper()
-            option_value = str(value).strip()
-            if option_key and option_value:
-                options[option_key] = option_value
-        if len(options) < 4:
-            continue
-        if not all(label in options for label in ("A", "B", "C", "D")):
-            continue
-
-        correct_answer = str(row.get("correct_answer", "")).strip().upper()
-        if correct_answer not in options:
-            continue
-
-        explanation = str(row.get("explanation", "")).strip()
-        if not explanation:
-            continue
-
-        knowledge_points = row.get("knowledge_points", [])
-        if not isinstance(knowledge_points, list):
-            continue
-        kp = [str(item).strip() for item in knowledge_points if str(item).strip()]
-        if not kp:
-            continue
-
-        out.append(
-            {
-                "content": content,
-                "options": options,
-                "correct_answer": correct_answer,
-                "explanation": explanation,
-                "knowledge_points": kp,
-            }
-        )
+        out.append(question.model_dump())
         if len(out) >= count:
             break
+    if len(out) != count:
+        return []
     return out
 
 
