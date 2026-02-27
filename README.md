@@ -1,250 +1,183 @@
-# EduNexus AI
+# 🎓 EduNexus AI: 智能教育一体化工作台
 
-[🌍 English Version](#english-version) | [🇨🇳 中文版](#中文版)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](https://github.com/hicancan/edunexus-ai)
+[![Framework](https://img.shields.io/badge/Framework-Spring%20Boot%203.4%20%7C%20FastAPI%20%7C%20Vue%203.5-green)](https://github.com/hicancan/edunexus-ai)
+[![Java](https://img.shields.io/badge/Java-21-red)](https://openjdk.org/projects/jdk/21/)
+[![Python](https://img.shields.io/badge/Python-3.12-yellow)](https://www.python.org/downloads/release/python-3120/)
+[![License](https://img.shields.io/badge/License-MIT-orange)](LICENSE)
+
+**EduNexus AI** 是一款专为 2026 年现代智慧教育场景打造的旗舰级一体化工作台。项目采用微服务化架构理念，深度整合 **RAG (检索增强生成)** 技术，为学生、教师和管理者提供从智能辅导到全量治理的闭环体验。
 
 ---
 
-<span id="中文版"></span>
-# 🎓 EduNexus AI (中文版)
+## ✨ 核心特性展厅
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Vue](https://img.shields.io/badge/Vue-3.5-brightgreen.svg)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.3-green.svg)
-![Python](https://img.shields.io/badge/Python-3.12-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.116-teal.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)
+### 1. 极简登录与多角色适配
+项目内置基于角色 (RBAC) 的动态路由与权限拦截引擎。
 
-**EduNexus AI** 是一个面向高校实训场景的现代化、智能化 AI 学习赋能平台。项目致力于打破传统教育的信息孤岛，通过大语言模型（LLM）与检索增强生成（RAG）技术，在学生、教师和管理者之间形成**“学-练-评-教-管”**的完整业务闭环。
+![登录页面预览](./doc/picture/login_page.png)
 
-本级项目严格遵循 **“单一事实来源（SSOT）”** 的工程治理规范，追求企业级的高可维护性、高可测试性与代码规范。
+### 2. 学生端：全链路智能辅助
+- **智能对话 (RAG)**：基于自研切片算法的知识库精准问答。
+- **题目练习与解析**：支持全科题目练习，配备由 AI 驱动的深度解析与薄弱点扫描。
 
-## ✨ 核心特性
+![学生练习界面](./doc/picture/student_exercise.png)
 
-### 👨‍🎓 学生端 (Student)
-- **智能伴学对话 (RAG-based Chat)**：基于教师专属知识库的 AI 问答，支持流式输出与精确到文档片段的来源引用（Citations），告别“AI 幻觉”。
-- **智能化练习与错题本**：支持自动判分、知识点提取与错误成因分析。错题自动收录并根据掌握情况动态移除。
-- **AI 个性化出题**：AI 结合学生薄弱点（错题画像）与教师建议，动态生成贴合当前学习进度的专属练习题。
+### 3. 教师端：教研数字化中枢
+- **知识穹顶管理**：支持 PDF/Word 异步解析与向量化。
+- **学情多维追踪**：利用 ECharts 雷达图进行细粒度知识漏洞诊断。
 
-### 👨‍🏫 教师端 (Teacher)
-- **私有知识库摄取 (Knowledge Pipeline)**：支持一键上传 PDF/Word 文档。系统采用异步任务进行自动解析、智能切片与高维空间向量化（Embedding）。
-- **AI 智能教案生成**：输入核心主题与课时，极速生成结构化、支持 Markdown/PDF 导出与临时链接分享的教案。
-- **学情分析与干预**：可视化跟踪班级学生的错题重灾区，提供定点建议直达学生解析面板。
+![教师学情分析](./doc/picture/teacher_analytics.png)
 
-### 🛡️ 管理与平台工程 (Admin & Platform)
-- **智能模型路由机制 (Model Routing)**：根据场景复杂度自动回退与分发策略。轻量级任务走本地 `qwen3`，深度推理任务走 `deepseek-r1`，具备高可用降级能力。
-- **严格权限隔离 (RBAC+ABAC)**：基于角色与资源归属、师生绑定关系的多维度数据隔离，确保数据隐私绝对安全。
+### 4. 管理端：全域资源治理
+- **数据看版**：实时观测平台活跃度与资源健康指标。
+- **全合规审计**：记录全量操作日志，支持资源生命周期管理。
 
-## 🏗️ 架构设计
+![管理端看板](./doc/picture/admin_dashboard.png)
 
-项目采用轻量化微服务/单体混合架构设计，业务与 AI 推理服务严格解耦。
+---
+
+## 🏗 全景架构图
 
 ```mermaid
 graph TB
-    subgraph 用户层
-        Browser["浏览器\n(Vue 3.5 + TS 5.8 + Vite 6)"]
+    subgraph Client [用户终端层]
+        Web[Vue 3 SPA - Vite]
     end
 
-    subgraph 应用层
-        API["业务核心骨架\n(Spring Boot 3.4.3 / Java 21)"]
-        AI["AI 专门服务\n(FastAPI / Python 3.12 / litellm)"]
-        Worker["异步治理 Worker\n(流解析/向量化)"]
+    subgraph Business [业务逻辑层]
+        API[Spring Boot 3.4 - API Service]
+        Auth[Spring Security + JWT]
+        Job[Idempotent Job Engine]
     end
 
-    subgraph 引擎与数据基座
-        Ollama["本地推理引擎\n(Ollama)"]
-        PG[("PostgreSQL 17\n(核心事务)")]
-        Redis[("Redis 7.2\n(缓存/限流)")]
-        Qdrant[("Qdrant 1.17\n(高维向量)")]
-        MinIO[("MinIO\n(类S3对象存储)")]
+    subgraph AI [人工智能层]
+        AIS[FastAPI - AI/RAG Service]
+        Parse[PDF/Docx Parser]
+        Embed[Vector Embedding]
+        Search[Vector Search]
     end
 
-    Browser -->|REST| API
-    API -->|HTTP契约| AI
-    API -->|发布任务| Worker
-    AI -->|HTTP :11434| Ollama
-    AI -->|gRPC :6333| Qdrant
-    API -->|JDBC| PG
-    API -->|TCP| Redis
-    API -->|S3 API| MinIO
+    subgraph Infra [基础设施层]
+        DB[(PostgreSQL 16)]
+        Redis[(Redis 7 - Cache/Blacklist)]
+        Qdrant[(Qdrant - Vector DB)]
+        MinIO[(MinIO - S3 Blob Storage)]
+    end
+
+    %% Communication Flow
+    Web -- "REST API (Role-Based)" --> API
+    API -- "Internal REST (Service Token)" --> AIS
+    API -- "JDBC" --> DB
+    API -- "Jedis" --> Redis
+    API -- "S3 SDK" --> MinIO
+    AIS -- "HTTP" --> LLM{Local Ollama / Cloud LLM}
+    AIS -- "GRPC/HTTP" --> Qdrant
+
+    %% Shared logic
+    API -- "Audit Logging" --> DB
 ```
 
-## 🛠️ 技术栈清单
+---
 
-- **前端 (Frontend)**: Vue 3.5, TypeScript 5.8, Vite 6, Pinia, Vue Router, Element Plus, Tailwind/CSS Variables.
-- **后端 (Backend)**: Java 21, Spring Boot 3.4.3, JdbcTemplate, Flyway, Virtual Threads.
-- **AI 算法与服务 (AI Service)**: Python 3.12, FastAPI 0.116, Uvicorn, litellm.
-- **数据中间件 (Data & Infrastructure)**: PostgreSQL 17, Redis 7.2, Qdrant 1.17, MinIO.
-- **大模型 (LLMs)**: qwen3-embedding:0.6b, qwen3:4b/8b, deepseek-r1:8b (均可基于 Ollama 本地化部署，支持无缝切换至云端 API).
+## 🛠 技术栈与工具链
 
-## 🚀 快速启动
+### **前端 (apps/web)**
+- **核心框架**: Vue 3.5 (Composition API) + TypeScript 5
+- **架构模式**: Feature-Sliced Design (FSD)
+- **状态管理**: Pinia + PersistedState (持久化)
+- **UI 组件库**: Naive UI + TailwindCSS
+- **数据可视化**: ECharts 6 + Vue-ECharts
+- **工具**: Vite (构建), Vitest (测试), Axios (请求), Zod (Schema 校验)
+
+### **后端 (apps/api)**
+- **核心框架**: Spring Boot 3.4.3 (Java 21)
+- **鉴权中心**: Spring Security + Stateless JWT (含退出黑名单机制)
+- **数据访问**: Spring JDBC + Flyway (数据库迁移)
+- **文档处理**: Apache PDFBox + software.amazon.awssdk (S3)
+- **监控/契约**: Spring Actuator + OpenAPI 3 (SpringDoc)
+
+### **AI 服务 (apps/ai-service)**
+- **核心框架**: FastAPI (Python 3.12)
+- **向量引擎**: Qdrant Client
+- **文档解析**: pypdf, python-docx
+- **大模型支持**: Ollama (本地), DeepSeek, OpenAI, Gemini
+- **环境治理**: Conda + UV (超快包管理器)
+
+---
+
+## 📂 项目文件架构 (Tree)
+
+```text
+edunexus-ai/
+├── apps/
+│   ├── ai-service/          # Python AI 服务 (RAG/解析/模型调度)
+│   │   ├── ai_service/      # 核心逻辑 (routes, schemas, services)
+│   │   └── pyproject.toml   # UV 环境配置
+│   ├── api/                 # Java 业务后端
+│   │   ├── src/main/java    # Spring Boot 源码
+│   │   ├── src/main/resources/db/migration # Flyway SQL 脚本
+│   │   └── pom.xml          # Maven 依赖管理
+│   └── web/                 # 前端单页应用
+│       ├── src/             
+│       │   ├── app/         # 全局初始化与 Provider
+│       │   ├── features/    # 细粒度业务特性
+│       │   ├── pages/       # 各角色路由页面
+│       │   └── entities/    # 业务数据实体
+│       └── package.json     # 前端依赖配置
+├── doc/                     # 项目文档 (契约、图片、设计稿)
+│   └── picture/             # 存放 README 引用图示
+├── scripts/                 # 跨平台 (PS1/SH) 自动化运维脚本
+├── docker-compose.yml       # 一键部署基础设施 (PostgreSQL/Redis/Qdrant/MinIO)
+└── .env.example             # 环境变量模版
+```
+
+---
+
+## 🚀 快速上手
 
 ### 1. 环境准备
-- 确保系统已安装 **Docker** 与 **Docker Compose**。
-- 确保已安装 JDK 21 和 Node.js 20+。
-- ⚠️ **强制要求**：Python 环境**必须**使用 [Conda](https://docs.conda.io/en/latest/)，且环境名必须为 `edunexus-ai`。
-- ⚠️ **强制要求**：Python 依赖管理与执行**必须**使用 [uv](https://docs.astral.sh/uv/)。
+- **Docker Desktop** (包含 Compose)
+- **JDK 21** & **Node.js 20+**
+- **Conda** (环境名必须设定为 `edunexus-ai`)
+- **uv** (推荐安装以获得极速 Python 启动体验)
 
-### 2. 构建与运行基础设施
-```bash
-# 启动 PG, Redis, Qdrant, MinIO 等底层依赖
-docker-compose up -d
+### 2. 初始化与启动
+```powershell
+# 1. 复制环境变量
+Copy-Item .env.example .env
+
+# 2. 一键启动所有服务 (包含基础设施、API、AI 与前端)
+.\scripts\run-dev.ps1
 ```
 
-### 3. 配置环境变量
-复制 `.env.example` 为 `.env` 并按需调整配置（特别是数据库密码与外部模型 API 密钥）。
-
-### 4. 启动 AI 服务 (Python)
-```bash
-# 创建并激活专用 Conda 环境
-conda create -n edunexus-ai python=3.12 -y
-conda activate edunexus-ai
-
-# 使用 uv 同步依赖并启动服务
-uv sync --project apps/ai-service 
-uv run --project apps/ai-service uvicorn ai_service.app:app --host 0.0.0.0 --port 8000
-```
-
-### 5. 启动核心业务骨架与前端
-```bash
-# 启动 Spring Boot (apps/api目录)
-./mvnw spring-boot:run
-
-# 启动 Vue 前端 (apps/web目录)
-npm install
-npm run dev
-```
-
-## 📚 查阅官方文档
-
-本项目拥有顶级的单一事实来源（SSOT）工程化文档支持，请在 `doc/` 目录下查阅全部设计规范：
-
-- 核心架构与规则：[`00-SSOT-总则.md`](./doc/00-SSOT-总则.md)
-- 业务需求边界：[`01-PRD-产品需求规格.md`](./doc/01-PRD-产品需求规格.md)
-- 数据与向量建模：[`05-数据模型与迁移规范.md`](./doc/05-数据模型与迁移规范.md)
-- API 交互契约：[`06-API契约-openapi.yaml`](./doc/06-API契约-openapi.yaml)
-- 智能问答与提示词管理：[`08-AI与RAG策略.md`](./doc/08-AI与RAG策略.md)
+### 3. 默认测试信息
+| 角色 | 账号 | 密码 | 初始入口 |
+| :--- | :--- | :--- | :--- |
+| **管理员** | `admin` | `12345678` | `/admin/users` |
+| **教师端** | `teacher01` | `12345678` | `/teacher/knowledge` |
+| **学生端** | `student01` | `12345678` | `/student/chat` |
 
 ---
 
-<span id="english-version"></span>
-# 🎓 EduNexus AI (English Version)
+## 📹 工作流实测演示
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Vue](https://img.shields.io/badge/Vue-3.5-brightgreen.svg)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.3-green.svg)
-![Python](https://img.shields.io/badge/Python-3.12-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.116-teal.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)
-
-**EduNexus AI** is a modernized, AI-empowered educational platform tailored for higher education and practical training scenarios. By integrating Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG) capabilities, the platform completely bridges the information gap between students, educators, and administrators, forming a closed-loop ecosystem of **"Learn - Practice - Evaluate - Teach - Manage"**.
-
-The repository strictly adheres to the **"Single Source of Truth (SSOT)"** engineering governance standards, aiming for enterprise-grade maintainability, extreme testability, and rigid code consistency.
-
-## ✨ Key Features
-
-### 👨‍🎓 For Students
-- **Smart RAG-based Chat Tutor**: Converse with an AI backed by teachers' private knowledge bases. Features streaming responses and precise artifact citations to thoroughly eliminate AI hallucinations.
-- **Intelligent Exercise & Wrong-Book**: Automated grading, knowledge point extraction, and root-cause analysis for mistakes. Incorrect answers automatically populate an interactive "wrong-book" that prunes itself based on mastery levels.
-- **Personalized AI Question Generation**: Dynamically spins up relevant practice questions targeted exactly at the student's weakness profiles and specific teacher suggestions.
-
-### 👨‍🏫 For Teachers
-- **Private Knowledge Ingestion**: Seamless one-click uploads for PDFs/Word documents. Triggers asynchronous background jobs for text parsing, semantic chunking, and high-dimensional space embedding.
-- **AI Lesson Plan Generation**: Instantly generate structured, pedagogically sound lesson plans based on core topics and durations. Supports Markdown/PDF exports and secure sharing via expirable links.
-- **Analytics & Intervention**: Visually track class-wide struggling points and push personalized suggestions directly into a student's exercise evaluation flow.
-
-### 🛡️ For Admins & Platform Integrity
-- **Smart Model Routing**: Scenario-based automated fallback and dispatching. Lightweight routing goes to local `qwen3`, deep reasoning routes to `deepseek-r1`, with high-availability fallbacks to cloud providers.
-- **Strict Authorization Bounds (RBAC+ABAC)**: Multi-dimensional data isolation driven by user roles, resource ownership, and verified teacher-student rosters ensures absolute data privacy.
-
-## 🏗️ Architecture Design
-
-The project adopts a lightweight hybrid microservices/monolith design, strictly decoupling the core transactional business logic from the heavy AI inference services.
-
-```mermaid
-graph TB
-    subgraph Client Layer
-        Browser["Web Browser\n(Vue 3.5 + TS 5.8 + Vite 6)"]
-    end
-
-    subgraph Application Layer
-        API["Core Business API\n(Spring Boot 3.4.3 / Java 21)"]
-        AI["Dedicated AI Service\n(FastAPI / Python 3.12 / litellm)"]
-        Worker["Async Task Worker\n(Parsing / Embedding)"]
-    end
-
-    subgraph Engines & Data Foundation
-        Ollama["Local Inference Engine\n(Ollama)"]
-        PG[("PostgreSQL 17\n(Core Transactions)")]
-        Redis[("Redis 7.2\n(Cache/Rate-Limits)")]
-        Qdrant[("Qdrant 1.17\n(Vector Database)")]
-        MinIO[("MinIO\n(S3-compatible Obj Store)")]
-    end
-
-    Browser -->|REST| API
-    API -->|HTTP Contract| AI
-    API -->|Enqueue Task| Worker
-    AI -->|HTTP :11434| Ollama
-    AI -->|gRPC :6333| Qdrant
-    API -->|JDBC| PG
-    API -->|TCP| Redis
-    API -->|S3 API| MinIO
-```
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Vue 3.5, TypeScript 5.8, Vite 6, Pinia, Vue Router, Element Plus, Tailwind/CSS Variables.
-- **Backend API**: Java 21, Spring Boot 3.4.3, JdbcTemplate, Flyway, Virtual Threads.
-- **AI Algorithms & Service**: Python 3.12, FastAPI 0.116, Uvicorn, litellm.
-- **Data & Middleware**: PostgreSQL 17, Redis 7.2, Qdrant 1.17, MinIO.
-- **LLM Fleet**: qwen3-embedding:0.6b, qwen3:4b/8b, deepseek-r1:8b (All deployable locally via Ollama with seamless fallback to Cloud APIs).
-
-## 🚀 Quick Start
-
-### 1. Prerequisites
-- Ensure **Docker** and **Docker Compose** are installed and running.
-- Ensure **JDK 21** and **Node.js 20+** are installed.
-- ⚠️ **MANDATORY**: The Python environment **MUST** be provisioned via [Conda](https://docs.conda.io/en/latest/), and the environment name **MUST** be `edunexus-ai`.
-- ⚠️ **MANDATORY**: Python dependency management and script execution **MUST** use [uv](https://docs.astral.sh/uv/).
-
-### 2. Stand up Infrastructure Hub
-```bash
-# Boot PG, Redis, Qdrant, MinIO, etc.
-docker-compose up -d
-```
-
-### 3. Environment Variable Configuration
-Copy `.env.example` to `.env` and adjust your variables accordingly (Especially DB passwords and external LLM keys).
-
-### 4. Boot up the AI Service (Python)
-```bash
-# Create and activate the mandatory Conda environment
-conda create -n edunexus-ai python=3.12 -y
-conda activate edunexus-ai
-
-# Use uv to sync dependencies and run the server
-uv sync --project apps/ai-service 
-uv run --project apps/ai-service uvicorn ai_service.app:app --host 0.0.0.0 --port 8000
-```
-
-### 5. Boot Core API and Frontend
-```bash
-# Start Spring Boot (inside apps/api)
-./mvnw spring-boot:run
-
-# Start Vue Client (inside apps/web)
-npm install
-npm run dev
-```
-
-## 📚 Official Documentation
-
-This repository prides itself on its premier Single Source of Truth (SSOT) engineering docs. Please find the comprehensive system constraints inside the `doc/` folder:
-
-- Core Directives & Architecture: [`00-SSOT-总则.md`](./doc/00-SSOT-总则.md)
-- Product Requirements (PRD): [`01-PRD-产品需求规格.md`](./doc/01-PRD-产品需求规格.md)
-- Relational & Vector Data Models: [`05-数据模型与迁移规范.md`](./doc/05-数据模型与迁移规范.md)
-- REST API Contracts: [`06-API契约-openapi.yaml`](./doc/06-API契约-openapi.yaml)
-- Pipeline & Generation Prompt Specs: [`08-AI与RAG策略.md`](./doc/08-AI与RAG策略.md)
+````carousel
+### 📖 学生端：从练习到解析的全流程
+![学生端操作演示](./doc/picture/student_workflow.webp)
+<!-- slide -->
+### 🏫 教师端：知识库管理与学生洞察
+![教师端操作演示](./doc/picture/teacher_workflow.webp)
+<!-- slide -->
+### 🛠 管理端：全域资源与指标监控
+![管理员操作演示](./doc/picture/admin_workflow.webp)
+````
 
 ---
-*Powered by EduNexus AI Team | 2026 Edition*
+
+## 📜 开源协议
+本项目基于 **MIT License** 开源。
+
+---
+
+> **EduNexus AI** - 连接知识，驱动未来。
