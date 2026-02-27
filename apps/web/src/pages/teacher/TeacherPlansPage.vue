@@ -1,11 +1,31 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, h, onMounted, reactive, ref, watch } from "vue";
+import {
+  NCard,
+  NForm,
+  NFormItem,
+  NInput,
+  NInputNumber,
+  NSelect,
+  NButton,
+  NSpace,
+  NText,
+  NAlert,
+  NTag,
+  NModal,
+  NSpin,
+  NEmpty,
+  useDialog,
+  useMessage
+} from "naive-ui";
+import { Sparkles, Edit3, Download, Share2, Trash2, BookOpen, Clock, Presentation, GraduationCap, Link } from "lucide-vue-next";
 import MarkdownPreview from "../../components/common/MarkdownPreview.vue";
-import PaginationBar from "../../components/common/PaginationBar.vue";
-import { teacherPlanSchema } from "../../schemas/teacher.schemas";
-import { useTeacherStore } from "../../stores/teacher";
+import { teacherPlanSchema } from "../../features/teacher-workspace/model/teacher.schemas";
+import { useTeacherStore } from "../../features/teacher-workspace/model/teacher";
 
 const teacherStore = useTeacherStore();
+const dialog = useDialog();
+const message = useMessage();
 
 const generateForm = reactive({
   topic: "",
@@ -22,6 +42,7 @@ const editor = reactive({
 const exportFormat = ref<"md" | "pdf">("md");
 const formError = ref("");
 const operationSuccess = ref("");
+const showEditorModal = ref(false);
 
 const latestShareText = computed(() => {
   if (!teacherStore.shareResult) {
@@ -32,9 +53,16 @@ const latestShareText = computed(() => {
 
 async function loadPlans(): Promise<void> {
   await teacherStore.loadPlans({
-    page: teacherStore.plansPage,
-    size: teacherStore.plansSize
+    page: pagination.page,
+    size: pagination.pageSize
   });
+}
+
+function syncCartToForm() {
+  if (teacherStore.examCart.length > 0 && !generateForm.topic) {
+    const docNames = teacherStore.examCart.map(d => d.filename?.split('.')[0] || '未知文档').join('、');
+    generateForm.topic = `高维组阵推演: ${docNames}`.slice(0, 60);
+  }
 }
 
 async function createPlan(): Promise<void> {
@@ -43,11 +71,21 @@ async function createPlan(): Promise<void> {
 
   const parsed = teacherPlanSchema.safeParse(generateForm);
   if (!parsed.success) {
-    formError.value = parsed.error.issues[0]?.message || "教案参数不合法";
+    message.warning(parsed.error.issues[0]?.message || "生成参数不符合拓扑规范");
     return;
   }
 
-  const created = await teacherStore.createPlan(parsed.data);
+  // Prepend metadata about cart items if any
+  let finalTopic = parsed.data.topic;
+  if (teacherStore.examCart.length > 0 && !finalTopic.includes("关联底源:")) {
+      const docIds = teacherStore.examCart.map(d => d.id).join(',');
+      finalTopic = `${finalTopic} [关联底源:${docIds}]`;
+  }
+
+  const created = await teacherStore.createPlan({
+    ...parsed.data,
+    topic: finalTopic
+  });
   if (!created) {
     return;
   }
@@ -55,8 +93,18 @@ async function createPlan(): Promise<void> {
   editor.planId = created.id || "";
   editor.topic = created.topic || "";
   editor.contentMd = created.contentMd || "";
-  operationSuccess.value = "教案已生成，可继续编辑后保存。";
-  await teacherStore.loadPlans({ page: 1, size: teacherStore.plansSize });
+  
+  // Clear the cart after successful generation
+  if (teacherStore.examCart.length > 0) {
+    teacherStore.clearCart();
+    message.success("组阵池消耗完毕，教案原型已坍缩生成");
+  } else {
+    message.success("AI 教学切片已火速生成，可继续编辑");
+  }
+  
+  showEditorModal.value = true;
+  generateForm.topic = ""; // Reset form
+  await loadPlans();
 }
 
 function openEditor(planId: string): void {
@@ -67,40 +115,63 @@ function openEditor(planId: string): void {
   editor.planId = target.id || "";
   editor.topic = target.topic || "";
   editor.contentMd = target.contentMd || "";
+  showEditorModal.value = true;
 }
 
 async function savePlan(): Promise<void> {
   if (!editor.planId) {
-    formError.value = "请先选择教案后再保存";
+    message.warning("请锁定切片实体后再保存");
     return;
   }
-  operationSuccess.value = "";
   const updated = await teacherStore.savePlan(editor.planId, editor.contentMd);
   if (updated) {
-    operationSuccess.value = "教案保存成功";
+    message.success("教学切片拓扑已重构并封存");
+    showEditorModal.value = false;
     await loadPlans();
   }
 }
 
-async function removePlan(planId: string): Promise<void> {
-  if (!planId || !window.confirm("确认删除该教案吗？")) {
-    return;
-  }
+function confirmRemovePlan(planId: string): void {
+  dialog.warning({
+    title: "抹除切片数据",
+    content: "确认抹除该教案分身吗？其占用的向量态将不可逆注销。",
+    positiveText: "强制湮灭",
+    negativeText: "维持闭合",
+    onPositiveClick: async () => {
+       try {
+         await teacherStore.removePlan(planId);
+         if (editor.planId === planId) {
+           editor.planId = "";
+           editor.topic = "";
+           editor.contentMd = "";
+           showEditorModal.value = false;
+         }
+         message.success("切片分身已成功湮灭");
+         await loadPlans();
+       } catch {
+         message.error("湮灭指令失效");
+       }
+    }
+  });
+}
 
-  await teacherStore.removePlan(planId);
-  if (editor.planId === planId) {
-    editor.planId = "";
-    editor.topic = "";
-    editor.contentMd = "";
-  }
-  await loadPlans();
+function closeEditor(): void {
+   dialog.info({
+      title: "跃出编辑态",
+      content: "系统检测到未封装的微扰，直接跃出将遗失数据。是否确认放弃？",
+      positiveText: "放弃微扰",
+      negativeText: "继续重排",
+      onPositiveClick: () => {
+         showEditorModal.value = false;
+      }
+   });
 }
 
 async function sharePlan(planId: string): Promise<void> {
   operationSuccess.value = "";
   const shareResult = await teacherStore.shareLessonPlan(planId);
   if (shareResult) {
-    operationSuccess.value = "教案分享链接已生成";
+    message.success("全息通讯锚点已生成");
   }
 }
 
@@ -111,125 +182,414 @@ async function exportCurrentPlan(planId: string): Promise<void> {
     return;
   }
 
-  const fileName = `lesson-plan-${planId}.${exportFormat.value}`;
+  const fileName = `hologram-plan-${planId}.${exportFormat.value}`;
   const blobUrl = window.URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = blobUrl;
   anchor.download = fileName;
   anchor.click();
   window.URL.revokeObjectURL(blobUrl);
-  operationSuccess.value = `导出成功：${fileName}`;
+  message.success(`物质化导出完毕：${fileName}`);
 }
 
-async function updatePage(page: number): Promise<void> {
-  await teacherStore.loadPlans({ page, size: teacherStore.plansSize });
-}
+const pagination = reactive({
+  page: teacherStore.plansPage,
+  pageSize: teacherStore.plansSize,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+  onChange: (page: number) => {
+    pagination.page = page;
+    loadPlans();
+  },
+  onUpdatePageSize: (pageSize: number) => {
+    pagination.pageSize = pageSize;
+    pagination.page = 1;
+    loadPlans();
+  }
+});
 
-async function updateSize(size: number): Promise<void> {
-  await teacherStore.loadPlans({ page: 1, size });
-}
+onMounted(() => {
+  syncCartToForm();
+  loadPlans();
+});
 
-onMounted(loadPlans);
+watch(() => teacherStore.examCart.length, syncCartToForm);
 </script>
 
 <template>
-  <section class="panel">
-    <header class="panel-head">
-      <div>
-        <h2 class="panel-title">教案管理</h2>
-        <p class="panel-note">支持教案生成、编辑、保存、导出与分享。</p>
-      </div>
-      <button class="btn" type="button" :disabled="teacherStore.operationLoading" @click="createPlan">
-        {{ teacherStore.operationLoading ? "处理中..." : "生成教案" }}
-      </button>
-    </header>
-
-    <div class="form-grid">
-      <div class="field-block">
-        <label for="plan-topic">主题</label>
-        <input id="plan-topic" v-model="generateForm.topic" placeholder="例如：牛顿定律" />
-      </div>
-      <div class="field-block">
-        <label for="plan-grade">年级</label>
-        <input id="plan-grade" v-model="generateForm.gradeLevel" placeholder="例如：高一" />
-      </div>
-      <div class="field-block">
-        <label for="plan-duration">课时（分钟）</label>
-        <input id="plan-duration" v-model.number="generateForm.durationMins" type="number" min="10" max="180" />
-      </div>
-      <div class="field-block">
-        <label for="plan-export-format">导出格式</label>
-        <select id="plan-export-format" v-model="exportFormat">
-          <option value="md">Markdown</option>
-          <option value="pdf">PDF</option>
-        </select>
-      </div>
-    </div>
-
-    <p v-if="formError" class="status-box error" role="alert">{{ formError }}</p>
-    <p v-if="teacherStore.plansError" class="status-box error" role="alert">{{ teacherStore.plansError }}</p>
-    <p v-if="teacherStore.operationError" class="status-box error" role="alert">{{ teacherStore.operationError }}</p>
-    <p v-if="operationSuccess" class="status-box success">{{ operationSuccess }}</p>
-    <p v-if="latestShareText" class="status-box info">分享链接：{{ latestShareText }}</p>
-
-    <div v-if="teacherStore.plansLoading && !teacherStore.plansLoaded" class="status-box info">正在加载教案...</div>
-    <div v-else-if="teacherStore.plans.length === 0" class="status-box empty">暂无教案记录。</div>
-    <div v-else class="list-stack">
-      <article v-for="plan in teacherStore.plans" :key="plan.id" class="list-item">
-        <div class="list-item-main">
-          <p class="list-item-title">{{ plan.topic }}</p>
-          <p class="list-item-meta">教案 ID：{{ plan.id }} · 年级：{{ plan.gradeLevel }} · 时长：{{ plan.durationMins }} 分钟 · 更新：{{ plan.updatedAt }}</p>
-        </div>
-        <div class="list-item-actions">
-          <button class="btn ghost small" type="button" @click="openEditor(plan.id || '')">编辑</button>
-          <button class="btn secondary small" type="button" @click="exportCurrentPlan(plan.id || '')">导出</button>
-          <button class="btn warning small" type="button" @click="sharePlan(plan.id || '')">分享</button>
-          <button class="btn danger small" type="button" @click="removePlan(plan.id || '')">删除</button>
-        </div>
-      </article>
-
-      <PaginationBar
-        :page="teacherStore.plansPage"
-        :size="teacherStore.plansSize"
-        :total-pages="teacherStore.plansTotalPages"
-        :total-elements="teacherStore.plansTotalElements"
-        :disabled="teacherStore.plansLoading"
-        @update:page="updatePage"
-        @update:size="updateSize"
-      />
-    </div>
-
-    <section v-if="editor.planId" class="editor-block">
-      <header class="panel-head">
+  <div class="plans-page app-container">
+    <div class="workspace-main">
+      <div class="workspace-header">
         <div>
-          <h3 class="panel-title">编辑教案：{{ editor.topic || editor.planId }}</h3>
-          <p class="panel-note">Markdown 内容会先净化再渲染预览，避免 XSS 注入。</p>
+          <h1 class="workspace-title">智能教案孵化舱</h1>
+          <p class="workspace-subtitle">定义推演参数，触发大模型进行知识图谱编织，秒级生成结构化与可视化的教学切片。</p>
         </div>
-        <button class="btn success" type="button" :disabled="teacherStore.operationLoading" @click="savePlan">
-          {{ teacherStore.operationLoading ? "保存中..." : "保存教案" }}
-        </button>
-      </header>
-      <textarea v-model="editor.contentMd" rows="12" aria-label="教案内容编辑器" />
-      <div class="preview-block">
-        <h4>Markdown 预览</h4>
-        <MarkdownPreview :content="editor.contentMd" />
       </div>
-    </section>
-  </section>
+
+      <n-alert v-if="teacherStore.examCart.length > 0" type="info" class="cart-alert">
+         <template #icon><Sparkles /></template>
+         发现高维组阵池挂载了 <b>{{ teacherStore.examCart.length }}</b> 个知识源！本次孵化将利用这些底源进行交叉推演，极速生成定制化考核/教学材料。
+      </n-alert>
+
+      <div class="panel glass-card generator-panel">
+        <div class="generator-content">
+          <div class="generator-banner">
+             <div class="banner-icon-bg"><Sparkles :size="28" /></div>
+             <div>
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--color-primary);">敏捷跃迁式生成</h3>
+                <span style="font-size: 0.85rem; color: var(--color-text-muted);">注入你的核心概念锚点，启动孵化引擎。</span>
+             </div>
+          </div>
+          <n-form inline :model="generateForm" label-placement="left" :show-feedback="false" class="ethereal-form">
+            <n-form-item label="教学课题中心" class="topic-item">
+               <n-input v-model:value="generateForm.topic" placeholder="例：牛顿第一定律及其向量应用" style="width: 250px" class="transparent-input" />
+            </n-form-item>
+            <n-form-item label="适用层级">
+               <n-input v-model:value="generateForm.gradeLevel" placeholder="例：高一" style="width: 120px" class="transparent-input" />
+            </n-form-item>
+            <n-form-item label="干涉时序(分钟)">
+               <n-input-number v-model:value="generateForm.durationMins" :min="10" :max="180" style="width: 130px" />
+            </n-form-item>
+            <n-form-item label="物质化介质">
+               <n-select v-model:value="exportFormat" :options="[{label:'Markdown 拓扑', value:'md'}, {label:'PDF 快照', value:'pdf'}]" style="width: 160px" />
+            </n-form-item>
+            <n-form-item>
+               <n-button type="primary" :loading="teacherStore.operationLoading" @click="createPlan" class="animate-pop glass-pill generate-btn">
+                 <template #icon><Sparkles :size="16" /></template>
+                 启动坍缩孵化
+               </n-button>
+            </n-form-item>
+          </n-form>
+        </div>
+      </div>
+
+      <n-alert v-if="teacherStore.plansError" type="error" :show-icon="true">{{ teacherStore.plansError }}</n-alert>
+      <n-alert v-if="teacherStore.operationError" type="error" :show-icon="true">{{ teacherStore.operationError }}</n-alert>
+      <n-alert v-if="latestShareText" type="success" :show-icon="true" class="share-alert">
+         全息通讯锚点已接通：<a :href="latestShareText" target="_blank">{{ latestShareText }}</a>
+      </n-alert>
+
+      <n-spin :show="teacherStore.plansLoading">
+         <n-empty v-if="teacherStore.plansLoaded && teacherStore.plans.length === 0" description="舱体空载中，未检索到教学切片" class="empty-layout">
+             <template #icon><Presentation :size="48" style="color: var(--color-border-strong)"/></template>
+         </n-empty>
+         
+         <div v-else class="plans-grid">
+            <div 
+              v-for="plan in teacherStore.plans" 
+              :key="plan.id"
+              class="panel glass-card plan-card"
+            >
+               <div class="plan-header">
+                  <div class="plan-icon">
+                     <Presentation :size="28" />
+                  </div>
+                  <div class="plan-info">
+                    <h3 class="plan-topic" :title="plan.topic">{{ plan.topic }}</h3>
+                    <span class="plan-id">{{ plan.id }}</span>
+                  </div>
+               </div>
+               
+               <div class="plan-meta-grid">
+                  <div class="meta-tag">
+                     <GraduationCap :size="14" />
+                     <span>{{ plan.gradeLevel || '未指定' }}</span>
+                  </div>
+                  <div class="meta-tag">
+                     <Clock :size="14" />
+                     <span>{{ plan.durationMins }} min</span>
+                  </div>
+               </div>
+
+               <div class="plan-footer">
+                  <div class="plan-date">{{ plan.updatedAt?.substring(0, 16) }}</div>
+                  <div class="plan-actions">
+                     <n-button circle size="small" type="primary" quaternary ghost @click="openEditor(plan.id || '')" class="animate-pop tool-btn">
+                       <template #icon><Edit3 :size="16" /></template>
+                     </n-button>
+                     <n-button circle size="small" type="warning" quaternary ghost @click="sharePlan(plan.id || '')" class="animate-pop tool-btn">
+                       <template #icon><Share2 :size="16" /></template>
+                     </n-button>
+                     <n-button circle size="small" type="info" quaternary ghost @click="exportCurrentPlan(plan.id || '')" class="animate-pop tool-btn">
+                       <template #icon><Download :size="16" /></template>
+                     </n-button>
+                     <n-button circle size="small" type="error" quaternary ghost @click="confirmRemovePlan(plan.id || '')" class="animate-pop tool-btn dust-btn">
+                       <template #icon><Trash2 :size="16" /></template>
+                     </n-button>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </n-spin>
+    </div>
+
+    <!-- Editor Modal -->
+    <n-modal
+      v-model:show="showEditorModal"
+      preset="card"
+      :title="`高维干涉中：${editor.topic || editor.planId}`"
+      class="editor-modal eth-modal"
+      :mask-closable="false"
+      size="huge"
+      :style="{ width: '1200px', maxWidth: '95vw', height: '85vh', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)' }"
+      :on-close="closeEditor"
+    >
+       <div class="editor-layout">
+          <div class="editor-pane">
+             <n-input
+                v-model:value="editor.contentMd"
+                type="textarea"
+                placeholder="在此编写 Markdown 拓扑结构..."
+                class="full-height-input transparent-input"
+             />
+          </div>
+          <div class="preview-pane">
+             <div class="preview-header">
+                <n-space align="center" :size="8">
+                   <BookOpen :size="16" style="color: var(--color-primary)" />
+                   <n-text strong>安全净化视界 (XSS-Safe)</n-text>
+                </n-space>
+             </div>
+             <div class="preview-content">
+                <MarkdownPreview :content="editor.contentMd" />
+             </div>
+          </div>
+       </div>
+
+       <template #action>
+          <n-space justify="end" style="padding-top: 12px; border-top: 1px solid var(--color-border-glass)">
+             <n-button @click="closeEditor" round class="animate-pop">终止干涉</n-button>
+             <n-button type="primary" :loading="teacherStore.operationLoading" @click="savePlan" round class="hover-glow animate-pop">
+                固化拓扑修订
+             </n-button>
+          </n-space>
+       </template>
+    </n-modal>
+  </div>
 </template>
 
 <style scoped>
-.editor-block {
-  margin-top: 14px;
-  border-top: 1px dashed var(--color-border);
-  padding-top: 14px;
+.workspace-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.preview-block {
-  margin-top: 12px;
+.cart-alert {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.05);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.05);
+}
+.cart-alert :deep(.n-alert-body__title) {
+  color: #059669;
 }
 
-.preview-block h4 {
-  margin: 0 0 8px;
+.generator-panel {
+  padding: 24px;
+}
+
+.generator-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.banner-icon-bg {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(92,101,246,0.1), rgba(92,101,246,0.2));
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.generate-btn {
+  border-radius: 20px;
+}
+
+.share-alert {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.empty-layout {
+  padding: 80px 0;
+}
+
+/* Plans Grid */
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-5);
+  margin-top: 16px;
+}
+
+.plan-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  border: 1px solid var(--color-border-glass);
+}
+
+.plan-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-float);
+  border-color: rgba(92, 101, 246, 0.3);
+}
+
+.plan-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.plan-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(92,101,246,0.08);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plan-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.plan-topic {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-id {
+  font-family: var(--font-code);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.plan-meta-grid {
+  display: flex;
+  gap: 12px;
+  background: rgba(0,0,0,0.02);
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.meta-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  background: rgba(255,255,255,0.6);
+  padding: 4px 10px;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.plan-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border-glass);
+}
+
+.plan-date {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.plan-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tool-btn {
+  background: transparent !important;
+}
+
+.tool-btn:hover {
+  background: rgba(92, 101, 246, 0.1) !important;
+}
+
+.dust-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: var(--color-danger) !important;
+}
+
+/* Editor Styles */
+.editor-layout {
+  display: flex;
+  height: calc(85vh - 160px);
+  gap: 16px;
+}
+
+.editor-pane, .preview-pane {
+  flex: 1;
+  height: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-glass);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+}
+
+.preview-pane {
+  background-color: rgba(255,255,255,0.6);
+}
+
+.full-height-input {
+  flex: 1;
+  height: 100%;
+}
+
+:deep(.full-height-input .n-input-wrapper) {
+  height: 100%;
+  padding: 0;
+  background: transparent;
+}
+
+:deep(.full-height-input textarea) {
+  height: 100% !important;
+  font-family: var(--font-code);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 20px;
+  resize: none;
+  background: rgba(255,255,255,0.4);
+}
+
+.preview-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border-glass);
+  background: rgba(92,101,246,0.05);
+}
+
+.preview-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
 }
 </style>

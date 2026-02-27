@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onErrorCaptured, ref } from "vue";
+import { NResult, NButton } from "naive-ui";
 
 const hasError = ref(false);
 const errorMessage = ref("页面渲染异常，请刷新后重试。");
@@ -19,11 +20,25 @@ function reloadPage(): void {
 
 <template>
   <slot v-if="!hasError" />
-  <div v-else class="app-container">
-    <section class="panel">
-      <h2 class="panel-title">页面发生错误</h2>
-      <p class="panel-note">{{ errorMessage }}</p>
-      <button class="btn" type="button" @click="reloadPage">刷新页面</button>
-    </section>
+  <div v-else class="error-boundary-container">
+    <NResult
+      status="500"
+      title="页面发生致命错误"
+      :description="errorMessage"
+    >
+      <template #footer>
+        <NButton type="primary" @click="reloadPage">刷新页面</NButton>
+      </template>
+    </NResult>
   </div>
 </template>
+
+<style scoped>
+.error-boundary-container {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-soft);
+}
+</style>

@@ -1,4 +1,4 @@
-import { apiClient, unwrapResponse } from "./api-client";
+import { apiClient, unwrapResponse } from "../../../services/api-client";
 import {
   type AdminResourceVO,
   type AdminUserCreateRequest,
@@ -12,7 +12,7 @@ import {
   type UserStatus,
   type UserVO,
   normalizePagedResult
-} from "./contracts";
+} from "../../../services/contracts";
 
 export interface UserListQuery {
   page?: number;

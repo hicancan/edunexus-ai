@@ -1,6 +1,7 @@
 package com.edunexus.api.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.ErrorCode;
 import com.edunexus.api.common.TraceFilter;
 import com.edunexus.api.service.DbService;
@@ -14,8 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -136,17 +135,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             traceId = request.getHeader("X-Request-Id");
         }
         if (traceId == null || traceId.isBlank()) {
+            traceId = request.getHeader("X-Trace-Id");
+        }
+        if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString();
         }
         response.setStatus(status);
         response.setContentType("application/json;charset=UTF-8");
         response.setHeader("X-Request-Id", traceId);
-        Map<String, Object> body = new HashMap<>();
-        body.put("code", errorCode.name());
-        body.put("message", errorCode.defaultMessage());
-        body.put("data", null);
-        body.put("traceId", traceId);
-        body.put("timestamp", Instant.now().toString());
-        response.getWriter().write(objectMapper.writeValueAsString(body));
+        response.setHeader("X-Trace-Id", traceId);
+        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.error(errorCode, traceId)));
     }
 }

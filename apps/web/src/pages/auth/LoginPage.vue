@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { NCard, NForm, NFormItem, NInput, NButton, NAlert, NText, NSpace, useMessage } from "naive-ui";
 import { roleHomePath } from "../../app/router/routes";
-import { getFirstIssueMessage, loginSchema } from "../../schemas/auth.schemas";
-import { login as loginApi } from "../../services/auth.service";
+import { getFirstIssueMessage, loginSchema } from "../../features/auth/model/auth.schemas";
+import { login as loginApi } from "../../features/auth/api/auth.service";
 import { toErrorMessage } from "../../services/error-message";
-import { useAuthStore } from "../../stores/auth";
+import { useAuthStore } from "../../features/auth/model/auth";
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const message = useMessage();
 
 const username = ref("");
 const password = ref("");
@@ -32,6 +34,7 @@ async function submitLogin(): Promise<void> {
   try {
     const result = await loginApi(parsed.data);
     auth.setSession(result);
+    message.success("登录成功");
     const redirect =
       typeof route.query.redirect === "string" && route.query.redirect.startsWith("/")
         ? route.query.redirect
@@ -46,132 +49,187 @@ async function submitLogin(): Promise<void> {
 </script>
 
 <template>
-  <div class="app-container auth-layout">
-    <section class="panel auth-intro">
-      <p class="auth-kicker">EduNexus AI</p>
-      <h1>学习、教学、治理一体化工作台</h1>
-      <p class="panel-note">
-        学生可进行问答、做题与 AI 出题，教师管理知识库并生成教案，管理员可治理用户与资源。
-      </p>
-      <div class="auth-accounts" aria-label="默认账号提示">
-        <span>管理员：admin / 12345678</span>
-        <span>教师：teacher01 / 12345678</span>
-        <span>学生：student01 / 12345678</span>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2 class="panel-title">登录系统</h2>
-      <p class="panel-note">请输入用户名和密码。</p>
-
-      <div class="form-grid">
-        <div class="field-block">
-          <label for="login-username">用户名</label>
-          <input
-            id="login-username"
-            v-model="username"
-            autocomplete="username"
-            placeholder="请输入用户名"
-            @keyup.enter="submitLogin"
-          />
-        </div>
-        <div class="field-block">
-          <label for="login-password">密码</label>
-          <input
-            id="login-password"
-            v-model="password"
-            autocomplete="current-password"
-            type="password"
-            placeholder="请输入密码"
-            @keyup.enter="submitLogin"
-          />
+  <div class="auth-layout">
+    <div class="auth-intro">
+      <div class="intro-content">
+        <n-text depth="3" class="auth-kicker">EduNexus AI</n-text>
+        <h1 class="intro-title">学习、教学、治理<br />一体化工作台</h1>
+        <p class="intro-desc">
+          学生可进行问答、做题与 AI 出题，教师管理知识库并生成教案，管理员可治理用户与资源。
+        </p>
+        <div class="auth-accounts">
+          <n-text depth="3" class="account-hint">测试账号提示</n-text>
+          <div class="account-list">
+            <span class="account-badge glass-pill">管理员：admin / 12345678</span>
+            <span class="account-badge glass-pill">教师：teacher01 / 12345678</span>
+            <span class="account-badge glass-pill">学生：student01 / 12345678</span>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="auth-actions">
-        <button class="btn" type="button" :disabled="loading" aria-label="登录" @click="submitLogin">
-          {{ loading ? "登录中..." : "登录" }}
-        </button>
-        <router-link to="/register">没有账号？立即注册</router-link>
-      </div>
+    <div class="auth-form-area">
+      <n-card class="login-card glass-card" :bordered="false" size="large">
+        <template #header>
+          <n-text tag="h2" class="login-title">全域单点登录</n-text>
+        </template>
+        <n-space vertical :size="20">
+          <n-alert v-if="error" type="error" :show-icon="false">
+            {{ error }}
+          </n-alert>
 
-      <p v-if="error" class="status-box error" role="alert">{{ error }}</p>
-    </section>
+          <n-form @submit.prevent="submitLogin">
+            <n-form-item label="用户名" path="username">
+              <n-input
+                v-model:value="username"
+                placeholder="请输入用户名"
+                @keyup.enter="submitLogin"
+                size="large"
+              />
+            </n-form-item>
+            <n-form-item label="密码" path="password">
+              <n-input
+                v-model:value="password"
+                type="password"
+                show-password-on="click"
+                placeholder="请输入密码"
+                @keyup.enter="submitLogin"
+                size="large"
+              />
+            </n-form-item>
+            <div class="form-actions">
+              <n-button
+                type="primary"
+                attr-type="submit"
+                :loading="loading"
+                block
+                size="large"
+                class="animate-pop hover-glow"
+                @click="submitLogin"
+              >
+                授权连接
+              </n-button>
+            </div>
+          </n-form>
+
+          <div class="form-footer">
+            <n-text depth="3">尚未注册身份拓扑？</n-text>
+            <n-button text type="primary" class="animate-pop" @click="router.push('/register')">
+              立即注册
+            </n-button>
+          </div>
+        </n-space>
+      </n-card>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .auth-layout {
-  min-height: calc(100vh - 20px);
+  min-height: 100vh;
   display: grid;
-  align-items: center;
-  grid-template-columns: 1.05fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  background-color: var(--color-bg-light);
+  background-image:
+    radial-gradient(at 0% 0%, hsla(237, 100%, 85%, 0.4) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(237, 80%, 90%, 0.3) 0px, transparent 50%);
 }
 
 .auth-intro {
-  background:
-    radial-gradient(circle at 82% 15%, rgba(23, 103, 173, 0.17), transparent 45%),
-    radial-gradient(circle at 9% 90%, rgba(45, 139, 67, 0.13), transparent 45%),
-    var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.intro-content {
+  max-width: 480px;
+  padding: 40px;
 }
 
 .auth-kicker {
-  display: inline-flex;
-  margin: 0;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border-strong);
-  color: #35597b;
-  font-size: 0.8rem;
-  font-weight: 700;
-  background: #edf6ff;
-}
-
-.auth-intro h1 {
-  margin: 12px 0 10px;
-  font-size: 1.95rem;
-  line-height: 1.3;
-}
-
-.auth-accounts {
-  display: grid;
-  gap: 8px;
-  margin-top: 18px;
-}
-
-.auth-accounts span {
-  display: block;
-  border: 1px solid #d4e4f2;
-  border-radius: var(--radius-sm);
-  background: #f3f9ff;
-  color: #375c7f;
-  padding: 7px 10px;
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background-color: rgba(5, 80, 140, 0.08);
+  color: var(--color-primary);
+  font-weight: 600;
   font-size: 0.85rem;
+  margin-bottom: 16px;
 }
 
-.auth-actions {
-  margin-top: 14px;
+.intro-title {
+  margin: 0 0 16px;
+  font-size: 2.8rem;
+  line-height: 1.2;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #1e293b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.intro-desc {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: #4b6278;
+  margin-bottom: 40px;
+}
+
+.account-hint {
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  font-family: var(--font-code);
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.auth-form-area {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  padding: 40px;
 }
 
-@media (max-width: 1279px) {
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+}
+
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.form-footer {
+  text-align: center;
+  margin-top: 16px;
+}
+
+@media (max-width: 991px) {
   .auth-layout {
-    min-height: auto;
     grid-template-columns: 1fr;
-    align-items: stretch;
   }
-}
-
-@media (max-width: 767px) {
-  .auth-intro h1 {
-    font-size: 1.56rem;
+  .auth-intro {
+    padding: 60px 20px 40px;
+    align-items: flex-end;
   }
-
-  .auth-actions {
-    flex-direction: column;
+  .auth-form-area {
     align-items: flex-start;
   }
 }

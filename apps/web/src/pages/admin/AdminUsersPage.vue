@@ -1,11 +1,29 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from "vue";
-import PaginationBar from "../../components/common/PaginationBar.vue";
-import { adminCreateUserSchema } from "../../schemas/admin.schemas";
-import type { Role, UserStatus } from "../../services/contracts";
-import { useAdminStore } from "../../stores/admin";
+import { h, onMounted, reactive, ref, watch } from "vue";
+import {
+  NCard,
+  NForm,
+  NFormItem,
+  NInput,
+  NSelect,
+  NButton,
+  NSpace,
+  NText,
+  NAlert,
+  NDataTable,
+  NTag,
+  NModal,
+  useMessage,
+  type DataTableColumns
+} from "naive-ui";
+import { Search, UserPlus, Settings, Save } from "lucide-vue-next";
+import { adminCreateUserSchema } from "../../features/admin/model/admin.schemas";
+import type { Role, UserStatus, UserVO } from "../../services/contracts";
+import { useAdminStore } from "../../features/admin/model/admin";
 
 const adminStore = useAdminStore();
+const message = useMessage();
+const showCreateModal = ref(false);
 
 const filters = reactive<{
   role: "" | Role;
@@ -27,7 +45,20 @@ const createForm = reactive({
   phone: ""
 });
 
-const rowEdits = reactive<Record<string, { role: Role; status: UserStatus }>>({});
+const roleOptions = [
+  { label: "全部角色", value: "" },
+  { label: "学生 STUDENT", value: "STUDENT" },
+  { label: "教师 TEACHER", value: "TEACHER" },
+  { label: "系统管理员 ADMIN", value: "ADMIN" }
+];
+
+const statusOptions = [
+  { label: "全部状态", value: "" },
+  { label: "正常 ACTIVE", value: "ACTIVE" },
+  { label: "封禁 DISABLED", value: "DISABLED" }
+];
+
+const rowEdits = reactive<Record<string, { role: Role; status: UserStatus; saving: boolean }>>({});
 const formError = ref("");
 const success = ref("");
 
@@ -38,10 +69,13 @@ function syncRowEdits(): void {
       continue;
     }
     activeKeys.add(user.id);
-    rowEdits[user.id] = {
-      role: (user.role || "STUDENT") as Role,
-      status: (user.status || "ACTIVE") as UserStatus
-    };
+    if (!rowEdits[user.id]) {
+      rowEdits[user.id] = {
+        role: (user.role || "STUDENT") as Role,
+        status: (user.status || "ACTIVE") as UserStatus,
+        saving: false
+      };
+    }
   }
 
   for (const key of Object.keys(rowEdits)) {
@@ -50,6 +84,33 @@ function syncRowEdits(): void {
     }
   }
 }
+
+const pagination = reactive({
+  page: filters.page,
+  pageSize: filters.size,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+  onChange: (page: number) => {
+    pagination.page = page;
+    filters.page = page;
+    loadUsers();
+  },
+  onUpdatePageSize: (pageSize: number) => {
+    pagination.pageSize = pageSize;
+    pagination.page = 1;
+    filters.size = pageSize;
+    filters.page = 1;
+    loadUsers();
+  },
+  itemCount: 0
+});
+
+watch(
+  () => adminStore.usersTotalElements,
+  (total) => {
+    pagination.itemCount = total;
+  }
+);
 
 async function loadUsers(): Promise<void> {
   await adminStore.loadUsers({
@@ -63,6 +124,7 @@ async function loadUsers(): Promise<void> {
 
 async function applyFilters(): Promise<void> {
   filters.page = 1;
+  pagination.page = 1;
   await loadUsers();
 }
 
@@ -72,7 +134,7 @@ async function createUser(): Promise<void> {
 
   const parsed = adminCreateUserSchema.safeParse(createForm);
   if (!parsed.success) {
-    formError.value = parsed.error.issues[0]?.message || "创建用户参数不合法";
+    message.warning(parsed.error.issues[0]?.message || "参数校验未通过");
     return;
   }
 
@@ -88,11 +150,12 @@ async function createUser(): Promise<void> {
     return;
   }
 
-  success.value = `用户 ${result.username} 创建成功`;
+  message.success(`安全身份 ${result.username} 已签发入网`);
   createForm.username = "";
   createForm.password = "";
   createForm.email = "";
   createForm.phone = "";
+  showCreateModal.value = false;
   await loadUsers();
 }
 
@@ -102,163 +165,229 @@ async function saveUser(userId: string): Promise<void> {
     return;
   }
 
-  const updated = await adminStore.updateUser(userId, {
-    role: edit.role,
-    status: edit.status
-  });
+  edit.saving = true;
+  try {
+     const updated = await adminStore.updateUser(userId, {
+       role: edit.role,
+       status: edit.status
+     });
 
-  if (updated) {
-    success.value = `用户 ${updated.username} 更新成功`;
-    await loadUsers();
+     if (updated) {
+       message.success(`租户网络策略 ${updated.username} 变更生效`);
+       await loadUsers();
+     }
+  } finally {
+     edit.saving = false;
   }
 }
 
-async function updatePage(page: number): Promise<void> {
-  filters.page = page;
-  await loadUsers();
-}
-
-async function updateSize(size: number): Promise<void> {
-  filters.size = size;
-  filters.page = 1;
-  await loadUsers();
-}
+const columns: DataTableColumns<UserVO> = [
+  {
+    title: "访问账号",
+    key: "username",
+    minWidth: 150,
+    render(row) {
+      return h(NText, { strong: true }, { default: () => row.username });
+    }
+  },
+  {
+    title: "底层指针 (UUID)",
+    key: "id",
+    width: 250,
+    render(row) {
+      return h(NText, { depth: 3, code: true, style: "font-size: 12px" }, { default: () => row.id });
+    }
+  },
+  {
+    title: "权限级",
+    key: "role",
+    width: 140,
+    render(row) {
+       const edit = rowEdits[row.id || ""];
+       if (!edit) return null;
+       return h(
+         NSelect,
+         {
+            value: edit.role,
+            options: [
+              { label: "学生", value: "STUDENT" },
+              { label: "教师", value: "TEACHER" },
+              { label: "管理员", value: "ADMIN" }
+            ],
+            size: "small",
+            onUpdateValue: (v: any) => edit.role = v
+         }
+       );
+    }
+  },
+  {
+    title: "入网状态",
+    key: "status",
+    width: 120,
+    render(row) {
+       const edit = rowEdits[row.id || ""];
+       if (!edit) return null;
+       return h(
+         NSelect,
+         {
+            value: edit.status,
+            options: [
+              { label: "正常", value: "ACTIVE" },
+              { label: "封禁", value: "DISABLED" }
+            ],
+            size: "small",
+            onUpdateValue: (v: any) => edit.status = v
+         }
+       );
+    }
+  },
+  {
+    title: "配置下发",
+    key: "actions",
+    align: "center",
+    width: 100,
+    render(row) {
+       const edit = rowEdits[row.id || ""];
+       if (!edit) return null;
+       return h(
+         NButton,
+         {
+            size: "small",
+            type: "warning",
+            quaternary: true,
+            loading: edit.saving,
+            onClick: () => saveUser(row.id || "")
+         },
+         { default: () => "生效", icon: () => h(Save, { size: 14 }) }
+       );
+    }
+  },
+  {
+    title: "注册时间",
+    key: "createdAt",
+    width: 180,
+    render(row) {
+      return h(NText, { depth: 3 }, { default: () => row.createdAt });
+    }
+  }
+];
 
 onMounted(loadUsers);
-
-watch(
-  () => adminStore.users,
-  () => {
-    syncRowEdits();
-  },
-  { immediate: true }
-);
 </script>
 
 <template>
-  <section class="panel">
-    <header class="panel-head">
-      <div>
-        <h2 class="panel-title">用户管理</h2>
-        <p class="panel-note">支持用户查询、新建，以及角色/状态更新。</p>
-      </div>
-      <button class="btn" type="button" :disabled="adminStore.operationLoading" @click="createUser">
-        {{ adminStore.operationLoading ? "处理中..." : "创建用户" }}
-      </button>
-    </header>
-
-    <div class="form-grid">
-      <div class="field-block">
-        <label for="users-filter-role">筛选角色</label>
-        <select id="users-filter-role" v-model="filters.role">
-          <option value="">全部</option>
-          <option value="STUDENT">STUDENT</option>
-          <option value="TEACHER">TEACHER</option>
-          <option value="ADMIN">ADMIN</option>
-        </select>
-      </div>
-      <div class="field-block">
-        <label for="users-filter-status">筛选状态</label>
-        <select id="users-filter-status" v-model="filters.status">
-          <option value="">全部</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="DISABLED">DISABLED</option>
-        </select>
-      </div>
-      <div class="field-block">
-        <label for="create-username">新用户名</label>
-        <input id="create-username" v-model="createForm.username" placeholder="3-50 位字母数字下划线" />
-      </div>
-      <div class="field-block">
-        <label for="create-password">密码</label>
-        <input id="create-password" v-model="createForm.password" type="password" placeholder="8-64 位" />
-      </div>
-      <div class="field-block">
-        <label for="create-role">创建角色</label>
-        <select id="create-role" v-model="createForm.role">
-          <option value="STUDENT">STUDENT</option>
-          <option value="TEACHER">TEACHER</option>
-          <option value="ADMIN">ADMIN</option>
-        </select>
-      </div>
-      <div class="field-block">
-        <label for="create-email">邮箱（可选）</label>
-        <input id="create-email" v-model="createForm.email" placeholder="name@school.edu.cn" />
-      </div>
-    </div>
-
-    <div class="list-item-actions" style="margin-top: 12px;">
-      <button class="btn secondary" type="button" :disabled="adminStore.usersLoading" @click="applyFilters">
-        {{ adminStore.usersLoading ? "加载中..." : "按条件查询" }}
-      </button>
-    </div>
-
-    <p v-if="formError" class="status-box error" role="alert">{{ formError }}</p>
-    <p v-if="adminStore.usersError" class="status-box error" role="alert">{{ adminStore.usersError }}</p>
-    <p v-if="adminStore.operationError" class="status-box error" role="alert">{{ adminStore.operationError }}</p>
-    <p v-if="success" class="status-box success">{{ success }}</p>
-
-    <div v-if="adminStore.usersLoading && !adminStore.usersLoaded" class="status-box info">正在加载用户...</div>
-    <div v-else-if="adminStore.users.length === 0" class="status-box empty">暂无用户数据。</div>
-    <div v-else class="list-stack">
-      <article v-for="user in adminStore.users" :key="user.id" class="list-item">
-        <div class="list-item-main">
-          <p class="list-item-title">{{ user.username }}</p>
-          <p class="list-item-meta">用户 ID：{{ user.id }} · 创建时间：{{ user.createdAt }} · 邮箱：{{ user.email || "--" }}</p>
+  <div class="admin-users-page">
+    <n-space vertical :size="16">
+      <div class="page-header">
+        <div>
+          <n-text tag="h2" class="page-title">全域访问控制中心</n-text>
+          <n-text depth="3">负责底层身份注册、策略封禁、越权隔离及权限级调配。</n-text>
         </div>
-        <div v-if="user.id && rowEdits[user.id]" class="list-item-actions user-edit-actions">
-          <label>
-            角色
-            <select v-model="rowEdits[user.id].role">
-              <option value="STUDENT">STUDENT</option>
-              <option value="TEACHER">TEACHER</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-          </label>
-          <label>
-            状态
-            <select v-model="rowEdits[user.id].status">
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="DISABLED">DISABLED</option>
-            </select>
-          </label>
-          <button class="btn success small" type="button" :disabled="adminStore.operationLoading" @click="saveUser(user.id)">保存</button>
-        </div>
-        <div v-else class="list-item-actions user-edit-actions">
-          <span class="list-item-meta">编辑状态初始化中...</span>
-        </div>
-      </article>
+      </div>
 
-      <PaginationBar
-        :page="adminStore.usersPage"
-        :size="adminStore.usersSize"
-        :total-pages="adminStore.usersTotalPages"
-        :total-elements="adminStore.usersTotalElements"
-        :disabled="adminStore.usersLoading"
-        @update:page="updatePage"
-        @update:size="updateSize"
-      />
-    </div>
-  </section>
+      <n-card class="glass-card" :bordered="false" size="small">
+        <n-space justify="space-between" align="center">
+          <n-form inline :model="filters" label-placement="left" :show-feedback="false">
+             <n-form-item label="身份沙箱约束">
+               <n-select v-model:value="filters.role" :options="roleOptions" style="width: 140px" @update:value="applyFilters" />
+             </n-form-item>
+             <n-form-item label="网关状态拦截">
+               <n-select v-model:value="filters.status" :options="statusOptions" style="width: 140px" @update:value="applyFilters" />
+             </n-form-item>
+             <n-form-item>
+               <n-button @click="applyFilters" :loading="adminStore.usersLoading" class="animate-pop glass-pill">
+                 <template #icon><Search :size="16" /></template>
+                 执行扫描
+               </n-button>
+             </n-form-item>
+          </n-form>
+          
+          <n-button type="primary" @click="showCreateModal = true" class="animate-pop">
+             <template #icon><UserPlus :size="16" /></template>
+             注入安全身份
+          </n-button>
+        </n-space>
+      </n-card>
+
+      <n-alert v-if="adminStore.usersError" type="error" :show-icon="true">{{ adminStore.usersError }}</n-alert>
+      <n-alert v-if="adminStore.operationError" type="error" :show-icon="true">{{ adminStore.operationError }}</n-alert>
+
+      <n-card :bordered="false" class="table-card glass-card" content-style="padding: 0;">
+        <n-data-table
+          remote
+          :loading="adminStore.usersLoading"
+          :columns="columns"
+          :data="adminStore.users"
+          :pagination="pagination"
+          :bordered="false"
+          :bottom-bordered="false"
+        />
+      </n-card>
+    </n-space>
+
+    <!-- Create User Modal -->
+    <n-modal v-model:show="showCreateModal" preset="card" title="底层签发安全身份" :style="{ width: '500px' }">
+      <n-form :model="createForm" label-placement="left" label-width="80" require-mark-placement="right-hanging">
+         <n-form-item label="访问句柄" required>
+            <n-input v-model:value="createForm.username" placeholder="3-50 位安全字符" />
+         </n-form-item>
+         <n-form-item label="密钥环" required>
+            <n-input v-model:value="createForm.password" type="password" show-password-on="click" placeholder="强化密码 (8-64位)" />
+         </n-form-item>
+         <n-form-item label="最高权限级" required>
+            <n-select v-model:value="createForm.role" :options="roleOptions.slice(1)" />
+         </n-form-item>
+         <n-form-item label="网关邮箱">
+            <n-input v-model:value="createForm.email" placeholder="name@school.edu.cn (可选)" />
+         </n-form-item>
+         <n-form-item label="物理频段">
+            <n-input v-model:value="createForm.phone" placeholder="手机校验位 (可选)" />
+         </n-form-item>
+      </n-form>
+      <template #action>
+     <n-space justify="end">
+            <n-button @click="showCreateModal = false" class="animate-pop">中断挂起</n-button>
+            <n-button type="primary" :loading="adminStore.operationLoading" class="animate-pop" @click="createUser">验证并下发链路</n-button>
+         </n-space>
+      </template>
+    </n-modal>
+  </div>
 </template>
 
 <style scoped>
-.user-edit-actions label {
-  display: inline-flex;
+.page-title {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 6px;
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
+  margin-bottom: 8px;
 }
 
-.user-edit-actions select {
-  width: auto;
-  min-height: 32px;
+.table-card {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-glass);
 }
 
-@media (max-width: 767px) {
-  .user-edit-actions {
-    width: 100%;
-  }
+:deep(.n-data-table) {
+  background: transparent;
+  --n-merged-th-color: rgba(255,255,255,0.4);
+  --n-merged-td-color: rgba(255,255,255,0.1);
+  --n-merged-td-color-hover: rgba(255,255,255,0.3);
+  --n-merged-border-color: var(--color-border-glass);
+}
+
+:deep(.n-data-table-th) {
+  font-weight: 700;
+  backdrop-filter: blur(8px);
 }
 </style>

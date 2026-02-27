@@ -1,4 +1,4 @@
-import { apiClient, unwrapResponse } from "./api-client";
+import { apiClient, unwrapResponse } from "../../../services/api-client";
 import {
   type AiQuestionAnalysisVO,
   type AiQuestionGenerateRequest,
@@ -19,7 +19,7 @@ import {
   type WrongBookEntryVO,
   type WrongStatus,
   normalizePagedResult
-} from "./contracts";
+} from "../../../services/contracts";
 
 export interface ChatListQuery {
   page?: number;

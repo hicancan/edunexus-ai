@@ -3,6 +3,8 @@ package com.edunexus.api.controller;
 import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
+import com.edunexus.api.common.CryptoUtil;
+import com.edunexus.api.common.FilenameUtil;
 import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.DbService;
 import com.edunexus.api.service.GovernanceService;
@@ -46,9 +48,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.MessageDigest;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -111,7 +111,7 @@ public class TeacherController implements ControllerSupport {
                 "filename", filename,
                 "fileType", fileType,
                 "fileSize", fileSize,
-                "contentSha256", sha256(fileBytes)));
+                "contentSha256", CryptoUtil.sha256(fileBytes)));
 
         Map<String, Object> replay = governance.getIdempotentReplay("teacher.knowledge.upload", idempotencyKey,
                 requestHash);
@@ -149,7 +149,7 @@ public class TeacherController implements ControllerSupport {
                 "filename", filename,
                 "storagePath", storagePath));
 
-        Path tempFile = Files.createTempFile("edunexus-doc-" + documentId + "-", "-" + sanitizeFilename(filename));
+        Path tempFile = Files.createTempFile("edunexus-doc-" + documentId + "-", "-" + FilenameUtil.sanitize(filename));
         Files.write(tempFile, fileBytes);
         documentIngestExecutor.execute(() -> processDocumentInBackground(
                 documentId,
@@ -211,7 +211,10 @@ public class TeacherController implements ControllerSupport {
         String traceStr = trace(request);
         documentIngestExecutor.execute(() -> {
             try {
-                aiClient.deleteKb(Map.of("traceId", traceStr, "documentId", docIdStr));
+                aiClient.deleteKb(Map.of(
+                        "traceId", traceStr,
+                        "documentId", docIdStr,
+                        "idempotencyKey", "kb-delete-" + docIdStr));
             } catch (Exception ex) {
                 log.error("async_kb_delete_failed documentId={} traceId={}", docIdStr, traceStr, ex);
             }
@@ -345,7 +348,7 @@ public class TeacherController implements ControllerSupport {
                 trace(request));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + sanitizeFilename(topic) + "." + format + "\"")
+                        "attachment; filename=\"" + FilenameUtil.sanitize(topic) + "." + format + "\"")
                 .header("X-Request-Id", trace(request))
                 .contentType(contentType)
                 .body(content);
@@ -495,7 +498,8 @@ public class TeacherController implements ControllerSupport {
                     "teacherId", teacherId.toString(),
                     "filename", filename,
                     "filePath", tempFile.toAbsolutePath().toString(),
-                    "idempotencyKey", idempotencyKey == null ? "" : idempotencyKey));
+                    "idempotencyKey",
+                    idempotencyKey == null || idempotencyKey.isBlank() ? "kb-ingest-" + documentId : idempotencyKey));
 
             db.update("update documents set status='READY',error_message=null,updated_at=now() where id=?", documentId);
             governance.markJobSucceeded(jobId, Map.of(
@@ -586,24 +590,6 @@ public class TeacherController implements ControllerSupport {
         out.put("suggestion", String.valueOf(row.get("suggestion")));
         out.put("createdAt", ApiDataMapper.asIsoTime(row.get("created_at")));
         return out;
-    }
-
-    private String sha256(byte[] value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(value);
-            StringBuilder builder = new StringBuilder();
-            for (byte item : hash) {
-                builder.append(String.format("%02x", item));
-            }
-            return builder.toString();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    private String sanitizeFilename(String filename) {
-        return filename.replaceAll("[^a-zA-Z0-9._-\\u4e00-\\u9fa5]", "_");
     }
 
     private byte[] renderPdf(String title, String markdown) {

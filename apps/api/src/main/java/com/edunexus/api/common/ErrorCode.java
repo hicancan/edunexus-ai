@@ -25,6 +25,7 @@ public enum ErrorCode {
     // AI & Dependency
     AI_MODEL_UNAVAILABLE(503, "AI 模型暂不可用"),
     AI_OUTPUT_INVALID(502, "AI 返回格式异常"),
+    AI_RATE_LIMITED(429, "AI 请求过于频繁"),
     SYSTEM_DEPENDENCY(503, "依赖服务不可用"),
 
     // System

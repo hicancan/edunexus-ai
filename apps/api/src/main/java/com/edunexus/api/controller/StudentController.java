@@ -3,6 +3,7 @@ package com.edunexus.api.controller;
 import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
+import com.edunexus.api.common.Difficulty;
 import com.edunexus.api.common.ResourceNotFoundException;
 import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.DbService;
@@ -193,12 +194,13 @@ public class StudentController implements ControllerSupport {
         chatBody.put("message", req.message());
         chatBody.put("stream", false);
         chatBody.put("context", Map.of("history", history));
-        if (teacherBinding != null) {
-            chatBody.put("teacherScope", Map.of(
-                    "teacherId", String.valueOf(teacherBinding.get("teacher_id")),
-                    "classId", teacherBinding.get("classroom_id") == null ? null : String.valueOf(teacherBinding.get("classroom_id"))
-            ));
-        }
+        Map<String, Object> teacherScope = new LinkedHashMap<>();
+        teacherScope.put("teacherId", teacherBinding == null ? null : String.valueOf(teacherBinding.get("teacher_id")));
+        teacherScope.put("classId",
+                teacherBinding == null || teacherBinding.get("classroom_id") == null
+                        ? null
+                        : String.valueOf(teacherBinding.get("classroom_id")));
+        chatBody.put("teacherScope", teacherScope);
 
         Map<String, Object> aiResult = aiClient.chat(chatBody);
         String answer = String.valueOf(aiResult.getOrDefault("answer", "课堂资料不足，暂时无法给出可靠答案。"));
@@ -243,7 +245,7 @@ public class StudentController implements ControllerSupport {
             HttpServletRequest request
     ) {
         requireRole("STUDENT");
-        validateDifficulty(difficulty);
+        Difficulty parsedDifficulty = Difficulty.fromString(difficulty);
 
         StringBuilder where = new StringBuilder(" where is_active=true");
         List<Object> args = new ArrayList<>();
@@ -251,9 +253,9 @@ public class StudentController implements ControllerSupport {
             where.append(" and subject=?");
             args.add(subject);
         }
-        if (difficulty != null && !difficulty.isBlank()) {
+        if (parsedDifficulty != null) {
             where.append(" and difficulty=?");
-            args.add(difficulty);
+            args.add(parsedDifficulty.name());
         }
 
         int offset = (page - 1) * size;
@@ -557,7 +559,7 @@ public class StudentController implements ControllerSupport {
     ) {
         requireRole("STUDENT");
         AuthUser user = currentUser();
-        validateDifficulty(req.difficulty());
+        Difficulty parsedDifficulty = Difficulty.fromString(req.difficulty());
 
         String requestHash = governance.requestHash(Map.of("studentId", user.userId(), "payload", req));
         Map<String, Object> replay = governance.getIdempotentReplay("student.aiq.generate", idempotencyKey, requestHash);
@@ -565,7 +567,7 @@ public class StudentController implements ControllerSupport {
             return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
         }
 
-        String difficulty = req.difficulty() == null || req.difficulty().isBlank() ? "MEDIUM" : req.difficulty();
+        String difficulty = parsedDifficulty == null ? Difficulty.MEDIUM.name() : parsedDifficulty.name();
         List<Map<String, Object>> weaknessProfile = db.list(
                 """
                 select q.knowledge_points as knowledge_points, w.wrong_count as wrong_count
@@ -607,6 +609,7 @@ public class StudentController implements ControllerSupport {
         aiBody.put("conceptTags", req.conceptTags() == null ? List.of() : req.conceptTags());
         aiBody.put("weaknessProfile", weaknessProfile);
         aiBody.put("teacherSuggestions", suggestions);
+        aiBody.put("idempotencyKey", idempotencyKey == null ? "" : idempotencyKey);
         Map<String, Object> aiResult = aiClient.generateQuestions(aiBody);
 
         List<Map<String, Object>> generated = ApiDataMapper.parseObjectList(aiResult.get("questions"), objectMapper);
@@ -932,9 +935,13 @@ public class StudentController implements ControllerSupport {
         if (tokenUsagePayload == null) {
             return 0;
         }
-        Map<String, Object> map = objectMapper.convertValue(tokenUsagePayload, new TypeReference<>() {
-        });
-        return ApiDataMapper.asInt(map.get("prompt")) + ApiDataMapper.asInt(map.get("completion"));
+        try {
+            Map<String, Object> map = objectMapper.convertValue(tokenUsagePayload, new TypeReference<>() {
+            });
+            return ApiDataMapper.asInt(map.get("prompt")) + ApiDataMapper.asInt(map.get("completion"));
+        } catch (IllegalArgumentException ex) {
+            return 0;
+        }
     }
 
     private UUID parseUuid(String raw, String fieldName) {
@@ -942,15 +949,6 @@ public class StudentController implements ControllerSupport {
             return UUID.fromString(raw);
         } catch (Exception ex) {
             throw new IllegalArgumentException(fieldName + " 必须是合法 UUID");
-        }
-    }
-
-    private void validateDifficulty(String difficulty) {
-        if (difficulty == null || difficulty.isBlank()) {
-            return;
-        }
-        if (!"EASY".equals(difficulty) && !"MEDIUM".equals(difficulty) && !"HARD".equals(difficulty)) {
-            throw new IllegalArgumentException("difficulty 仅支持 EASY/MEDIUM/HARD");
         }
     }
 
@@ -991,10 +989,10 @@ public class StudentController implements ControllerSupport {
         out.put("questionType", String.valueOf(row.get("question_type")));
         out.put("difficulty", String.valueOf(row.get("difficulty")));
         out.put("content", String.valueOf(row.get("content")));
-        out.put("options", ApiDataMapper.parseStringMap(row.get("options"), objectMapper));
+        out.put("options", ApiDataMapper.parseNullableStringMap(row.get("options"), objectMapper));
         out.put("correctAnswer", ApiDataMapper.asString(row.get("correct_answer")));
         out.put("analysis", ApiDataMapper.asString(row.get("analysis")));
-        out.put("knowledgePoints", ApiDataMapper.parseStringList(row.get("knowledge_points"), objectMapper));
+        out.put("knowledgePoints", ApiDataMapper.parseNullableStringList(row.get("knowledge_points"), objectMapper));
         out.put("score", ApiDataMapper.asInt(row.get("score")));
         out.put("source", String.valueOf(row.get("source")));
         out.put("createdAt", ApiDataMapper.asIsoTime(row.get("created_at")));
@@ -1009,7 +1007,7 @@ public class StudentController implements ControllerSupport {
         out.put("correctAnswer", ApiDataMapper.asString(row.get("correct_answer")));
         out.put("isCorrect", ApiDataMapper.asBoolean(row.get("is_correct")));
         out.put("analysis", ApiDataMapper.asString(row.get("analysis")));
-        out.put("knowledgePoints", ApiDataMapper.parseStringList(row.get("knowledge_points"), objectMapper));
+        out.put("knowledgePoints", ApiDataMapper.parseNullableStringList(row.get("knowledge_points"), objectMapper));
         out.put("teacherSuggestion", ApiDataMapper.asString(row.get("teacher_suggestion")));
         return out;
     }
@@ -1021,10 +1019,10 @@ public class StudentController implements ControllerSupport {
         question.put("questionType", String.valueOf(row.get("question_type")));
         question.put("difficulty", String.valueOf(row.get("difficulty")));
         question.put("content", String.valueOf(row.get("content")));
-        question.put("options", ApiDataMapper.parseStringMap(row.get("options"), objectMapper));
+        question.put("options", ApiDataMapper.parseNullableStringMap(row.get("options"), objectMapper));
         question.put("correctAnswer", ApiDataMapper.asString(row.get("correct_answer")));
         question.put("analysis", ApiDataMapper.asString(row.get("analysis")));
-        question.put("knowledgePoints", ApiDataMapper.parseStringList(row.get("knowledge_points"), objectMapper));
+        question.put("knowledgePoints", ApiDataMapper.parseNullableStringList(row.get("knowledge_points"), objectMapper));
         question.put("score", ApiDataMapper.asInt(row.get("score")));
         question.put("source", String.valueOf(row.get("source")));
         question.put("createdAt", ApiDataMapper.asIsoTime(row.get("created_at")));

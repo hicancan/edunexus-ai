@@ -160,7 +160,8 @@ def extract_pdf(path: Path) -> str:
     try:
         reader = PdfReader(str(path))
         return "\n".join((page.extract_text() or "") for page in reader.pages)
-    except Exception:  # noqa: BLE001
+    except Exception as ex:  # noqa: BLE001
+        logger.error("Failed to extract pdf %s: %s", path, ex, exc_info=True)
         return ""
 
 
@@ -168,7 +169,8 @@ def extract_docx(path: Path) -> str:
     try:
         document = DocxDocument(str(path))
         return "\n".join(row.text for row in document.paragraphs if row.text)
-    except Exception:  # noqa: BLE001
+    except Exception as ex:  # noqa: BLE001
+        logger.error("Failed to extract docx %s: %s", path, ex, exc_info=True)
         return ""
 
 

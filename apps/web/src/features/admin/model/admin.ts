@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { toErrorMessage } from "../services/error-message";
+import { toErrorMessage } from "../../../services/error-message";
 import {
   createUser,
   downloadResource,
@@ -8,7 +8,7 @@ import {
   listResources,
   listUsers,
   patchUser
-} from "../services/admin.service";
+} from "../api/admin.service";
 import type {
   AdminResourceVO,
   AdminUserCreateRequest,
@@ -20,7 +20,7 @@ import type {
   Role,
   UserStatus,
   UserVO
-} from "../services/contracts";
+} from "../../../services/contracts";
 
 interface AdminState {
   users: UserVO[];

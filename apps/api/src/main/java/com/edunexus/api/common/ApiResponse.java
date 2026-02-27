@@ -1,31 +1,39 @@
 package com.edunexus.api.common;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.time.Instant;
 
 public record ApiResponse(
-        Object code,
+        int code,
         String message,
         Object data,
         String traceId,
-        String timestamp
+        String timestamp,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String errorCode
 ) {
+    private static ApiResponse of(int code, String message, Object data, String traceId, String errorCode) {
+        return new ApiResponse(code, message, data, traceId, Instant.now().toString(), errorCode);
+    }
+
     public static ApiResponse ok(Object data, String traceId) {
-        return new ApiResponse(200, "success", data, traceId, Instant.now().toString());
+        return of(200, "success", data, traceId, null);
     }
 
     public static ApiResponse created(Object data, String traceId) {
-        return new ApiResponse(201, "success", data, traceId, Instant.now().toString());
+        return of(201, "success", data, traceId, null);
     }
 
     public static ApiResponse accepted(Object data, String traceId) {
-        return new ApiResponse(202, "success", data, traceId, Instant.now().toString());
+        return of(202, "success", data, traceId, null);
     }
 
     public static ApiResponse error(ErrorCode errorCode, String message, String traceId) {
-        return new ApiResponse(errorCode.name(), message, null, traceId, Instant.now().toString());
+        String resolvedMessage = message == null || message.isBlank() ? errorCode.defaultMessage() : message;
+        return of(errorCode.httpStatus(), resolvedMessage, null, traceId, errorCode.name());
     }
 
     public static ApiResponse error(ErrorCode errorCode, String traceId) {
-        return new ApiResponse(errorCode.name(), errorCode.defaultMessage(), null, traceId, Instant.now().toString());
+        return of(errorCode.httpStatus(), errorCode.defaultMessage(), null, traceId, errorCode.name());
     }
 }

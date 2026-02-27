@@ -1,5 +1,7 @@
 package com.edunexus.api.service;
 
+import com.edunexus.api.common.DependencyException;
+import com.edunexus.api.common.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,19 +68,20 @@ public class AiClient {
                 .toString(body.getOrDefault("traceId", body.getOrDefault("trace_id", UUID.randomUUID().toString())));
         String idemKey = Objects.toString(body.getOrDefault("idempotencyKey", body.getOrDefault("idempotency_key", "")))
                 .trim();
+        if (idemKey.isBlank()) {
+            idemKey = UUID.randomUUID().toString();
+        }
         long startMs = System.currentTimeMillis();
-        RuntimeException last = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 RestClient.RequestBodySpec req = client.post()
                         .uri(baseUrl + path)
                         .header("X-Service-Token", serviceToken)
                         .header("X-Trace-Id", traceId)
+                        .header("Idempotency-Key", idemKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON);
-                if (!idemKey.isBlank()) {
-                    req = req.header("Idempotency-Key", idemKey);
-                }
+
                 Map<String, Object> result = req
                         .body(body)
                         .retrieve()
@@ -88,28 +91,42 @@ public class AiClient {
                 log.info("ai_call path={} attempt={} latency_ms={} trace_id={}", path, attempt, elapsed, traceId);
                 return result;
             } catch (RestClientResponseException ex) {
-                last = ex;
                 log.warn("ai_call_error path={} attempt={} status={} trace_id={}", path, attempt,
                         ex.getStatusCode().value(), traceId);
-                if (!isRetryableStatus(ex.getStatusCode().value()) || attempt >= maxAttempts) {
-                    break;
+
+                if (isRetryableStatus(ex.getStatusCode().value()) && attempt < maxAttempts) {
+                    sleep(baseDelayMs, attempt, true);
+                    continue;
                 }
-                sleep(baseDelayMs, attempt, true);
+                throw toDependencyException(path, ex);
             } catch (RuntimeException ex) {
-                last = ex;
                 log.warn("ai_call_error path={} attempt={} error={} trace_id={}", path, attempt, ex.getMessage(),
                         traceId);
-                if (attempt >= maxAttempts) {
-                    break;
+
+                if (attempt < maxAttempts) {
+                    sleep(baseDelayMs, attempt, path.startsWith("/internal/v1/kb/"));
+                    continue;
                 }
-                sleep(baseDelayMs, attempt, path.startsWith("/internal/v1/kb/"));
+                throw new DependencyException(ErrorCode.SYSTEM_DEPENDENCY, "调用 AI 服务失败", ex);
             }
         }
-        throw last == null ? new RuntimeException("调用 AI 服务失败") : last;
+
+        throw new DependencyException(ErrorCode.SYSTEM_DEPENDENCY, "调用 AI 服务失败");
     }
 
     private boolean isRetryableStatus(int status) {
         return status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
+    }
+
+    private DependencyException toDependencyException(String path, RestClientResponseException ex) {
+        int status = ex.getStatusCode().value();
+        ErrorCode errorCode = switch (status) {
+            case 429 -> ErrorCode.AI_RATE_LIMITED;
+            case 502 -> ErrorCode.AI_OUTPUT_INVALID;
+            case 503, 504 -> ErrorCode.AI_MODEL_UNAVAILABLE;
+            default -> ErrorCode.SYSTEM_DEPENDENCY;
+        };
+        return new DependencyException(errorCode, "调用 AI 服务失败: " + path + " [status=" + status + "]", ex);
     }
 
     private void sleep(long baseDelayMs, int attempt, boolean withJitter) {

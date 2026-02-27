@@ -1,10 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
-import PaginationBar from "../../components/common/PaginationBar.vue";
-import { aiGenerateSchema } from "../../schemas/student.schemas";
-import { useAiqStore } from "../../stores/aiq";
+import { computed, h, onMounted, reactive, ref, watch } from "vue";
+import {
+  NCard,
+  NForm,
+  NFormItem,
+  NInput,
+  NSelect,
+  NButton,
+  NSpace,
+  NText,
+  NAlert,
+  NSpin,
+  NEmpty,
+  NRadioGroup,
+  NRadio,
+  NTag,
+  NDivider,
+  NInputNumber,
+  NDataTable,
+  useMessage,
+  type DataTableColumns
+} from "naive-ui";
+import { Sparkles, Send, CheckCircle, AlertCircle, RefreshCw, Search, FileText } from "lucide-vue-next";
+import { aiGenerateSchema } from "../../features/student/model/student.schemas";
+import { useAiqStore } from "../../features/student/model/aiq";
+// Import removed due to type constraints
 
 const aiqStore = useAiqStore();
+const message = useMessage();
 
 const form = reactive<{
   subject: string;
@@ -17,6 +40,13 @@ const form = reactive<{
   difficulty: "MEDIUM",
   conceptTagsText: ""
 });
+
+const difficultyOptions = [
+  { label: "自动匹配难度", value: "" },
+  { label: "简单 EASY", value: "EASY" },
+  { label: "中等 MEDIUM", value: "MEDIUM" },
+  { label: "困难 HARD", value: "HARD" }
+];
 
 const historyFilter = reactive({
   subject: "",
@@ -43,12 +73,45 @@ function parseConceptTags(raw: string): string[] {
     .filter(Boolean);
 }
 
+const historyPagination = reactive({
+  page: historyFilter.page,
+  pageSize: historyFilter.size,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+  onChange: (page: number) => {
+    historyPagination.page = page;
+    historyFilter.page = page;
+    loadHistory();
+  },
+  onUpdatePageSize: (pageSize: number) => {
+    historyPagination.pageSize = pageSize;
+    historyPagination.page = 1;
+    historyFilter.size = pageSize;
+    historyFilter.page = 1;
+    loadHistory();
+  },
+  itemCount: 0
+});
+
+watch(
+  () => aiqStore.historyTotalElements,
+  (total) => {
+    historyPagination.itemCount = total;
+  }
+);
+
 async function loadHistory(): Promise<void> {
   await aiqStore.loadHistory({
     subject: historyFilter.subject || undefined,
     page: historyFilter.page,
     size: historyFilter.size
   });
+}
+
+async function applyHistoryFilters(): Promise<void> {
+  historyFilter.page = 1;
+  historyPagination.page = 1;
+  await loadHistory();
 }
 
 async function generateQuestions(): Promise<void> {
@@ -61,13 +124,18 @@ async function generateQuestions(): Promise<void> {
   });
 
   if (!parsed.success) {
-    formError.value = parsed.error.issues[0]?.message || "生成参数不合法";
+    message.warning(parsed.error.issues[0]?.message || "生成参数不合法");
     return;
   }
 
-  await aiqStore.generate(parsed.data);
-  answerMap.value = {};
-  await loadHistory();
+  try {
+    await aiqStore.generate(parsed.data);
+    answerMap.value = {};
+    message.success("AI 题目生成成功");
+    await loadHistory();
+  } catch (error) {
+    message.error("生成失败，请重试");
+  }
 }
 
 async function submitAnswers(): Promise<void> {
@@ -81,19 +149,20 @@ async function submitAnswers(): Promise<void> {
     }));
 
   if (payload.length === 0) {
-    formError.value = "请先生成题目";
+    message.warning("请先生成题目");
     return;
   }
 
   const hasBlank = payload.some((item) => !item.userAnswer.trim());
   if (hasBlank) {
-    formError.value = "请完成所有 AI 题目后再提交";
+    message.warning("请完成所有 AI 题目后再提交");
     return;
   }
 
   const result = await aiqStore.submitAnswers(payload);
   if (result?.recordId) {
     selectedRecordId.value = result.recordId;
+    message.success("提交成功，已加载分析与成绩");
   }
   await loadHistory();
 }
@@ -101,189 +170,392 @@ async function submitAnswers(): Promise<void> {
 async function viewAnalysis(recordId: string): Promise<void> {
   selectedRecordId.value = recordId;
   await aiqStore.loadAnalysis(recordId);
+  message.success("分析数据已加载");
 }
 
-async function updateHistoryPage(page: number): Promise<void> {
-  historyFilter.page = page;
+function getDifficultyType(diff: string): "success" | "warning" | "error" | "default" {
+  if (diff === "EASY") return "success";
+  if (diff === "MEDIUM") return "warning";
+  if (diff === "HARD") return "error";
+  return "default";
+}
+
+const historyColumns: DataTableColumns<any> = [
+  {
+    title: "学科",
+    key: "subject",
+    render(row) {
+      return h(NTag, { type: "info", size: "small", bordered: false }, { default: () => row.subject || "未分类" });
+    }
+  },
+  {
+    title: "生成时间",
+    key: "generatedAt",
+    width: 200,
+    render(row) {
+      return h(NText, { depth: 3 }, { default: () => row.generatedAt });
+    }
+  },
+  {
+    title: "题目数",
+    key: "questionCount",
+    align: "center",
+  },
+  {
+    title: "完成状态",
+    key: "completed",
+    align: "center",
+    render(row) {
+      return h(
+        NTag,
+        { type: row.completed ? "success" : "warning", size: "small", bordered: false },
+        { default: () => (row.completed ? "已完成" : "未完成") }
+      );
+    }
+  },
+  {
+    title: "正确率 / 得分",
+    key: "metrics",
+    align: "center",
+    render(row) {
+      if (!row.completed) return h(NText, { depth: 3 }, { default: () => "--" });
+      return h(
+        NSpace,
+        { align: "center", justify: "center", size: 8 },
+        () => [
+           h(NText, { type: "success", strong: true }, { default: () => `${(Number(row.correctRate || 0) * 100).toFixed(0)}%` }),
+           h(NText, { depth: 3 }, { default: () => "|" }),
+           h(NText, { type: "info", strong: true }, { default: () => `${row.score} 分` })
+        ]
+      );
+    }
+  },
+];
+
+onMounted(async () => {
+  historyPagination.page = historyFilter.page;
+  historyPagination.pageSize = historyFilter.size;
   await loadHistory();
-}
-
-async function updateHistorySize(size: number): Promise<void> {
-  historyFilter.size = size;
-  historyFilter.page = 1;
-  await loadHistory();
-}
-
-onMounted(loadHistory);
+});
 </script>
 
 <template>
-  <section class="panel">
-    <header class="panel-head">
-      <div>
-        <h2 class="panel-title">AI 个性化出题</h2>
-        <p class="panel-note">按学科、难度和数量生成题目，提交后可查看解析与历史指标。</p>
-      </div>
-      <button class="btn" type="button" :disabled="aiqStore.generateLoading" @click="generateQuestions">
-        {{ aiqStore.generateLoading ? "生成中..." : "生成题目" }}
-      </button>
-    </header>
-
-    <div class="form-grid">
-      <div class="field-block">
-        <label for="aiq-subject">学科</label>
-        <input id="aiq-subject" v-model="form.subject" placeholder="例如：物理" />
-      </div>
-      <div class="field-block">
-        <label for="aiq-count">题目数量</label>
-        <input id="aiq-count" v-model.number="form.count" type="number" min="1" max="20" />
-      </div>
-      <div class="field-block">
-        <label for="aiq-difficulty">难度</label>
-        <select id="aiq-difficulty" v-model="form.difficulty">
-          <option value="">自动</option>
-          <option value="EASY">EASY</option>
-          <option value="MEDIUM">MEDIUM</option>
-          <option value="HARD">HARD</option>
-        </select>
-      </div>
-      <div class="field-block">
-        <label for="aiq-tags">知识点（逗号分隔）</label>
-        <input id="aiq-tags" v-model="form.conceptTagsText" placeholder="牛顿第二定律, 受力分析" />
-      </div>
-    </div>
-
-    <p v-if="formError" class="status-box error" role="alert">{{ formError }}</p>
-    <p v-if="aiqStore.error" class="status-box error" role="alert">{{ aiqStore.error }}</p>
-    <p v-if="aiqStore.sessionId" class="status-box info">当前会话：{{ aiqStore.sessionId }}</p>
-
-    <div v-if="aiqStore.generatedQuestions.length === 0" class="status-box empty">尚未生成题目。</div>
-    <div v-else class="list-stack">
-      <article v-for="question in aiqStore.generatedQuestions" :key="question.id" class="list-item question-item">
-        <div class="list-item-main">
-          <p class="list-item-title">{{ question.content }}</p>
-          <p class="list-item-meta">难度：{{ question.difficulty }} · 来源：{{ question.source }}</p>
-          <div class="field-block" style="margin-top: 8px;">
-            <label :for="`aiq-answer-${question.id}`">作答</label>
-            <select :id="`aiq-answer-${question.id}`" v-model="answerMap[question.id as string]">
-              <option value="">请选择答案</option>
-              <option v-for="(value, key) in question.options || {}" :key="key" :value="key">{{ key }}. {{ value }}</option>
-            </select>
-          </div>
-        </div>
-      </article>
-      <div class="list-item-actions">
-        <button class="btn success" type="button" :disabled="aiqStore.submitLoading" @click="submitAnswers">
-          {{ aiqStore.submitLoading ? "提交中..." : "提交 AI 答案" }}
-        </button>
-      </div>
-    </div>
-
-    <section v-if="aiqStore.submitResult" class="result-block">
-      <h3>本次 AI 题成绩</h3>
-      <div class="result-metrics">
-        <span class="pill">总题数：{{ aiqStore.submitResult.totalQuestions }}</span>
-        <span class="pill">正确数：{{ aiqStore.submitResult.correctCount }}</span>
-        <span class="pill">总分：{{ aiqStore.submitResult.totalScore }}</span>
-      </div>
-      <div class="list-stack" style="margin-top: 10px;">
-        <article v-for="item in aiqStore.submitResult.items || []" :key="item.questionId" class="list-item">
-          <div class="list-item-main">
-            <p class="list-item-title">题目 {{ item.questionId }}</p>
-            <p class="list-item-meta">你的答案：{{ item.userAnswer }} · 正确答案：{{ item.correctAnswer }} · 得分：{{ item.score }}</p>
-          </div>
-          <button class="btn secondary small" type="button" @click="viewAnalysis(aiqStore.submitResult?.recordId || '')">查看解析</button>
-        </article>
-      </div>
-    </section>
-
-    <section v-if="currentAnalysis" class="result-block">
-      <h3>AI 题解析</h3>
-      <div class="list-stack">
-        <article v-for="item in currentAnalysis.items || []" :key="item.questionId" class="list-item question-item">
-          <div class="list-item-main">
-            <p class="list-item-title">{{ item.content }}</p>
-            <p class="list-item-meta">你的答案：{{ item.userAnswer }} · 正确答案：{{ item.correctAnswer }} · {{ item.isCorrect ? "正确" : "错误" }}</p>
-            <p class="analysis-line">解析：{{ item.analysis || "暂无解析" }}</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="result-block">
-      <header class="panel-head" style="margin-bottom: 8px;">
+  <div class="ai-questions-page">
+    <n-space vertical :size="24">
+      <div class="page-header">
         <div>
-          <h3 style="margin: 0;">历史记录</h3>
-          <p class="panel-note">展示 completed / correctRate / score 三项关键指标。</p>
-        </div>
-        <button class="btn secondary" type="button" :disabled="aiqStore.historyLoading" @click="loadHistory">
-          {{ aiqStore.historyLoading ? "加载中..." : "刷新历史" }}
-        </button>
-      </header>
-
-      <div class="form-grid">
-        <div class="field-block">
-          <label for="history-subject">学科筛选</label>
-          <input id="history-subject" v-model="historyFilter.subject" placeholder="可选" />
+          <n-text tag="h2" class="page-title">AI 个性化出题</n-text>
+          <n-text depth="3">按学科、难度和数量生成题目，提交后可查看解析与历史指标。</n-text>
         </div>
       </div>
 
-      <div class="list-item-actions" style="margin-top: 12px;">
-        <button class="btn" type="button" :disabled="aiqStore.historyLoading" @click="loadHistory">查询历史</button>
-      </div>
+      <!-- Generate Panel -->
+      <n-card :bordered="true" title="配置出题要求" size="small">
+        <template #header-extra>
+          <n-button type="primary" :loading="aiqStore.generateLoading" @click="generateQuestions">
+             <template #icon><Sparkles :size="16" /></template>
+             神奇生成
+          </n-button>
+        </template>
+        
+        <n-form inline :model="form" label-placement="left" :show-feedback="false">
+          <n-form-item label="学科">
+             <n-input v-model:value="form.subject" placeholder="例如：物理" clearable />
+          </n-form-item>
+          <n-form-item label="题目数量">
+             <n-input-number v-model:value="form.count" :min="1" :max="20" style="width: 120px" />
+          </n-form-item>
+          <n-form-item label="难度">
+            <n-select v-model:value="form.difficulty" :options="difficultyOptions" style="width: 150px" />
+          </n-form-item>
+          <n-form-item label="知识点">
+            <n-input v-model:value="form.conceptTagsText" placeholder="逗号分隔，可选" />
+          </n-form-item>
+        </n-form>
+      </n-card>
+      
+      <n-alert v-if="aiqStore.error" type="error" :show-icon="true">{{ aiqStore.error }}</n-alert>
+      <n-alert v-if="aiqStore.sessionId" type="info" :show-icon="true" class="session-alert">
+        <template #icon>
+          <FileText :size="18" />
+        </template>
+        当前答题会话：{{ aiqStore.sessionId }}
+      </n-alert>
 
-      <div v-if="aiqStore.historyLoading && !aiqStore.historyLoaded" class="status-box info">正在加载历史记录...</div>
-      <div v-else-if="aiqStore.history.length === 0" class="status-box empty">暂无 AI 出题历史。</div>
-      <div v-else class="list-stack">
-        <article v-for="history in aiqStore.history" :key="history.id" class="list-item">
-          <div class="list-item-main">
-            <p class="list-item-title">{{ history.subject || "未分类" }}</p>
-            <p class="list-item-meta">会话 ID：{{ history.id }} · 题目数：{{ history.questionCount }} · 生成时间：{{ history.generatedAt }}</p>
-          </div>
-          <div class="list-item-actions">
-            <span class="pill">完成：{{ history.completed ? "是" : "否" }}</span>
-            <span class="pill">正确率：{{ history.correctRate ?? "--" }}</span>
-            <span class="pill">分数：{{ history.score ?? "--" }}</span>
-          </div>
-        </article>
+      <!-- Questions List -->
+      <n-spin :show="aiqStore.generateLoading">
+        <n-empty v-if="aiqStore.generatedQuestions.length === 0" description="尚未生成题目" style="margin: 40px 0" />
+        
+        <div v-else class="question-list">
+          <n-card
+            v-for="(question, index) in aiqStore.generatedQuestions"
+            :key="question.id"
+            class="question-card"
+            :bordered="true"
+            size="small"
+          >
+            <template #header>
+              <n-text strong>{{ index + 1 }}. {{ question.content }}</n-text>
+            </template>
+            <template #header-extra>
+              <n-space :size="8">
+                 <n-tag size="small" :bordered="false">{{ question.questionType === "SHORT_ANSWER" ? "简答题" : "选择题" }}</n-tag>
+                 <n-tag size="small" :type="getDifficultyType(question.difficulty || '')" :bordered="false">{{ question.difficulty }}</n-tag>
+              </n-space>
+            </template>
 
-        <PaginationBar
-          :page="aiqStore.historyPage"
-          :size="aiqStore.historySize"
-          :total-pages="aiqStore.historyTotalPages"
-          :total-elements="aiqStore.historyTotalElements"
-          :disabled="aiqStore.historyLoading"
-          @update:page="updateHistoryPage"
-          @update:size="updateHistorySize"
+            <div class="answer-area">
+              <n-radio-group
+                v-if="question.questionType !== 'SHORT_ANSWER'"
+                v-model:value="answerMap[question.id as string]"
+                name="answer-group"
+              >
+                <n-space vertical :size="12">
+                  <n-radio v-for="(value, key) in question.options || {}" :key="key" :value="key">
+                    {{ key }}. {{ value }}
+                  </n-radio>
+                </n-space>
+              </n-radio-group>
+              
+              <n-input
+                v-else
+                v-model:value="answerMap[question.id as string]"
+                type="textarea"
+                placeholder="请输入详细答案..."
+                :autosize="{ minRows: 2, maxRows: 5 }"
+              />
+            </div>
+          </n-card>
+
+          <div v-if="aiqStore.generatedQuestions.length > 0" class="actions-footer">
+            <n-button
+              type="primary"
+              size="large"
+              :loading="aiqStore.submitLoading"
+              @click="submitAnswers"
+              style="width: 100%"
+            >
+              <template #icon>
+                <Send :size="16" />
+              </template>
+              提交 AI 试卷
+            </n-button>
+          </div>
+        </div>
+      </n-spin>
+
+      <!-- Result Card -->
+      <n-card v-if="aiqStore.submitResult" title="判题结果分析" :bordered="true" class="result-card" size="small">
+        <n-space :size="24" style="margin-bottom: 20px">
+          <div class="metric-item">
+            <n-text depth="3">总题数</n-text>
+            <n-text class="metric-value">{{ aiqStore.submitResult.totalQuestions }}</n-text>
+          </div>
+          <div class="metric-item">
+            <n-text depth="3">正确数</n-text>
+            <n-text class="metric-value success">{{ aiqStore.submitResult.correctCount }}</n-text>
+          </div>
+          <div class="metric-item">
+            <n-text depth="3">总得分</n-text>
+            <n-text class="metric-value highlight">{{ aiqStore.submitResult.totalScore }}</n-text>
+          </div>
+        </n-space>
+        
+        <n-space vertical :size="12">
+          <div v-for="item in aiqStore.submitResult.items || []" :key="item.questionId" class="result-detail-item">
+            <n-space justify="space-between" align="center">
+               <n-text strong>题目 {{ item.questionId }}</n-text>
+               <component :is="item.isCorrect ? CheckCircle : AlertCircle" :size="20" :class="item.isCorrect ? 'text-success' : 'text-error'" />
+            </n-space>
+            <n-space :size="20">
+              <n-text depth="2">你的答案：<n-text strong :type="item.isCorrect ? 'success' : 'error'">{{ item.userAnswer }}</n-text></n-text>
+              <n-text depth="2">正确答案：<n-text strong type="success">{{ item.correctAnswer }}</n-text></n-text>
+              <n-text depth="2">得分：<n-text strong>{{ item.score }}</n-text></n-text>
+            </n-space>
+          </div>
+        </n-space>
+        
+        <template #action>
+          <n-button
+            ghost
+            type="primary"
+            class="view-analysis-btn"
+            @click="viewAnalysis(aiqStore.submitResult?.recordId || '')"
+          >
+            查看权威 AI 解析
+          </n-button>
+        </template>
+      </n-card>
+
+      <!-- Analysis Card -->
+      <n-card v-if="currentAnalysis" title="逐题解析与指引" :bordered="true" class="analysis-card" size="small">
+        <n-space vertical :size="16">
+          <div v-for="(item, index) in currentAnalysis.items || []" :key="item.questionId" class="analysis-item-box">
+            <n-text strong class="analysis-title">题目: {{ item.content }}</n-text>
+            <div class="analysis-badge-row">
+              <n-tag :type="item.isCorrect ? 'success' : 'error'" size="small">{{ item.isCorrect ? "正确" : "错误" }}</n-tag>
+              <n-text depth="3">| 你的答案：{{ item.userAnswer }} | 正确答案：{{ item.correctAnswer }}</n-text>
+            </div>
+            <div class="analysis-content">
+               <n-text depth="2" class="analysis-label">【AI 深度解析】</n-text>
+               <n-text>{{ item.analysis || "暂无解析" }}</n-text>
+            </div>
+            <div v-if="item.teacherSuggestion" class="teacher-suggestion">
+               <n-text type="warning" class="analysis-label">【学习建议】</n-text>
+               <n-text type="warning">{{ item.teacherSuggestion }}</n-text>
+            </div>
+          </div>
+        </n-space>
+      </n-card>
+
+      <!-- History Section -->
+      <n-card :bordered="true" title="生成历史跟踪" size="small" class="history-card">
+        <template #header-extra>
+           <n-form inline :model="historyFilter" label-placement="left" :show-feedback="false" size="small">
+            <n-form-item label="学科">
+              <n-input v-model:value="historyFilter.subject" placeholder="过滤学科" clearable @keydown.enter="applyHistoryFilters" style="width: 140px"/>
+            </n-form-item>
+            <n-button @click="applyHistoryFilters">
+               <template #icon><RefreshCw :size="14" /></template>
+               查询
+            </n-button>
+          </n-form>
+        </template>
+
+        <n-data-table
+          remote
+          :loading="aiqStore.historyLoading"
+          :columns="historyColumns"
+          :data="aiqStore.history"
+          :pagination="historyPagination"
+          :bordered="false"
+          :bottom-bordered="false"
         />
-      </div>
-    </section>
-  </section>
+      </n-card>
+
+    </n-space>
+  </div>
 </template>
 
 <style scoped>
-.question-item {
-  align-items: flex-start;
+.page-title {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
 }
 
-.result-block {
-  margin-top: 14px;
-  border-top: 1px dashed var(--color-border);
-  padding-top: 14px;
-}
-
-.result-block h3 {
-  margin: 0 0 10px;
-}
-
-.result-metrics {
+.page-header {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.session-alert {
+  margin-top: 8px;
+}
+
+.question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.question-card, .history-card {
+  border-radius: 8px;
+}
+
+.answer-area {
+  margin-top: 12px;
+  padding: 16px;
+  background-color: var(--color-bg-soft);
+  border-radius: 6px;
+}
+
+.actions-footer {
+  margin-top: 16px;
+}
+
+.result-card, .analysis-card {
+  margin-top: 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-code);
+}
+
+.metric-value.success {
+  color: #18a058;
+}
+
+.metric-value.highlight {
+  color: #2080f0;
+}
+
+.result-detail-item {
+  padding: 12px 16px;
+  background-color: #f8fafc;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.analysis-line {
-  margin: 6px 0 0;
-  color: #365d7f;
+.text-success { color: #18a058; }
+.text-error { color: #d03050; }
+
+.view-analysis-btn {
+  margin-top: 12px;
+}
+
+.analysis-item-box {
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #bae0ff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analysis-title {
+  font-size: 1.05rem;
+}
+
+.analysis-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.analysis-content {
+  margin-top: 4px;
+  padding: 12px;
+  background-color: #fff;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.teacher-suggestion {
+  margin-top: 4px;
+  padding: 12px;
+  background-color: #fffbdf;
+  border-radius: 6px;
+  border: 1px solid #fce8a1;
+}
+
+.analysis-label {
+  font-weight: 600;
+  margin-right: 4px;
 }
 </style>

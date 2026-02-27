@@ -1,32 +1,57 @@
 :root {
-  --color-bg: #f3f8fc;
-  --color-bg-soft: #e7f1f9;
-  --color-surface: #ffffff;
-  --color-surface-strong: #f7fbff;
-  --color-border: #d7e3ef;
-  --color-border-strong: #c2d5e8;
-  --color-text: #1d3042;
-  --color-text-muted: #4e647a;
-  --color-primary: #1767ad;
-  --color-primary-strong: #13558f;
-  --color-success: #2d8b43;
-  --color-warning: #e07b1a;
-  --color-danger: #cb3b66;
-  --color-danger-strong: #ac2e55;
-  --shadow-soft: 0 16px 34px rgba(23, 70, 114, 0.1);
-  --shadow-focus: 0 0 0 3px rgba(23, 103, 173, 0.22);
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  /* Ethereal Glass HSL Color System */
+  --color-primary-h: 237;
+  --color-primary-s: 90%;
+  --color-primary-l: 66%;
+  --color-primary: hsl(var(--color-primary-h), var(--color-primary-s), var(--color-primary-l));
+  --color-primary-hover: hsl(var(--color-primary-h), var(--color-primary-s), 72%);
+  --color-primary-pressed: hsl(var(--color-primary-h), var(--color-primary-s), 56%);
+
+  --color-secondary-h: 180;
+  --color-secondary-s: 80%;
+  --color-secondary-l: 45%;
+  --color-secondary: hsl(var(--color-secondary-h), var(--color-secondary-s), var(--color-secondary-l));
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  --color-bg-light: #f4f6fb;
+  --color-bg-dark: #0f111a;
+  
+  --color-surface-glass: rgba(255, 255, 255, 0.75);
+  --color-surface-glass-hover: rgba(255, 255, 255, 0.85);
+  
+  --color-border-glass: rgba(255, 255, 255, 0.4);
+  --color-border-solid: #e2e8f0;
+
+  --color-text-main: #1e293b;
+  --color-text-muted: #64748b;
+
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  --shadow-float: 0 20px 40px -20px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 24px -4px rgba(92, 101, 246, 0.4);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
-  --font-title: "HarmonyOS Sans SC", "Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-  --font-body: "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
-  --font-code: "JetBrains Mono", "Consolas", monospace;
-  --breakpoint-mobile: 767px;
-  --breakpoint-tablet: 1279px;
+  --space-12: 48px;
+
+  --font-title: "Outfit", "Inter", "Source Han Sans SC", system-ui, sans-serif;
+  --font-body: "Inter", "Source Han Sans SC", system-ui, sans-serif;
+  --font-code: "JetBrains Mono", "Fira Code", monospace;
+
+  /* Spring animation values */
+  --transition-spring: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }

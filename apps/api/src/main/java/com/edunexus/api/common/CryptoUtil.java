@@ -10,9 +10,13 @@ public final class CryptoUtil {
     private CryptoUtil() {}
 
     public static String sha256(String input) {
+        return sha256(input.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static String sha256(byte[] input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(input);
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) {
                 sb.append(String.format("%02x", b));

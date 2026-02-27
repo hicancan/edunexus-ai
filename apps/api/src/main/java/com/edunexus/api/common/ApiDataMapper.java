@@ -112,9 +112,14 @@ public final class ApiDataMapper {
     }
 
     public static Map<String, String> parseStringMap(Object value, ObjectMapper objectMapper) {
+        Map<String, String> parsed = parseNullableStringMap(value, objectMapper);
+        return parsed == null ? Collections.emptyMap() : parsed;
+    }
+
+    public static Map<String, String> parseNullableStringMap(Object value, ObjectMapper objectMapper) {
         Object parsed = parseJsonValue(value, objectMapper);
         if (!(parsed instanceof Map<?, ?> map)) {
-            return Collections.emptyMap();
+            return null;
         }
         Map<String, String> out = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : map.entrySet()) {
@@ -124,9 +129,14 @@ public final class ApiDataMapper {
     }
 
     public static List<String> parseStringList(Object value, ObjectMapper objectMapper) {
+        List<String> parsed = parseNullableStringList(value, objectMapper);
+        return parsed == null ? Collections.emptyList() : parsed;
+    }
+
+    public static List<String> parseNullableStringList(Object value, ObjectMapper objectMapper) {
         Object parsed = parseJsonValue(value, objectMapper);
         if (!(parsed instanceof List<?> list)) {
-            return Collections.emptyList();
+            return null;
         }
         return list.stream().map(String::valueOf).toList();
     }

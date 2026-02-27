@@ -11,12 +11,16 @@ body,
 body {
   margin: 0;
   font-family: var(--font-body);
-  color: var(--color-text);
-  line-height: 1.55;
-  background:
-    radial-gradient(48rem 42rem at 0% -6%, rgba(23, 103, 173, 0.15), transparent 58%),
-    radial-gradient(44rem 42rem at 100% 8%, rgba(45, 139, 67, 0.09), transparent 62%),
-    linear-gradient(180deg, var(--color-bg-soft) 0%, var(--color-bg) 100%);
+  color: var(--color-text-main);
+  line-height: 1.6;
+  background-color: var(--color-bg-light);
+  background-image:
+    radial-gradient(at 0% 0%, hsla(var(--color-primary-h), 100%, 85%, 0.4) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(var(--color-secondary-h), 100%, 80%, 0.4) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(var(--color-primary-h), 80%, 90%, 0.3) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsla(280, 100%, 85%, 0.3) 0px, transparent 50%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -67,14 +71,22 @@ h4 {
 }
 
 .panel {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: 1px solid var(--color-border-glass);
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-glass);
   padding: var(--space-5);
+  transition: var(--transition-smooth);
 }
 
-.panel + .panel {
+.panel:hover {
+  box-shadow: var(--shadow-float);
+  transform: translateY(-2px);
+}
+
+.panel+.panel {
   margin-top: var(--space-4);
 }
 
@@ -136,9 +148,35 @@ h4 {
 .field-block label {
   display: inline-block;
   margin-bottom: 6px;
-  font-size: 0.84rem;
-  color: #44627f;
-  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Glass Utilities */
+.glass-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-glass);
+  border-radius: var(--radius-lg);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-pill);
+}
+
+.animate-pop {
+  transition: var(--transition-spring);
+}
+
+.animate-pop:active {
+  transform: scale(0.96);
 }
 
 input,
@@ -310,12 +348,13 @@ textarea {
 .code-block {
   margin: 0;
   padding: 12px;
-  border: 1px solid #d0dfec;
+  border: 1px solid var(--color-border-glass);
   border-radius: var(--radius-md);
-  background: #f5f9fd;
-  color: #23415f;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(4px);
+  color: var(--color-text-main);
   font-family: var(--font-code);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

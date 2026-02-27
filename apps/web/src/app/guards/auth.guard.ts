@@ -1,7 +1,7 @@
 import type { Router } from "vue-router";
-import { getMe } from "../../services/auth.service";
+import { getMe } from "../../features/auth/api/auth.service";
 import { toErrorMessage } from "../../services/error-message";
-import { useAuthStore } from "../../stores/auth";
+import { useAuthStore } from "../../features/auth/model/auth";
 import { roleHomePath } from "../router/routes";
 
 const PROFILE_CACHE_MS = 2 * 60 * 1000;

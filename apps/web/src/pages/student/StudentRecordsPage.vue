@@ -1,22 +1,41 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, h, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import PaginationBar from "../../components/common/PaginationBar.vue";
+import {
+  NCard,
+  NForm,
+  NFormItem,
+  NDatePicker,
+  NButton,
+  NSpace,
+  NText,
+  NAlert,
+  NDataTable,
+  NTag,
+  NModal,
+  NSpin,
+  useMessage,
+  type DataTableColumns
+} from "naive-ui";
+import { Search, Eye, CheckCircle, AlertCircle } from "lucide-vue-next";
 import { readQueryInt, readQueryString, replaceQuery } from "../../app/providers/query-state";
-import { useExerciseStore } from "../../stores/exercise";
+import { useExerciseStore } from "../../features/student/model/exercise";
+import type { ExerciseRecordVO } from "../../services/contracts";
 
 const route = useRoute();
 const router = useRouter();
 const exerciseStore = useExerciseStore();
+const message = useMessage();
 
 const filters = reactive({
-  startDate: "",
-  endDate: "",
+  dateRange: null as [number, number] | null,
   page: 1,
   size: 20
 });
 
 const selectedRecordId = ref("");
+const showAnalysisModal = ref(false);
+
 const currentAnalysis = computed(() => {
   if (!selectedRecordId.value) {
     return null;
@@ -25,25 +44,50 @@ const currentAnalysis = computed(() => {
 });
 
 function hydrateFromQuery(): void {
-  filters.startDate = readQueryString(route.query, "startDate");
-  filters.endDate = readQueryString(route.query, "endDate");
+  const start = readQueryString(route.query, "startDate");
+  const end = readQueryString(route.query, "endDate");
+  if (start && end) {
+    filters.dateRange = [Date.parse(start), Date.parse(end)];
+  } else {
+    filters.dateRange = null;
+  }
   filters.page = readQueryInt(route.query, "page", 1);
   filters.size = readQueryInt(route.query, "size", 20);
 }
 
 async function syncQueryAndLoad(): Promise<void> {
+  let startDate = undefined;
+  let endDate = undefined;
+  
+  if (filters.dateRange && filters.dateRange.length === 2) {
+    const d1 = new Date(filters.dateRange[0]);
+    const d2 = new Date(filters.dateRange[1]);
+    startDate = `${d1.getFullYear()}-${String(d1.getMonth() + 1).padStart(2, '0')}-${String(d1.getDate()).padStart(2, '0')}`;
+    endDate = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}-${String(d2.getDate()).padStart(2, '0')}`;
+  }
+
   await replaceQuery(router, route.query, {
-    startDate: filters.startDate || undefined,
-    endDate: filters.endDate || undefined,
+    startDate,
+    endDate,
     page: String(filters.page),
     size: String(filters.size)
   });
 }
 
 async function loadRecords(): Promise<void> {
+  let startDate = undefined;
+  let endDate = undefined;
+  
+  if (filters.dateRange && filters.dateRange.length === 2) {
+     const d1 = new Date(filters.dateRange[0]);
+     const d2 = new Date(filters.dateRange[1]);
+     startDate = `${d1.getFullYear()}-${String(d1.getMonth() + 1).padStart(2, '0')}-${String(d1.getDate()).padStart(2, '0')}`;
+     endDate = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}-${String(d2.getDate()).padStart(2, '0')}`;
+  }
+
   await exerciseStore.loadRecords({
-    startDate: filters.startDate || undefined,
-    endDate: filters.endDate || undefined,
+    startDate,
+    endDate,
     page: filters.page,
     size: filters.size
   });
@@ -51,125 +95,269 @@ async function loadRecords(): Promise<void> {
 
 async function applyFilters(): Promise<void> {
   filters.page = 1;
-  await syncQueryAndLoad();
-}
-
-async function updatePage(page: number): Promise<void> {
-  filters.page = page;
-  await syncQueryAndLoad();
-}
-
-async function updateSize(size: number): Promise<void> {
-  filters.size = size;
-  filters.page = 1;
+  pagination.page = 1;
   await syncQueryAndLoad();
 }
 
 async function viewAnalysis(recordId: string): Promise<void> {
   selectedRecordId.value = recordId;
+  showAnalysisModal.value = true;
   await exerciseStore.loadAnalysis(recordId);
 }
+
+const pagination = reactive({
+  page: filters.page,
+  pageSize: filters.size,
+  showSizePicker: true,
+  pageSizes: [10, 20, 50],
+  onChange: (page: number) => {
+    pagination.page = page;
+    filters.page = page;
+    syncQueryAndLoad();
+  },
+  onUpdatePageSize: (pageSize: number) => {
+    pagination.pageSize = pageSize;
+    pagination.page = 1;
+    filters.size = pageSize;
+    filters.page = 1;
+    syncQueryAndLoad();
+  },
+  itemCount: 0
+});
+
+watch(
+  () => exerciseStore.recordsTotalElements,
+  (total) => {
+    pagination.itemCount = total;
+  }
+);
 
 watch(
   () => route.query,
   async () => {
     hydrateFromQuery();
+    pagination.page = filters.page;
+    pagination.pageSize = filters.size;
     await loadRecords();
   }
 );
 
+const columns: DataTableColumns<ExerciseRecordVO> = [
+  {
+    title: "学科",
+    key: "subject",
+    render(row) {
+      return h(NTag, { type: "info", size: "small", bordered: false }, { default: () => row.subject || "未分类" });
+    }
+  },
+  {
+    title: "记录 ID",
+    key: "id",
+    width: 280,
+    render(row) {
+      return h(NText, { depth: 3, code: true, style: "font-size: 12px" }, { default: () => row.id });
+    }
+  },
+  {
+    title: "得分",
+    key: "totalScore",
+    align: "center",
+    render(row) {
+      return h(NText, { type: "info", strong: true }, { default: () => `${row.totalScore} 分` });
+    }
+  },
+  {
+    title: "正确数 / 总题数",
+    key: "correctCount",
+    align: "center",
+    render(row) {
+      return h(
+        NSpace,
+        { align: "center", justify: "center", size: 4 },
+        () => [
+          h(NText, { type: "success", strong: true }, { default: () => row.correctCount }),
+          h(NText, { depth: 3 }, { default: () => "/" }),
+          h(NText, {}, { default: () => row.totalQuestions })
+        ]
+      );
+    }
+  },
+  {
+    title: "时间",
+    key: "createdAt",
+    width: 180,
+    render(row) {
+      return h(NText, { depth: 3 }, { default: () => row.createdAt });
+    }
+  },
+  {
+    title: "操作",
+    key: "actions",
+    align: "center",
+    width: 120,
+    render(row) {
+      return h(
+        NButton,
+        {
+          size: "small",
+          type: "primary",
+          secondary: true,
+          onClick: () => viewAnalysis(row.id || "")
+        },
+        { default: () => "查看解析", icon: () => h(Eye, { size: 14 }) }
+      );
+    }
+  }
+];
+
 onMounted(async () => {
   hydrateFromQuery();
+  pagination.page = filters.page;
+  pagination.pageSize = filters.size;
   await loadRecords();
 });
 </script>
 
 <template>
-  <section class="panel">
-    <header class="panel-head">
-      <div>
-        <h2 class="panel-title">做题记录</h2>
-        <p class="panel-note">支持按时间区间检索，并可查看逐题解析。</p>
-      </div>
-      <button class="btn secondary" type="button" :disabled="exerciseStore.recordsLoading" @click="loadRecords">
-        {{ exerciseStore.recordsLoading ? "加载中..." : "刷新记录" }}
-      </button>
-    </header>
-
-    <div class="form-grid">
-      <div class="field-block">
-        <label for="records-start-date">开始日期</label>
-        <input id="records-start-date" v-model="filters.startDate" type="date" />
-      </div>
-      <div class="field-block">
-        <label for="records-end-date">结束日期</label>
-        <input id="records-end-date" v-model="filters.endDate" type="date" />
-      </div>
-    </div>
-
-    <div class="list-item-actions" style="margin-top: 12px;">
-      <button class="btn" type="button" :disabled="exerciseStore.recordsLoading" @click="applyFilters">按条件查询</button>
-    </div>
-
-    <p v-if="exerciseStore.recordsError" class="status-box error" role="alert">{{ exerciseStore.recordsError }}</p>
-    <div v-if="exerciseStore.recordsLoading && !exerciseStore.recordsLoaded" class="status-box info">正在加载记录...</div>
-    <div v-else-if="exerciseStore.records.length === 0" class="status-box empty">暂无记录。</div>
-    <div v-else class="list-stack">
-      <article v-for="record in exerciseStore.records" :key="record.id" class="list-item">
-        <div class="list-item-main">
-          <p class="list-item-title">{{ record.subject || "未分类" }}</p>
-          <p class="list-item-meta">
-            记录 ID：{{ record.id }} · 得分：{{ record.totalScore }} · 正确/总题：{{ record.correctCount }}/{{ record.totalQuestions }} · 时间：{{ record.createdAt }}
-          </p>
+  <div class="records-page">
+    <n-space vertical :size="16">
+      <div class="page-header">
+        <div>
+          <n-text tag="h2" class="page-title">做题记录</n-text>
+          <n-text depth="3">支持按时间区间检索，并可查看逐题详尽解析。</n-text>
         </div>
-        <button class="btn secondary small" type="button" @click="viewAnalysis(record.id || '')">查看解析</button>
-      </article>
-
-      <PaginationBar
-        :page="exerciseStore.recordsPage"
-        :size="exerciseStore.recordsSize"
-        :total-pages="exerciseStore.recordsTotalPages"
-        :total-elements="exerciseStore.recordsTotalElements"
-        :disabled="exerciseStore.recordsLoading"
-        @update:page="updatePage"
-        @update:size="updateSize"
-      />
-    </div>
-
-    <p v-if="exerciseStore.analysisError" class="status-box error" role="alert">{{ exerciseStore.analysisError }}</p>
-    <section v-if="currentAnalysis" class="analysis-block">
-      <h3>记录解析</h3>
-      <div class="list-stack">
-        <article v-for="item in currentAnalysis.items || []" :key="item.questionId" class="list-item analysis-item">
-          <div class="list-item-main">
-            <p class="list-item-title">{{ item.content }}</p>
-            <p class="list-item-meta">你的答案：{{ item.userAnswer }} · 正确答案：{{ item.correctAnswer }} · {{ item.isCorrect ? "正确" : "错误" }}</p>
-            <p class="analysis-line">解析：{{ item.analysis || "暂无解析" }}</p>
-            <p v-if="item.teacherSuggestion" class="analysis-line">教师建议：{{ item.teacherSuggestion }}</p>
-          </div>
-        </article>
       </div>
-    </section>
-  </section>
+
+      <n-card :bordered="true">
+        <n-form inline :model="filters" label-placement="left" :show-feedback="false">
+          <n-form-item label="时间区间">
+             <n-date-picker v-model:value="filters.dateRange" type="daterange" clearable />
+          </n-form-item>
+          <n-form-item>
+            <n-button type="primary" :loading="exerciseStore.recordsLoading" @click="applyFilters">
+               <template #icon>
+                <Search :size="16" />
+              </template>
+              查询记录
+            </n-button>
+          </n-form-item>
+        </n-form>
+      </n-card>
+
+      <n-alert v-if="exerciseStore.recordsError" type="error" :show-icon="true">{{ exerciseStore.recordsError }}</n-alert>
+
+      <n-card :bordered="true" class="table-card" content-style="padding: 0;">
+        <n-data-table
+          remote
+          :loading="exerciseStore.recordsLoading"
+          :columns="columns"
+          :data="exerciseStore.records"
+          :pagination="pagination"
+          :bordered="false"
+          :bottom-bordered="false"
+        />
+      </n-card>
+    </n-space>
+
+    <!-- Modal overlay for analysis -->
+    <n-modal
+      v-model:show="showAnalysisModal"
+      preset="card"
+      title="记录深度解析"
+      class="analysis-modal"
+      :style="{ width: '800px', maxWidth: '95vw' }"
+    >
+      <div v-if="exerciseStore.analysisLoading" class="modal-loading">
+        <n-spin size="large" />
+      </div>
+      <div v-else-if="exerciseStore.analysisError">
+         <n-alert type="error" :show-icon="true">{{ exerciseStore.analysisError }}</n-alert>
+      </div>
+      <div v-else-if="currentAnalysis">
+        <n-space vertical :size="16">
+          <div v-for="(item, index) in currentAnalysis.items || []" :key="item.questionId" class="analysis-item-box">
+            <n-text strong class="analysis-title">题目: {{ item.content }}</n-text>
+            <div class="analysis-badge-row">
+              <n-tag :type="item.isCorrect ? 'success' : 'error'" size="small">{{ item.isCorrect ? "正确" : "错误" }}</n-tag>
+              <n-text depth="3">| 你的答案：{{ item.userAnswer }} | 正确答案：{{ item.correctAnswer }}</n-text>
+            </div>
+            <div class="analysis-content">
+               <n-text depth="2" class="analysis-label">【考点解析】</n-text>
+               <n-text>{{ item.analysis || "暂无解析" }}</n-text>
+            </div>
+            <div v-if="item.teacherSuggestion" class="teacher-suggestion">
+               <n-text type="warning" class="analysis-label">【教师指导】</n-text>
+               <n-text type="warning">{{ item.teacherSuggestion }}</n-text>
+            </div>
+          </div>
+        </n-space>
+      </div>
+    </n-modal>
+  </div>
 </template>
 
 <style scoped>
-.analysis-block {
-  margin-top: 14px;
-  border-top: 1px dashed var(--color-border);
-  padding-top: 14px;
+.page-title {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
 }
 
-.analysis-block h3 {
-  margin: 0 0 10px;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.analysis-item {
-  align-items: flex-start;
+.table-card {
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.analysis-line {
-  margin: 6px 0 0;
-  color: #345b7f;
+.modal-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 0;
+}
+
+.analysis-item-box {
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #bae0ff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analysis-title {
+  font-size: 1.05rem;
+}
+
+.analysis-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.analysis-content {
+  margin-top: 4px;
+  padding: 12px;
+  background-color: #fff;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.teacher-suggestion {
+  margin-top: 4px;
+  padding: 12px;
+  background-color: #fffbdf;
+  border-radius: 6px;
+  border: 1px solid #fce8a1;
+}
+
+.analysis-label {
+  font-weight: 600;
+  margin-right: 4px;
 }
 </style>

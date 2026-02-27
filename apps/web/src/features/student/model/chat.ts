@@ -1,13 +1,13 @@
 import { defineStore } from "pinia";
-import { toErrorMessage } from "../services/error-message";
+import { toErrorMessage } from "../../../services/error-message";
 import {
   createChatSession,
   deleteChatSession,
   getChatSessionDetail,
   listChatSessions,
   sendChatMessage
-} from "../services/student.service";
-import type { ChatMessageVO, ChatSessionVO, PagedResult } from "../services/contracts";
+} from "../api/student.service";
+import type { ChatMessageVO, ChatSessionVO, PagedResult } from "../../../services/contracts";
 
 interface ChatState {
   sessions: ChatSessionVO[];

@@ -1,11 +1,11 @@
 import { defineStore } from "pinia";
-import { toErrorMessage } from "../services/error-message";
+import { toErrorMessage } from "../../../services/error-message";
 import {
   generateAiQuestions,
   getAiQuestionAnalysis,
   listAiQuestionHistory,
   submitAiQuestions
-} from "../services/student.service";
+} from "../api/student.service";
 import type {
   AiQuestionAnalysisVO,
   AiQuestionGenerateRequest,
@@ -13,7 +13,7 @@ import type {
   AiQuestionSessionVO,
   PagedResult,
   QuestionVO
-} from "../services/contracts";
+} from "../../../services/contracts";
 
 interface AiqState {
   generateLoading: boolean;

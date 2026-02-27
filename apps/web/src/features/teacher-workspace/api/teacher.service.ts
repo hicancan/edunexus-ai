@@ -1,4 +1,4 @@
-import { apiClient, unwrapResponse } from "./api-client";
+import { apiClient, unwrapResponse } from "../../../services/api-client";
 import {
   type ApiEnvelope,
   type DocumentStatus,
@@ -12,7 +12,7 @@ import {
   type TeacherSuggestionRequest,
   type TeacherSuggestionVO,
   normalizePagedResult
-} from "./contracts";
+} from "../../../services/contracts";
 
 export type ExportFormat = "md" | "pdf";
 

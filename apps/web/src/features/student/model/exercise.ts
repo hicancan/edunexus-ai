@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { toErrorMessage } from "../services/error-message";
+import { toErrorMessage } from "../../../services/error-message";
 import {
   getExerciseAnalysis,
   listExerciseQuestions,
@@ -7,7 +7,7 @@ import {
   listWrongQuestions,
   removeWrongQuestion,
   submitExercise
-} from "../services/student.service";
+} from "../api/student.service";
 import type {
   ExerciseAnalysisVO,
   ExerciseRecordVO,
@@ -16,7 +16,7 @@ import type {
   PagedResult,
   QuestionVO,
   WrongBookEntryVO
-} from "../services/contracts";
+} from "../../../services/contracts";
 
 interface ExerciseState {
   questions: QuestionVO[];

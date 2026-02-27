@@ -1,6 +1,7 @@
 package com.edunexus.api.common;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -34,16 +35,30 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse> handleUnauthorized(UnauthorizedException ex, HttpServletRequest request) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(ErrorCode.AUTH_TOKEN_INVALID, ex.getMessage(), trace(request)));
+        return ResponseEntity.status(ex.errorCode().httpStatus())
+                .body(ApiResponse.error(ex.errorCode(), ex.getMessage(), trace(request)));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse> handleForbidden(ForbiddenException ex, HttpServletRequest request) {
+        return ResponseEntity.status(ex.errorCode().httpStatus())
+                .body(ApiResponse.error(ex.errorCode(), ex.getMessage(), trace(request)));
     }
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<ApiResponse> handleSecurity(SecurityException ex, HttpServletRequest request) {
-        ErrorCode code = ex.getMessage() != null && ex.getMessage().contains("非资源归属者")
-                ? ErrorCode.PERMISSION_OWNERSHIP
-                : ErrorCode.PERMISSION_DENIED;
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        String message = ex.getMessage() == null ? "" : ex.getMessage();
+        ErrorCode code;
+        if (message.contains("非资源归属者")) {
+            code = ErrorCode.PERMISSION_OWNERSHIP;
+        } else if (message.contains("账号已禁用")) {
+            code = ErrorCode.AUTH_ACCOUNT_DISABLED;
+        } else if (message.contains("未认证")) {
+            code = ErrorCode.AUTH_TOKEN_INVALID;
+        } else {
+            code = ErrorCode.PERMISSION_DENIED;
+        }
+        return ResponseEntity.status(code.httpStatus())
                 .body(ApiResponse.error(code, ex.getMessage(), trace(request)));
     }
 
@@ -55,8 +70,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DependencyException.class)
     public ResponseEntity<ApiResponse> handleDependency(DependencyException ex, HttpServletRequest request) {
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(ApiResponse.error(ErrorCode.SYSTEM_DEPENDENCY, ex.getMessage(), trace(request)));
+        return ResponseEntity.status(ex.errorCode().httpStatus())
+                .body(ApiResponse.error(ex.errorCode(), ex.getMessage(), trace(request)));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -67,6 +82,16 @@ public class GlobalExceptionHandler {
                 .map(e -> e.getField() + " " + e.getDefaultMessage())
                 .orElse("参数错误");
         return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.VALIDATION_FIELD, message, trace(request)));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse> handleConstraintViolation(ConstraintViolationException ex,
+            HttpServletRequest request) {
+        String message = ex.getConstraintViolations().stream()
+                .findFirst()
+                .map(v -> v.getPropertyPath() + " " + v.getMessage())
+                .orElse("参数错误");
+        return ResponseEntity.badRequest().body(ApiResponse.error(ErrorCode.VALIDATION_PARAM, message, trace(request)));
     }
 
     @ExceptionHandler(Exception.class)

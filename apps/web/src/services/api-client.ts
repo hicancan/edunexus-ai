@@ -76,10 +76,32 @@ function isAuthEndpoint(url?: string): boolean {
 }
 
 function readAccessToken(): string {
+  try {
+    const authStore = localStorage.getItem("auth");
+    if (authStore) {
+      const parsed = JSON.parse(authStore);
+      if (parsed && typeof parsed === "object" && parsed.token) {
+        return parsed.token;
+      }
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
   return localStorage.getItem(storageKeys.accessToken) || "";
 }
 
 function readRefreshToken(): string {
+  try {
+    const authStore = localStorage.getItem("auth");
+    if (authStore) {
+      const parsed = JSON.parse(authStore);
+      if (parsed && typeof parsed === "object" && parsed.refreshToken) {
+        return parsed.refreshToken;
+      }
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
   return localStorage.getItem(storageKeys.refreshToken) || localStorage.getItem(legacyRefreshTokenKey) || "";
 }
 
@@ -149,15 +171,17 @@ apiClient.interceptors.response.use(
     const startedAt = requestConfig.__startedAt ?? Date.now();
     const traceId = (response.data as ApiEnvelope | undefined)?.traceId || response.headers["x-trace-id"] || "";
 
-    console.info(
-      "[web-api]",
-      JSON.stringify({
-        route: response.config.url,
-        action: (response.config.method || "get").toUpperCase(),
-        latency: Date.now() - startedAt,
-        traceId
-      })
-    );
+    if (import.meta.env.DEV) {
+      console.info(
+        "[web-api]",
+        JSON.stringify({
+          route: response.config.url,
+          action: (response.config.method || "get").toUpperCase(),
+          latency: Date.now() - startedAt,
+          traceId
+        })
+      );
+    }
 
     return response;
   },

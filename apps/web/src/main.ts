@@ -1,7 +1,6 @@
 import { createPinia } from "pinia";
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { createApp } from "vue";
-import ElementPlus from "element-plus";
-import "element-plus/dist/index.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import App from "./App.vue";
@@ -9,12 +8,13 @@ import { createAppRouter } from "./app/router";
 
 const app = createApp(App);
 const pinia = createPinia();
+pinia.use(piniaPluginPersistedstate);
 const router = createAppRouter();
 
 app.use(pinia);
-app.use(ElementPlus);
 app.use(router);
 
+// Provide global naive ui setup if needed (Naive UI primarily uses NConfigProvider in App.vue)
 app.config.errorHandler = (error, instance, info) => {
   const componentName = (instance as { $options?: { name?: string } } | null)?.$options?.name || "unknown";
   console.error(

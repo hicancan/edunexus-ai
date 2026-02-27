@@ -4,6 +4,7 @@ import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.ConflictException;
+import com.edunexus.api.common.FilenameUtil;
 import com.edunexus.api.common.ResourceNotFoundException;
 import com.edunexus.api.service.DbService;
 import com.edunexus.api.service.GovernanceService;
@@ -346,14 +347,14 @@ public class AdminController implements ControllerSupport {
     private DownloadData resolveDownloadData(UUID resourceId) {
         Map<String, Object> lessonPlan = db.oneOrNull("select topic,content_md from lesson_plans where id=? and deleted_at is null", resourceId);
         if (lessonPlan != null) {
-            String filename = sanitizeFilename(String.valueOf(lessonPlan.get("topic"))) + ".md";
+            String filename = FilenameUtil.sanitize(String.valueOf(lessonPlan.get("topic"))) + ".md";
             byte[] bytes = String.valueOf(lessonPlan.get("content_md")).getBytes(StandardCharsets.UTF_8);
             return new DownloadData(filename, bytes);
         }
 
         Map<String, Object> document = db.oneOrNull("select filename,storage_path from documents where id=? and deleted_at is null", resourceId);
         if (document != null) {
-            String filename = sanitizeFilename(String.valueOf(document.get("filename")));
+            String filename = FilenameUtil.sanitize(String.valueOf(document.get("filename")));
             byte[] bytes = objectStorageService.download(String.valueOf(document.get("storage_path")));
             return new DownloadData(filename, bytes);
         }
@@ -365,10 +366,6 @@ public class AdminController implements ControllerSupport {
         }
 
         throw new ResourceNotFoundException("资源不存在");
-    }
-
-    private String sanitizeFilename(String filename) {
-        return filename.replaceAll("[^a-zA-Z0-9._-\\u4e00-\\u9fa5]", "_");
     }
 
     private record DownloadData(String filename, byte[] bytes) {

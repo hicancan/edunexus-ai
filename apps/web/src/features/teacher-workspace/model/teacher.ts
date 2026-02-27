@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { toErrorMessage } from "../services/error-message";
+import { toErrorMessage } from "../../../services/error-message";
 import {
   createTeacherSuggestion,
   deleteKnowledgeDocument,
@@ -12,7 +12,7 @@ import {
   sharePlan,
   updatePlan,
   uploadKnowledgeDocument
-} from "../services/teacher.service";
+} from "../api/teacher.service";
 import type {
   DocumentStatus,
   DocumentVO,
@@ -23,7 +23,7 @@ import type {
   StudentAnalyticsVO,
   TeacherSuggestionRequest,
   TeacherSuggestionVO
-} from "../services/contracts";
+} from "../../../services/contracts";
 
 interface TeacherState {
   documents: DocumentVO[];
@@ -51,6 +51,8 @@ interface TeacherState {
   operationLoading: boolean;
   operationError: string;
   shareResult: ShareResultVO | null;
+
+  examCart: DocumentVO[];
 }
 
 function assignPlanMeta(state: TeacherState, paged: PagedResult<LessonPlanVO>): void {
@@ -86,9 +88,25 @@ export const useTeacherStore = defineStore("teacher", {
 
     operationLoading: false,
     operationError: "",
-    shareResult: null
+    shareResult: null,
+
+    examCart: []
   }),
   actions: {
+    addToCart(doc: DocumentVO): void {
+      if (!this.examCart.find((item) => item.id === doc.id)) {
+        this.examCart.push(doc);
+      }
+    },
+
+    removeFromCart(id: string): void {
+      this.examCart = this.examCart.filter((item) => item.id !== id);
+    },
+
+    clearCart(): void {
+      this.examCart = [];
+    },
+
     async loadDocuments(status?: DocumentStatus): Promise<void> {
       this.documentsLoading = true;
       this.documentsError = "";

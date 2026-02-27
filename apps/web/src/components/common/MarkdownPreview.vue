@@ -1,42 +1,21 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 const props = defineProps<{
   content: string;
 }>();
 
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function renderSafeMarkdown(input: string): string {
-  const escaped = escapeHtml(input);
-  const withHeadings = escaped
-    .replace(/^###\s+(.+)$/gm, "<h3>$1</h3>")
-    .replace(/^##\s+(.+)$/gm, "<h2>$1</h2>")
-    .replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
-  const withInline = withHeadings
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>");
-
-  return withInline
-    .split(/\n{2,}/)
-    .map((block) => {
-      const trimmed = block.trim();
-      if (trimmed.startsWith("<h1>") || trimmed.startsWith("<h2>") || trimmed.startsWith("<h3>")) {
-        return trimmed;
-      }
-      return `<p>${trimmed.replace(/\n/g, "<br />")}</p>`;
-    })
-    .join("");
-}
-
-const renderedHtml = computed(() => renderSafeMarkdown(props.content || ""));
+const renderedHtml = computed(() => {
+  if (!props.content) return "";
+  
+  // Parse markdown to HTML
+  const rawHtml = marked.parse(props.content, { async: false }) as string;
+  
+  // Sanitize the HTML output
+  return DOMPurify.sanitize(rawHtml);
+});
 </script>
 
 <template>
@@ -73,5 +52,19 @@ const renderedHtml = computed(() => renderSafeMarkdown(props.content || ""));
   padding: 2px 5px;
   font-family: var(--font-code);
   font-size: 0.85em;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.markdown-body :deep(li) {
+  margin-bottom: 4px;
+}
+
+.markdown-body :deep(pre) {
+  margin: 0 0 10px;
 }
 </style>

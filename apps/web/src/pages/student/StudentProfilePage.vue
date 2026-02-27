@@ -1,9 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { getMe } from "../../services/auth.service";
+import {
+  NCard,
+  NDescriptions,
+  NDescriptionsItem,
+  NButton,
+  NSpace,
+  NText,
+  NAlert,
+  NTag,
+  NSpin
+} from "naive-ui";
+import { RefreshCw, User as UserIcon } from "lucide-vue-next";
+import { getMe } from "../../features/auth/api/auth.service";
 import { toErrorMessage } from "../../services/error-message";
 import type { UserVO } from "../../services/contracts";
-import { useAuthStore } from "../../stores/auth";
+import { useAuthStore } from "../../features/auth/model/auth";
 
 const auth = useAuthStore();
 const profile = ref<UserVO | null>(null);
@@ -26,81 +38,110 @@ async function loadProfile(): Promise<void> {
 }
 
 onMounted(loadProfile);
+
+function getRoleType(role: string): any {
+  if (role === "ADMIN") return "error";
+  if (role === "TEACHER") return "warning";
+  if (role === "STUDENT") return "info";
+  return "default";
+}
+
+function getStatusType(status: string): "success" | "error" {
+  if (status === "ACTIVE") return "success";
+  return "error";
+}
 </script>
 
 <template>
-  <section class="panel">
-    <header class="panel-head">
-      <div>
-        <h2 class="panel-title">个人信息</h2>
-        <p class="panel-note">来自 `GET /auth/me`，用于身份态校验和页面展示。</p>
+  <div class="profile-page">
+    <n-space vertical :size="16">
+      <div class="page-header">
+        <div>
+          <n-text tag="h2" class="page-title">个人主页</n-text>
+          <n-text depth="3">展示当前登录用户的账号详情与身份状态。</n-text>
+        </div>
       </div>
-      <button class="btn secondary" type="button" :disabled="loading" @click="loadProfile">
-        {{ loading ? "刷新中..." : "刷新资料" }}
-      </button>
-    </header>
 
-    <p v-if="error" class="status-box error" role="alert">{{ error }}</p>
-    <div v-if="loading && !profile" class="status-box info">正在加载个人信息...</div>
-    <div v-else-if="!profile" class="status-box empty">暂无个人信息。</div>
-    <div v-else class="profile-grid">
-      <article class="profile-item">
-        <h3>用户名</h3>
-        <p>{{ profile.username || "--" }}</p>
-      </article>
-      <article class="profile-item">
-        <h3>角色</h3>
-        <p>{{ profile.role || "--" }}</p>
-      </article>
-      <article class="profile-item">
-        <h3>状态</h3>
-        <p>{{ profile.status || "--" }}</p>
-      </article>
-      <article class="profile-item">
-        <h3>邮箱</h3>
-        <p>{{ profile.email || "--" }}</p>
-      </article>
-      <article class="profile-item">
-        <h3>手机号</h3>
-        <p>{{ profile.phone || "--" }}</p>
-      </article>
-      <article class="profile-item">
-        <h3>用户 ID</h3>
-        <p>{{ profile.id || "--" }}</p>
-      </article>
-    </div>
-  </section>
+      <n-alert v-if="error" type="error" :show-icon="true">{{ error }}</n-alert>
+
+      <n-card :bordered="true" class="profile-card">
+        <template #header>
+           <n-space align="center" :size="8">
+             <UserIcon :size="20" class="card-icon" />
+             <n-text strong>基础信息</n-text>
+           </n-space>
+        </template>
+        <template #header-extra>
+          <n-button secondary type="primary" :loading="loading" @click="loadProfile">
+             <template #icon><RefreshCw :size="14" /></template>
+             获取最新资料
+          </n-button>
+        </template>
+
+        <n-spin :show="loading && !profile">
+          <div v-if="!profile && !loading" style="padding: 40px; text-align: center;">
+             <n-text depth="3">暂无个人信息数据</n-text>
+          </div>
+          <n-descriptions
+            v-else-if="profile"
+            label-placement="left"
+            bordered
+            :column="2"
+            size="large"
+          >
+            <n-descriptions-item label="用户名">
+              <n-text strong>{{ profile.username || "--" }}</n-text>
+            </n-descriptions-item>
+            <n-descriptions-item label="账号状态">
+              <n-tag :type="getStatusType(profile.status || '')" size="small" :bordered="false">
+                {{ profile.status || "--" }}
+              </n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item label="系统角色">
+              <n-tag :type="getRoleType(profile.role || '')" :bordered="false">
+                {{ profile.role || "--" }}
+              </n-tag>
+            </n-descriptions-item>
+            <n-descriptions-item label="用户 ID">
+              <n-text code>{{ profile.id || "--" }}</n-text>
+            </n-descriptions-item>
+            <n-descriptions-item label="绑定邮箱">
+              {{ profile.email || "未绑定" }}
+            </n-descriptions-item>
+            <n-descriptions-item label="绑定手机号码">
+              {{ profile.phone || "未绑定" }}
+            </n-descriptions-item>
+          </n-descriptions>
+        </n-spin>
+      </n-card>
+    </n-space>
+  </div>
 </template>
 
 <style scoped>
-.profile-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.page-title {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
 }
 
-.profile-item {
-  border: 1px solid var(--color-border);
-  background: #ffffff;
-  border-radius: var(--radius-md);
-  padding: 12px;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.profile-item h3 {
-  margin: 0;
-  color: #416482;
-  font-size: 0.84rem;
+.profile-card {
+  margin-top: 8px;
+  border-radius: 8px;
 }
 
-.profile-item p {
-  margin: 6px 0 0;
-  font-weight: 700;
-  overflow-wrap: anywhere;
+.card-icon {
+  color: var(--color-primary);
 }
 
-@media (max-width: 767px) {
-  .profile-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  :deep(.n-descriptions) {
+    --n-title-text-color: var(--n-title-text-color); /* To prevent any strange inheritance */
   }
 }
 </style>

@@ -6,6 +6,8 @@ import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.ConflictException;
 import com.edunexus.api.common.CryptoUtil;
+import com.edunexus.api.common.ErrorCode;
+import com.edunexus.api.common.ForbiddenException;
 import com.edunexus.api.common.UnauthorizedException;
 import com.edunexus.api.service.DbService;
 import com.edunexus.api.service.GovernanceService;
@@ -76,17 +78,17 @@ public class AuthController implements ControllerSupport {
         Map<String, Object> user = db.oneOrNull("select * from users where username=? and deleted_at is null",
                 req.username());
         if (user == null) {
-            throw new UnauthorizedException("用户名或密码错误");
+            throw new UnauthorizedException(ErrorCode.AUTH_INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         String passwordHash = String.valueOf(user.get("password_hash"));
         if (!passwordEncoder.matches(req.password(), passwordHash)) {
-            throw new UnauthorizedException("用户名或密码错误");
+            throw new UnauthorizedException(ErrorCode.AUTH_INVALID_CREDENTIALS, "用户名或密码错误");
         }
 
         String status = String.valueOf(user.get("status"));
         if (!"ACTIVE".equals(status)) {
-            throw new SecurityException("账号已禁用");
+            throw new ForbiddenException(ErrorCode.AUTH_ACCOUNT_DISABLED, "账号已禁用");
         }
 
         UUID userId = UUID.fromString(String.valueOf(user.get("id")));
@@ -139,7 +141,7 @@ public class AuthController implements ControllerSupport {
         try {
             claims = jwtUtil.parse(req.refreshToken());
         } catch (Exception ex) {
-            throw new UnauthorizedException("refresh token 无效");
+            throw new UnauthorizedException(ErrorCode.AUTH_TOKEN_INVALID, "refresh token 无效");
         }
         UUID userId = UUID.fromString(claims.getSubject());
         String tokenHash = CryptoUtil.sha256(req.refreshToken());
@@ -149,15 +151,15 @@ public class AuthController implements ControllerSupport {
                 userId,
                 tokenHash);
         if (tokenRow == null) {
-            throw new UnauthorizedException("refresh token 无效");
+            throw new UnauthorizedException(ErrorCode.AUTH_TOKEN_INVALID, "refresh token 无效");
         }
 
         Map<String, Object> user = db.oneOrNull("select * from users where id=? and deleted_at is null", userId);
         if (user == null) {
-            throw new UnauthorizedException("refresh token 无效");
+            throw new UnauthorizedException(ErrorCode.AUTH_TOKEN_INVALID, "refresh token 无效");
         }
         if (!"ACTIVE".equals(String.valueOf(user.get("status")))) {
-            throw new SecurityException("账号已禁用");
+            throw new ForbiddenException(ErrorCode.AUTH_ACCOUNT_DISABLED, "账号已禁用");
         }
 
         upsertRefreshToken(userId, req.refreshToken(), true);

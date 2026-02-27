@@ -1,5 +1,5 @@
-import { apiClient, unwrapResponse } from "./api-client";
-import type { ApiEnvelope, LoginData, LoginRequest, RefreshData, RegisterRequest, UserVO } from "./contracts";
+import { apiClient, unwrapResponse } from "../../../services/api-client";
+import type { ApiEnvelope, LoginData, LoginRequest, RefreshData, RegisterRequest, UserVO } from "../../../services/contracts";
 
 export async function register(payload: RegisterRequest): Promise<UserVO> {
   const response = await apiClient.post<ApiEnvelope<UserVO>>("/auth/register", payload);

@@ -1,5 +1,6 @@
 package com.edunexus.api.service;
 
+import com.edunexus.api.common.FilenameUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseBytes;
@@ -27,7 +28,7 @@ public class ObjectStorageService {
     }
 
     public String upload(String fileName, String contentType, byte[] content) {
-        String key = "documents/" + UUID.randomUUID() + "-" + safeName(fileName);
+        String key = "documents/" + UUID.randomUUID() + "-" + FilenameUtil.sanitize(fileName);
         s3.putObject(
                 PutObjectRequest.builder()
                         .bucket(bucket)
@@ -78,10 +79,6 @@ public class ObjectStorageService {
             }
             s3.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
         }
-    }
-
-    private String safeName(String fileName) {
-        return fileName.replaceAll("[^a-zA-Z0-9._-\\u4e00-\\u9fa5]", "_");
     }
 
     private record ParsedPath(String bucket, String key) {}

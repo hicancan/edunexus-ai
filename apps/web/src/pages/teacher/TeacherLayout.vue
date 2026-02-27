@@ -2,8 +2,8 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import RoleWorkspaceLayout from "../../components/common/RoleWorkspaceLayout.vue";
-import { logout } from "../../services/auth.service";
-import { useAuthStore } from "../../stores/auth";
+import { logout } from "../../features/auth/api/auth.service";
+import { useAuthStore } from "../../features/auth/model/auth";
 
 const router = useRouter();
 const auth = useAuthStore();

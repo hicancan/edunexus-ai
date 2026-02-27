@@ -2,8 +2,9 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import RoleWorkspaceLayout from "../../components/common/RoleWorkspaceLayout.vue";
-import { logout } from "../../services/auth.service";
-import { useAuthStore } from "../../stores/auth";
+import FloatingAgent from "../../components/student/FloatingAgent.vue";
+import { logout } from "../../features/auth/api/auth.service";
+import { useAuthStore } from "../../features/auth/model/auth";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -32,12 +33,24 @@ async function handleLogout(): Promise<void> {
 </script>
 
 <template>
-  <RoleWorkspaceLayout
-    title="学生学习空间"
-    :subtitle="subtitle"
-    :nav-items="navItems"
-    @logout="handleLogout"
-  >
-    <router-view />
-  </RoleWorkspaceLayout>
+  <div class="student-layout-wrapper">
+    <RoleWorkspaceLayout
+      title="学生学习空间"
+      :subtitle="subtitle"
+      :nav-items="navItems"
+      @logout="handleLogout"
+    >
+      <router-view />
+    </RoleWorkspaceLayout>
+    
+    <!-- Proactive AI Floating Agent injected globally across the student domain -->
+    <FloatingAgent />
+  </div>
 </template>
+
+<style scoped>
+.student-layout-wrapper {
+  min-height: 100vh;
+  position: relative;
+}
+</style>
