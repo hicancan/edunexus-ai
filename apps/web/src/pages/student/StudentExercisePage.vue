@@ -211,6 +211,9 @@ function getDifficultyType(diff: string): "success" | "warning" | "error" | "inf
                  <span class="glass-pill tag-type">{{ question.questionType === "SHORT_ANSWER" ? "推演题" : "定轨题" }}</span>
                  <span class="glass-pill tag-diff" :class="'diff-' + question.difficulty?.toLowerCase()">{{ question.difficulty }}</span>
                  <span class="glass-pill tag-score">{{ question.score }} 分能盘</span>
+                 <template v-if="question.knowledgePoints && question.knowledgePoints.length > 0">
+                   <span class="glass-pill tag-kp" v-for="kp in question.knowledgePoints" :key="kp">🎯 {{ kp }}</span>
+                 </template>
               </div>
             </div>
 
@@ -433,7 +436,18 @@ function getDifficultyType(diff: string): "success" | "warning" | "error" | "inf
 
 .q-tags {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+
+.q-tags .glass-pill {
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tag-diff.diff-easy { color: var(--color-success); border-color: rgba(16, 185, 129, 0.3); }
@@ -444,6 +458,12 @@ function getDifficultyType(diff: string): "success" | "warning" | "error" | "inf
   background: linear-gradient(135deg, var(--color-primary), #60a5fa);
   color: white;
   border: none;
+}
+
+.tag-kp {
+  color: #8b5cf6;
+  border-color: rgba(139, 92, 246, 0.3);
+  background: rgba(139, 92, 246, 0.05);
 }
 
 .answer-area {

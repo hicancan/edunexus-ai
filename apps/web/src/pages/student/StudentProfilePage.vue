@@ -11,7 +11,7 @@ import {
   NTag,
   NSpin
 } from "naive-ui";
-import { RefreshCw, User as UserIcon } from "lucide-vue-next";
+import { RefreshCw, User as UserIcon, AlertTriangle } from "lucide-vue-next";
 import { getMe } from "../../features/auth/api/auth.service";
 import { toErrorMessage } from "../../services/error-message";
 import type { UserVO } from "../../services/contracts";
@@ -21,6 +21,12 @@ const auth = useAuthStore();
 const profile = ref<UserVO | null>(null);
 const loading = ref(false);
 const error = ref("");
+
+const mockWeakPoints = ref([
+  { name: "JavaScript 闭包与词法环境", errorRate: 68 },
+  { name: "Vue3 组件生命周期与副作用", errorRate: 55 },
+  { name: "CSS 弹性盒与网格布局原理", errorRate: 42 }
+]);
 
 async function loadProfile(): Promise<void> {
   loading.value = true;
@@ -114,6 +120,29 @@ function getStatusType(status: string): "success" | "error" {
           </n-descriptions>
         </n-spin>
       </n-card>
+
+      <n-card :bordered="true" class="warning-card animate-pop">
+        <template #header>
+           <n-space align="center" :size="8">
+             <AlertTriangle :size="20" class="warning-icon text-danger" />
+             <n-text strong style="color: var(--color-danger); font-size: 1.1rem;">AI 诊断：核心薄弱知识域 (Top 3)</n-text>
+           </n-space>
+        </template>
+        
+        <p class="warning-desc">根据您近期 50 道推演题的报错聚类，Nexus Agent 捕获以下知识坍缩点：</p>
+        
+        <div class="weak-points-list">
+          <div class="weak-point-item" v-for="(item, index) in mockWeakPoints" :key="index">
+            <div class="wp-header">
+              <n-text strong class="wp-name">🎯 {{ item.name }}</n-text>
+              <span class="wp-badge">失误率 {{ item.errorRate }}%</span>
+            </div>
+            <div class="wp-bar-bg">
+              <div class="wp-bar-fill" :style="{ width: item.errorRate + '%' }"></div>
+            </div>
+          </div>
+        </div>
+      </n-card>
     </n-space>
   </div>
 </template>
@@ -143,5 +172,74 @@ function getStatusType(status: string): "success" | "error" {
   :deep(.n-descriptions) {
     --n-title-text-color: var(--n-title-text-color); /* To prevent any strange inheritance */
   }
+}
+
+.warning-card {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.02);
+  border-radius: 12px;
+}
+
+.warning-icon {
+  margin-top: 2px;
+}
+
+.text-danger {
+  color: var(--color-danger);
+}
+
+.warning-desc {
+  margin: 0 0 16px 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.weak-points-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.weak-point-item {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.wp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.wp-name {
+  font-size: 1.05rem;
+  color: var(--color-text-main);
+}
+
+.wp-badge {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.wp-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.wp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f87171, #ef4444);
+  border-radius: 4px;
+  transition: width 1s ease-out;
 }
 </style>

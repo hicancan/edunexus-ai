@@ -301,6 +301,9 @@ onMounted(async () => {
               <n-space :size="8">
                  <n-tag size="small" :bordered="false">{{ question.questionType === "SHORT_ANSWER" ? "简答题" : "选择题" }}</n-tag>
                  <n-tag size="small" :type="getDifficultyType(question.difficulty || '')" :bordered="false">{{ question.difficulty }}</n-tag>
+                 <template v-if="question.knowledgePoints && question.knowledgePoints.length > 0">
+                   <n-tag size="small" type="info" :bordered="false" v-for="kp in question.knowledgePoints" :key="kp">🎯 {{ kp }}</n-tag>
+                 </template>
               </n-space>
             </template>
 

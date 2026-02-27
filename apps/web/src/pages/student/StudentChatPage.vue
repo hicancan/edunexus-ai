@@ -18,7 +18,7 @@ import {
   NImage,
   NTooltip
 } from "naive-ui";
-import { Plus, Trash2, MessageSquare, PanelLeftOpen, Image as ImageIcon, SendHorizontal, Bot, User, FileText } from "lucide-vue-next";
+import { Plus, Trash2, MessageSquare, PanelLeftOpen, Image as ImageIcon, Mic, Video, SendHorizontal, Bot, User, FileText } from "lucide-vue-next";
 import MarkdownPreview from "../../components/common/MarkdownPreview.vue";
 import { useChatStore } from "../../features/student/model/chat";
 
@@ -316,13 +316,31 @@ onMounted(async () => {
                       </n-tooltip>
                    </NUploadTrigger>
                  </NUpload>
+
+                 <n-tooltip placement="top">
+                   <template #trigger>
+                     <n-button quaternary circle class="upload-btn animate-pop" style="margin-left: 4px;" disabled>
+                       <template #icon><Mic :size="20" style="color: var(--color-text-muted)" /></template>
+                     </n-button>
+                   </template>
+                   声学模态载荷 (迭代中)
+                 </n-tooltip>
+
+                 <n-tooltip placement="top">
+                   <template #trigger>
+                     <n-button quaternary circle class="upload-btn animate-pop" style="margin-left: 4px;" disabled>
+                       <template #icon><Video :size="20" style="color: var(--color-text-muted)" /></template>
+                     </n-button>
+                   </template>
+                   视频流模态载荷 (迭代中)
+                 </n-tooltip>
                </div>
                
                <n-input
                  v-model:value="messageInput"
                  type="textarea"
                  class="main-chat-input"
-                 placeholder="询问结构化知识，或者投喂图片进行 OCR 推理... (回车发送)"
+                 placeholder="询问结构化知识，或投喂图文、音视频进行跨媒体推理... (回车发送)"
                  :autosize="{ minRows: 1, maxRows: 6 }"
                  :bordered="false"
                  @keydown.enter.prevent="sendMessage"

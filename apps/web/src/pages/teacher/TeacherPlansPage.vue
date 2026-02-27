@@ -18,7 +18,7 @@ import {
   useDialog,
   useMessage
 } from "naive-ui";
-import { Sparkles, Edit3, Download, Share2, Trash2, BookOpen, Clock, Presentation, GraduationCap, Link } from "lucide-vue-next";
+import { Sparkles, Edit3, Download, Share2, Trash2, BookOpen, Clock, Presentation, GraduationCap, Link, Library, Filter } from "lucide-vue-next";
 import MarkdownPreview from "../../components/common/MarkdownPreview.vue";
 import { teacherPlanSchema } from "../../features/teacher-workspace/model/teacher.schemas";
 import { useTeacherStore } from "../../features/teacher-workspace/model/teacher";
@@ -43,6 +43,32 @@ const exportFormat = ref<"md" | "pdf">("md");
 const formError = ref("");
 const operationSuccess = ref("");
 const showEditorModal = ref(false);
+
+const showQuestionBank = ref(false);
+const qbFilters = reactive({ chapter: "", difficulty: "" });
+const mockBank = [
+  { id: 1, content: "如何理解牛顿第一定律在惯性系中的适用条件？", difficulty: "HARD", chapter: "第一章" },
+  { id: 2, content: "一个质量为m的物体在光滑水平面上受力为F，求加速度。", difficulty: "EASY", chapter: "第二章" },
+  { id: 3, content: "简述动量守恒的条件及应用场景。", difficulty: "MEDIUM", chapter: "第三章" },
+  { id: 4, content: "匀速圆周运动的向心力公式推导过程是？", difficulty: "HARD", chapter: "第四章" }
+];
+const selectedQbIds = ref<number[]>([]);
+
+function addToCart(id: number) {
+  if (!selectedQbIds.value.includes(id)) selectedQbIds.value.push(id);
+}
+function removeFromCart(id: number) {
+  selectedQbIds.value = selectedQbIds.value.filter(i => i !== id);
+}
+function confirmQBCart() {
+  const selectedDetails = mockBank.filter(q => selectedQbIds.value.includes(q.id));
+  if (selectedDetails.length > 0) {
+    const topics = selectedDetails.map(q => q.content).join("；");
+    generateForm.topic = `结合以下核心题型出卷：${topics}`.substring(0, 100);
+    message.success(`已挂载 ${selectedDetails.length} 道靶向题源！`);
+  }
+  showQuestionBank.value = false;
+}
 
 const latestShareText = computed(() => {
   if (!teacherStore.shareResult) {
@@ -253,12 +279,16 @@ watch(() => teacherStore.examCart.length, syncCartToForm);
             <n-form-item label="物质化介质">
                <n-select v-model:value="exportFormat" :options="[{label:'Markdown 拓扑', value:'md'}, {label:'PDF 快照', value:'pdf'}]" style="width: 160px" />
             </n-form-item>
-            <n-form-item>
-               <n-button type="primary" :loading="teacherStore.operationLoading" @click="createPlan" class="animate-pop glass-pill generate-btn">
+             <n-form-item>
+               <n-button type="primary" :loading="teacherStore.operationLoading" @click="createPlan" class="animate-pop generate-btn">
                  <template #icon><Sparkles :size="16" /></template>
                  启动坍缩孵化
                </n-button>
-            </n-form-item>
+               <n-button type="info" ghost class="animate-pop generate-btn" @click="showQuestionBank = true" style="margin-left: 8px">
+                 <template #icon><Library :size="15" /></template>
+                 题源中心注入
+               </n-button>
+             </n-form-item>
           </n-form>
         </div>
       </div>
@@ -364,6 +394,49 @@ watch(() => teacherStore.examCart.length, syncCartToForm);
              </n-button>
           </n-space>
        </template>
+    </n-modal>
+
+     <!-- Question Bank Modal -->
+     <n-modal v-model:show="showQuestionBank" preset="card" title="教案题源筛选中枢" style="width: 900px; max-width: 90vw;">
+      <div class="qb-layout">
+        <div class="qb-main">
+           <div class="qb-filters" style="margin-bottom: 16px;">
+             <n-space>
+               <n-select v-model:value="qbFilters.chapter" style="width: 140px" :options="[{label:'全部章节', value:''}, {label:'第一章', value:'第一章'}, {label:'第二章', value:'第二章'}, {label:'第三章', value:'第三章'}, {label:'第四章', value:'第四章'}]" placeholder="按章节筛选" />
+               <n-select v-model:value="qbFilters.difficulty" style="width: 140px" :options="[{label:'全维度', value:''}, {label:'EASY', value:'EASY'}, {label:'MEDIUM', value:'MEDIUM'}, {label:'HARD', value:'HARD'}]" placeholder="按难度筛选" />
+             </n-space>
+           </div>
+           <div class="qb-list">
+             <div v-for="q in mockBank" :key="q.id" class="qb-item" v-show="(qbFilters.chapter === '' || q.chapter === qbFilters.chapter) && (qbFilters.difficulty === '' || q.difficulty === qbFilters.difficulty)">
+                <div class="qb-item-body">
+                  <span style="display:block; margin-bottom: 8px;">{{ q.content }}</span>
+                  <n-space size="small">
+                    <n-tag size="small" type="info" :bordered="false">{{ q.chapter }}</n-tag>
+                    <n-tag size="small" :type="q.difficulty === 'HARD' ? 'error' : 'success'" :bordered="false">{{ q.difficulty }}</n-tag>
+                  </n-space>
+                </div>
+                <div class="qb-item-actions">
+                   <n-button v-if="!selectedQbIds.includes(q.id)" type="primary" size="small" secondary @click="addToCart(q.id)">加入轨标</n-button>
+                   <n-button v-else type="default" size="small" disabled>已加入</n-button>
+                </div>
+             </div>
+           </div>
+        </div>
+        <div class="qb-cart glass-card">
+           <h4 style="margin-top:0; color: var(--color-primary);">已选轨标池 ({{ selectedQbIds.length }})</h4>
+           <div v-if="selectedQbIds.length === 0" style="color:var(--color-text-muted); font-size: 0.9rem">暂无靶向试卷预组装数据</div>
+           <div v-for="id in selectedQbIds" :key="id" class="qb-cart-item">
+             <span class="text-truncate" style="flex:1" :title="mockBank.find(q=>q.id===id)?.content">{{ mockBank.find(q=>q.id===id)?.content }}</span>
+             <n-button type="error" size="tiny" circle quaternary @click="removeFromCart(id)"><template #icon><Trash2 :size="14"/></template></n-button>
+           </div>
+        </div>
+      </div>
+      <template #action>
+        <n-space justify="end">
+          <n-button @click="showQuestionBank = false">取消</n-button>
+          <n-button type="primary" @click="confirmQBCart">锁定并挂载题源</n-button>
+        </n-space>
+      </template>
     </n-modal>
   </div>
 </template>
@@ -591,5 +664,65 @@ watch(() => teacherStore.examCart.length, syncCartToForm);
   flex: 1;
   overflow-y: auto;
   padding: 20px;
+}
+
+/* Question Bank Modal */
+.qb-layout {
+  display: flex;
+  gap: 20px;
+  min-height: 400px;
+  max-height: 60vh;
+  overflow: hidden;
+}
+.qb-main {
+  flex: 2;
+  border-right: 1px dashed var(--color-border-glass);
+  padding-right: 20px;
+  display: flex;
+  flex-direction: column;
+}
+.qb-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.qb-cart {
+  flex: 1;
+  background: rgba(92,101,246,0.03);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-y: auto;
+}
+.qb-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--color-border-glass);
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.4);
+  transition: all 0.2s ease;
+}
+.qb-item:hover {
+  border-color: rgba(92,101,246,0.4);
+  background: rgba(255,255,255,0.8);
+}
+.qb-item-body {
+  flex: 1;
+  padding-right: 16px;
+}
+.qb-cart-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--color-border-glass);
+}
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

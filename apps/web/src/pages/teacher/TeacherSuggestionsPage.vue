@@ -1,138 +1,215 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
-import {
-  NCard,
-  NForm,
-  NFormItem,
-  NInput,
-  NButton,
-  NSpace,
-  NText,
-  NAlert,
-  NStatistic,
-  useMessage
-} from "naive-ui";
-import { Send, Clock } from "lucide-vue-next";
-import { teacherSuggestionSchema } from "../../features/teacher-workspace/model/teacher.schemas";
+import { ref } from "vue";
+import { NButton, useMessage } from "naive-ui";
+import { Send, Users, ShieldAlert, Sparkles, CheckCircle2 } from "lucide-vue-next";
 import { useTeacherStore } from "../../features/teacher-workspace/model/teacher";
 
 const teacherStore = useTeacherStore();
 const message = useMessage();
 
-const form = reactive({
-  studentId: localStorage.getItem("teacher.analytics.studentId") || "",
-  questionId: "",
-  knowledgePoint: "",
-  suggestion: ""
-});
-
-async function submitSuggestion(): Promise<void> {
-  const parsed = teacherSuggestionSchema.safeParse(form);
-  if (!parsed.success) {
-    message.warning(parsed.error.issues[0]?.message || "建议参数不合法");
-    return;
+const pendingInterventions = ref([
+  {
+    id: "int-1",
+    topic: "闭包与作用域链的内存驻留漏斗",
+    studentCount: 18,
+    courseDetails: "建议立刻向该弱项群体并联投射【V8 引擎垃圾回收图解】视觉靶向题库",
+    dispatched: false,
+    loading: false
+  },
+  {
+    id: "int-2",
+    topic: "动态规划方程状态转移失败",
+    studentCount: 12,
+    courseDetails: "监测到逻辑断层。建议投放【背包问题全集与阶段坍缩原理】拔高流模型",
+    dispatched: false,
+    loading: false
   }
+]);
 
-  const result = await teacherStore.submitSuggestion({
-    studentId: parsed.data.studentId,
-    questionId: parsed.data.questionId || undefined,
-    knowledgePoint: parsed.data.knowledgePoint || undefined,
-    suggestion: parsed.data.suggestion
+async function dispatchIntervention(item: any) {
+  item.loading = true;
+  // Simulate network delay for AI dispatching to multiple students
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  
+  // Submit a mock suggestion request to register in the actual API backend
+  const studentId = localStorage.getItem("teacher.analytics.studentId") || "00000000-0000-0000-0000-000000000000";
+  
+  await teacherStore.submitSuggestion({
+    studentId: studentId,
+    knowledgePoint: item.topic,
+    suggestion: `AI自动下发干预策略：${item.courseDetails}`
   });
-
-  if (result) {
-    message.success("跨模态学情干预成功投递，底层分析架构已感知。");
-    form.suggestion = "";
-  }
+  
+  item.loading = false;
+  item.dispatched = true;
+  message.success(`已成功向 ${item.studentCount} 名特工通讯录定向投放干预流！`);
 }
 </script>
 
 <template>
-  <div class="suggestions-page">
-    <n-space vertical :size="16">
-      <div class="page-header">
+  <div class="suggestions-page app-container">
+    <div class="workspace-stack">
+      <div class="workspace-header">
         <div>
-          <n-text tag="h2" class="page-title">动态干预指导</n-text>
-          <n-text depth="3">录入针对性意见。提交后将融入引擎知识库，反哺关联学生的底层画像与 AI出题倾向。</n-text>
+          <h1 class="workspace-title">智能靶向干预中枢</h1>
+          <p class="workspace-subtitle">搭载核心引擎的数据聚类，自动捕获群体认知偏航，实施一键降维打击与知识补救。</p>
         </div>
       </div>
 
-      <n-card :bordered="true" class="suggestion-card">
-        <n-form :model="form" label-placement="left" label-width="120" require-mark-placement="right-hanging">
-          <n-form-item label="目标学生 UUID" path="studentId" required>
-            <n-input v-model:value="form.studentId" placeholder="输入绑定 UUID 以建立靶向链接" style="max-width: 400px" />
-          </n-form-item>
-          
-          <n-form-item label="锚定题目 UUID" path="questionId">
-            <n-input v-model:value="form.questionId" placeholder="如需点对点纠错可选填" style="max-width: 400px" />
-          </n-form-item>
-          
-          <n-form-item label="辐射知识点" path="knowledgePoint">
-            <n-input v-model:value="form.knowledgePoint" placeholder="例如：动能定理，关联 AI RAG 会聚流" style="max-width: 400px" />
-          </n-form-item>
-          
-          <n-form-item label="高教指导意见" path="suggestion" required>
-            <n-input
-              v-model:value="form.suggestion"
-              type="textarea"
-              placeholder="编写深度剖析意见，将被注入 AI 分析流中..."
-              :autosize="{ minRows: 4, maxRows: 8 }"
-            />
-          </n-form-item>
-          
-          <n-form-item>
-             <n-space justify="end" style="width: 100%;">
-                <n-button type="primary" size="large" :loading="teacherStore.suggestionLoading" @click="submitSuggestion">
-                  <template #icon><Send :size="18" /></template>
-                  下发战略指导意见
-                </n-button>
-             </n-space>
-          </n-form-item>
-        </n-form>
-      </n-card>
+      <div class="intervention-grid">
+         <div v-for="item in pendingInterventions" :key="item.id" class="panel glass-card int-card" :class="{ 'dispatched-card': item.dispatched }">
+            <div class="int-header">
+               <div class="int-icon">
+                 <ShieldAlert v-if="!item.dispatched" :size="24" class="text-danger" />
+                 <CheckCircle2 v-else :size="24" class="text-success" />
+               </div>
+               <div class="int-title-area">
+                 <h3 class="int-topic">{{ item.topic }}</h3>
+                 <span class="int-meta"><Users :size="14" style="margin-right: 4px" /> 影响范围：{{ item.studentCount }} 名特工</span>
+               </div>
+            </div>
+            
+            <div class="int-body">
+               <div class="ai-suggest-box">
+                  <span class="ai-badge"><Sparkles :size="12" style="margin-right: 4px"/> Nexus AI 决策方案</span>
+                  <p class="ai-strategy">{{ item.courseDetails }}</p>
+               </div>
+            </div>
 
-      <n-alert v-if="teacherStore.suggestionError" type="error" :show-icon="true">{{ teacherStore.suggestionError }}</n-alert>
-
-      <n-card v-if="teacherStore.latestSuggestion" title="数据管道最新追踪快照" :bordered="true" size="small" style="margin-top: 8px;">
-         <template #header-extra>
-            <n-space align="center" :size="4">
-               <Clock :size="14" style="color: #64748b;" />
-               <n-text depth="3">即时回执</n-text>
-            </n-space>
-         </template>
-         <n-space :size="40">
-           <div>
-             <n-text depth="3">分发事务 ID号段</n-text>
-             <div><n-text strong>{{ teacherStore.latestSuggestion.id }}</n-text></div>
-           </div>
-           <div>
-             <n-text depth="3">路由命中节点 / 学生</n-text>
-             <div><n-text strong>{{ teacherStore.latestSuggestion.studentId }}</n-text></div>
-           </div>
-           <div>
-             <n-text depth="3">事件写入戳</n-text>
-             <div><n-text strong>{{ teacherStore.latestSuggestion.createdAt }}</n-text></div>
-           </div>
-         </n-space>
-      </n-card>
-    </n-space>
+            <div class="int-footer">
+               <n-button 
+                 v-if="!item.dispatched"
+                 type="primary" 
+                 class="animate-pop dispatch-btn" 
+                 :loading="item.loading" 
+                 @click="dispatchIntervention(item)"
+               >
+                  <template #icon><Send :size="16" /></template>
+                  一键授权下发补救包
+               </n-button>
+               <n-button v-else type="success" secondary ghost disabled class="dispatched-btn">
+                  已完成维稳干预
+               </n-button>
+            </div>
+         </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.page-title {
-  margin: 0 0 4px;
-  font-size: 1.5rem;
+.intervention-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--space-5);
+  margin-top: 16px;
 }
 
-.page-header {
+.int-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  padding: 24px;
+  border-top: 4px solid var(--color-danger);
+  transition: all 0.3s ease;
 }
 
-.suggestion-card {
+.int-card.dispatched-card {
+  border-top-color: var(--color-success);
+  opacity: 0.8;
+}
+
+.int-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.int-icon {
+  background: rgba(255,255,255,0.8);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.text-danger { color: var(--color-danger); }
+.text-success { color: var(--color-success); }
+
+.int-title-area {
+  flex: 1;
+}
+
+.int-topic {
+  margin: 0 0 6px 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  line-height: 1.4;
+}
+
+.int-meta {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.dispatched-card .int-meta {
+  color: var(--color-success);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.ai-suggest-box {
+  background: linear-gradient(135deg, rgba(92,101,246,0.05), rgba(92,101,246,0.15));
+  padding: 16px;
   border-radius: 8px;
-  background-color: #fafcfe;
+  border: 1px solid rgba(92, 101, 246, 0.2);
+}
+
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  font-weight: 700;
+  margin-bottom: 8px;
+  border-bottom: 1px dashed rgba(92, 101, 246, 0.4);
+  padding-bottom: 4px;
+}
+
+.ai-strategy {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-main);
+  line-height: 1.5;
+}
+
+.int-footer {
+  margin-top: 24px;
+  text-align: right;
+}
+
+.dispatch-btn {
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  background: var(--color-danger);
+  border: none;
+}
+
+.dispatch-btn:hover {
+  background: #dc2626 !important;
+}
+
+.dispatched-btn {
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .intervention-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

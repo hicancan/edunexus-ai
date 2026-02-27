@@ -13,6 +13,8 @@ import {
   NDataTable,
   NTag,
   NModal,
+  NRadioGroup,
+  NRadioButton,
   useMessage,
   type DataTableColumns
 } from "naive-ui";
@@ -199,44 +201,48 @@ const columns: DataTableColumns<UserVO> = [
     }
   },
   {
-    title: "权限级",
+    title: "权限域划定",
     key: "role",
-    width: 140,
+    width: 240,
     render(row) {
        const edit = rowEdits[row.id || ""];
        if (!edit) return null;
        return h(
-         NSelect,
+         NRadioGroup,
          {
             value: edit.role,
-            options: [
-              { label: "学生", value: "STUDENT" },
-              { label: "教师", value: "TEACHER" },
-              { label: "管理员", value: "ADMIN" }
-            ],
             size: "small",
             onUpdateValue: (v: any) => edit.role = v
+         },
+         {
+            default: () => [
+               h(NRadioButton, { value: "STUDENT", label: "学生节点" }, { default: () => "学生节点" }),
+               h(NRadioButton, { value: "TEACHER", label: "督导阵列" }, { default: () => "督导阵列" }),
+               h(NRadioButton, { value: "ADMIN", label: "核心枢纽" },   { default: () => "核心枢纽" })
+            ]
          }
        );
     }
   },
   {
-    title: "入网状态",
+    title: "网络准入状态",
     key: "status",
-    width: 120,
+    width: 180,
     render(row) {
        const edit = rowEdits[row.id || ""];
        if (!edit) return null;
        return h(
-         NSelect,
+         NRadioGroup,
          {
             value: edit.status,
-            options: [
-              { label: "正常", value: "ACTIVE" },
-              { label: "封禁", value: "DISABLED" }
-            ],
             size: "small",
             onUpdateValue: (v: any) => edit.status = v
+         },
+         {
+            default: () => [
+               h(NRadioButton, { value: "ACTIVE", label: "链路连通" }, { default: () => "链路连通" }),
+               h(NRadioButton, { value: "DISABLED", label: "物理熔断" }, { default: () => "物理熔断" })
+            ]
          }
        );
     }

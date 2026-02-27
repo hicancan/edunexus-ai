@@ -203,6 +203,37 @@ onMounted(() => {
                </div>
             </div>
          </div>
+
+         <!-- AI Error Attribution Panel (Mock) -->
+         <div class="panel glass-card ai-attribution-panel">
+            <div class="panel-head">
+              <h3 class="panel-title" style="color: var(--color-danger); display: flex; align-items: center;">
+                <BrainCircuit :size="18" style="margin-right: 8px;" />
+                Nexus Agent 群体报错深度聚类归因
+              </h3>
+            </div>
+            <div class="attribution-content">
+              <div class="attribution-header">
+                <div class="attribution-badge">
+                   <span class="badge-label">高频预警节点</span>
+                   <span class="badge-value">闭包与作用域链</span>
+                </div>
+                <div class="attribution-stats">
+                   <Target :size="16" class="stats-icon" />
+                   <span class="stats-text">45% 样本受影响 (约 18人)</span>
+                </div>
+              </div>
+              <p class="attribution-text">
+                基于大模型对近期推演记录的无监督聚类分析，系统发现核心共性错因为：<br/>
+                学生对<strong>跨空间生命周期理解不清，经常捕获旧指针或未能正确访问外层词法环境</strong>，导致 <code>undefined</code> 报错频发。
+              </p>
+              <div class="attribution-actions">
+                <n-button type="primary" class="animate-pop" color="#ef4444" @click="message.success('已联动生成靶向干预计划！')">
+                  采取 AI 一键补救干预
+                </n-button>
+              </div>
+            </div>
+         </div>
       </div>
     </div>
   </div>
@@ -392,5 +423,76 @@ onMounted(() => {
   .visual-domain-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.ai-attribution-panel {
+  margin-top: var(--space-4);
+  background: linear-gradient(135deg, rgba(254, 226, 226, 0.4) 0%, rgba(255, 255, 255, 0.6) 100%);
+  border-left: 4px solid var(--color-danger);
+}
+
+.attribution-content {
+  padding: 16px 20px;
+}
+
+.attribution-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.attribution-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.badge-label {
+  background: var(--color-danger);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.badge-value {
+  padding: 4px 12px;
+  color: var(--color-danger);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.attribution-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-danger);
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: rgba(255,255,255,0.6);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.attribution-text {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-text-main);
+  background: rgba(255,255,255,0.7);
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px dashed rgba(239, 68, 68, 0.3);
+}
+
+.attribution-text strong {
+  color: var(--color-danger);
+}
+
+.attribution-actions {
+  margin-top: 16px;
+  text-align: right;
 }
 </style>
