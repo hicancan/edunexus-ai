@@ -28,7 +28,7 @@ class OpenApiSurfaceContractTest {
 
     @Test
     void openApiPathsAndMethods_shouldMatchControllerAnnotations() throws Exception {
-        Path openapiFile = Path.of("..", "..", "doc", "06-API契约-openapi.yaml").normalize();
+        Path openapiFile = Path.of("..", "..", "doc", "openapi.yaml").normalize();
         assertTrue(Files.exists(openapiFile), "OpenAPI file must exist: " + openapiFile);
 
         ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
