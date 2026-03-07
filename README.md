@@ -118,37 +118,55 @@ graph TB
 ### 🚪 公共入口页
 
 - `/login`：统一认证入口，支持根据角色登录后自动路由。
+  - ![用户登录](doc/picture/readme/login.png)
 - `/register`：包含用户名、邮箱、角色的综合注册面板。
+  - ![用户注册](doc/picture/readme/register.png)
 - `/403` / `/404`：标准权限拦截与路由丢失兜底。
+  - ![403 无权限](doc/picture/readme/forbidden.png)
+  - ![404 未找到](doc/picture/readme/not-found.png)
 
 ### 🎓 学生工作区
 
 - **代码路由**：`/student/*`
 - **核心页面**：
   1. `智能问答 (/chat)`：支持上下文对话，通过 RAG 技术连接班级知识库。
+     - ![智能问答](doc/picture/readme/student-chat.png)
   2. `练习大厅 (/exercise)`：支持多学科难度组合，进行无缝单/多选/简答作答。
+     - ![练习大厅](doc/picture/readme/student-exercise.png)
   3. `做题记录 (/records)`：历史轨迹回溯与云端解析回顾。
+     - ![做题记录](doc/picture/readme/student-records.png)
   4. `错题本 (/wrong-book)`：错题薄强化，支持“标记掌握”闭环操作。
+     - ![错题本](doc/picture/readme/student-wrong-book.png)
   5. `AI 个性化出题 (/ai-questions)`：基于知识盲区主动调用大模型产出新题。
+     - ![AI 个性化出题](doc/picture/readme/student-ai-questions.png)
   6. `学情画像 (/profile)`：数据雷达图呈现。
+     - ![学情画像](doc/picture/readme/student-profile.png)
 
 ### 📋 教师工作区
 
 - **代码路由**：`/teacher/*`
 - **核心页面**：
   1. `知识库管理 (/knowledge)`：核心 RAG 数据源输入口，支持多格式解析与切片管理。
+     - ![知识库管理](doc/picture/readme/teacher-knowledge.png)
   2. `教案管理 (/plans)`：引导大模型依据教育大纲产出结构化授课教案。
+     - ![教案管理](doc/picture/readme/teacher-plans.png)
   3. `全盘学情分析 (/analytics)`：从班级宏观维度分析学生的错题率与易错知识点。
+     - ![全盘学情分析](doc/picture/readme/teacher-analytics.png)
   4. `干预建议与下发 (/suggestions)`：结合大模型的建议流自动分配给学生主页。
+     - ![干预建议与下发](doc/picture/readme/teacher-suggestions.png)
 
 ### ⚙️ 管理员操作台
 
 - **代码路由**：`/admin/*`
 - **核心页面**：
   1. `用户管理 (/users)`：平台角色的审查与封禁解封。
+     - ![用户管理](doc/picture/readme/admin-users.png)
   2. `资源审计 (/resources)`：追踪 MinIO 底层的真实物理存储分布与利用率。
+     - ![资源审计](doc/picture/readme/admin-resources.png)
   3. `流式数据看板 (/dashboard)`：实时掌控系统的调用规模、吞吐及 API 开销。
+     - ![流式数据看板](doc/picture/readme/admin-dashboard.png)
   4. `合规审计日志 (/audits)`：溯源敏感操作，落实系统合规性。
+     - ![合规审计日志](doc/picture/readme/admin-audits.png)
 
 ---
 
