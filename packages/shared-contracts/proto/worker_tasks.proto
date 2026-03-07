@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package edunexus.worker.v1;
+
+option java_multiple_files = true;
+option java_package = "com.edunexus.api.grpc.worker.v1";
+option java_outer_classname = "WorkerTasksProto";
+
+// ----------------------------------------
+// 1. 异步任务模型 (Asynchronous Job Model)
+// ----------------------------------------
+enum JobType {
+  JOB_TYPE_UNSPECIFIED = 0;
+  JOB_TYPE_DOCUMENT_PARSE = 1;
+  JOB_TYPE_DOCUMENT_CHUNK = 2;
+  JOB_TYPE_DOCUMENT_EMBED = 3;
+  JOB_TYPE_DOCUMENT_UPSERT_QDRANT = 4;
+  JOB_TYPE_DOCUMENT_MARK_READY = 5;
+}
+
+enum JobStatus {
+  JOB_STATUS_UNSPECIFIED = 0;
+  JOB_STATUS_PENDING = 1;
+  JOB_STATUS_RUNNING = 2;
+  JOB_STATUS_SUCCEEDED = 3;
+  JOB_STATUS_FAILED = 4;
+  JOB_STATUS_DEAD_LETTER = 5;
+}
+
+message DocumentParsePayload {
+  string file_url = 1;
+  string file_type = 2;
+}
+
+message DocumentChunkPayload {
+  int32 chunk_size = 1;
+  int32 chunk_overlap = 2;
+}
+
+message DocumentEmbedPayload {
+  string model_name = 1;
+  int32 embedding_dim = 2;
+}
+
+message DocumentUpsertQdrantPayload {
+  string collection_name = 1;
+}
+
+message DocumentMarkReadyPayload {}
+
+message JobPayload {
+  string job_id = 1;
+  JobType job_type = 2;
+  string trace_id = 3;
+  string business_id = 4; // e.g., document_id
+  int32 attempt = 5;
+  
+  // 🔥 Strict 2026 Polymorphism (Replacing Payload JSON string)
+  oneof payload {
+    DocumentParsePayload parse_payload = 6;
+    DocumentChunkPayload chunk_payload = 7;
+    DocumentEmbedPayload embed_payload = 8;
+    DocumentUpsertQdrantPayload upsert_payload = 9;
+    DocumentMarkReadyPayload mark_ready_payload = 10;
+  }
+  
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp timeout_at = 12;
+}
+
+// ----------------------------------------
+// 2. 任务状态回传服务 (Worker -> API)
+// ----------------------------------------
+service JobStatusService {
+  rpc ReportStatus (JobStatusReportRequest) returns (JobStatusReportResponse);
+}
+
+message JobStatusReportRequest {
+  string job_id = 1;
+  JobStatus status = 2;
+  string error_message = 3;
+  int32 retry_count = 4;
+  google.protobuf.Timestamp reported_at = 5;
+  string trace_id = 6;
+  int32 chunks = 7;
+}
+
+message JobStatusReportResponse {
+  bool success = 1;
+}

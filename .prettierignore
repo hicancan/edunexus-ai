@@ -1,0 +1,16 @@
+apps/web/dist
+apps/web/node_modules
+apps/web/.vite
+apps/api/target
+apps/ai-service/.venv
+apps/ai-service/.pytest_cache
+apps/ai-service/.ruff_cache
+apps/ai-service/ai_service/*_pb2.py
+apps/ai-service/ai_service/*_pb2.pyi
+apps/ai-service/ai_service/*_grpc.py
+doc/picture
+*.log
+*.png
+*.jpg
+*.jpeg
+*.webp

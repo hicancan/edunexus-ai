@@ -1,0 +1,44 @@
+.env
+.env.local
+.env.*.local
+.agent
+.claude/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Java
+apps/api/target/
+apps/api/data/
+apps/api/.classpath
+apps/api/.project
+apps/api/.settings/
+*.log
+
+# Python
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+coverage/
+coverage.xml
+htmlcov/
+apps/ai-service/__pycache__/
+apps/ai-service/.venv/
+apps/ai-service/*.egg-info/
+*.pyc
+
+# Web
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.vite/
+
+# IDE
+.idea/
+.vscode/
+*.iml

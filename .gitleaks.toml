@@ -1,0 +1,4 @@
+title = "EduNexus gitleaks config"
+
+[extend]
+useDefault = true

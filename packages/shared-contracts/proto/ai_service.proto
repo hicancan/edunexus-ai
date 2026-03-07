@@ -1,0 +1,207 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package edunexus.ai.v1;
+
+option java_multiple_files = true;
+option java_package = "com.edunexus.api.grpc.ai.v1";
+option java_outer_classname = "AiServiceProto";
+
+// ----------------------------------------
+// 1. 聊天 RAG 服务 (Chat/RAG)
+// ----------------------------------------
+service RagChatService {
+  rpc Chat (ChatRequest) returns (ChatResponse);
+  // 对于支持流式的聊天，可以使用 server-streaming RPC
+  rpc ChatStream (ChatRequest) returns (stream ChatStreamResponse);
+}
+
+message ChatRequest {
+  string trace_id = 1;
+  string session_id = 2;
+  string student_id = 3;
+  
+  message TeacherScope {
+    string teacher_id = 1;
+    string class_id = 2;
+  }
+  TeacherScope teacher_scope = 4;
+  
+  string message = 5;
+  bool stream = 6;
+  
+  message Context {
+    message Message {
+      string role = 1; // "USER", "ASSISTANT", "SYSTEM"
+      string content = 2;
+      google.protobuf.Timestamp timestamp = 3;
+    }
+    repeated Message history = 1;
+  }
+  Context context = 7;
+}
+
+message Citation {
+  string document_id = 1;
+  string filename = 2;
+  int32 chunk_index = 3;
+  string content = 4;
+  float score = 5;
+}
+
+message ChatResponse {
+  string answer = 1;
+  repeated Citation citations = 2;
+  string provider = 3; // e.g., "ollama", "deepseek"
+  string model = 4;    // e.g., "qwen3:8b"
+
+  message TokenUsage {
+    int32 prompt = 1;
+    int32 completion = 2;
+  }
+  TokenUsage token_usage = 5;
+  int32 latency_ms = 6;
+
+  // Error fields — set on partial/fallback responses; on hard failure use gRPC status instead.
+  string error_code = 7;    // e.g., "LLM_TIMEOUT", "JSON_REPAIR_FAILED"
+  string error_message = 8; // human-readable detail
+}
+
+message ChatStreamResponse {
+  string delta = 1; // 对于流式返回，每次返回的增量字符串
+  repeated Citation citations = 2; // 通常在第一帧或最后一帧返回
+}
+
+// ----------------------------------------
+// 2. 错题解析服务 (Exercise Analysis)
+// ----------------------------------------
+service ExerciseAnalysisService {
+  rpc Analyze (ExerciseAnalysisRequest) returns (ExerciseAnalysisResponse);
+}
+
+message ExerciseAnalysisRequest {
+  string trace_id = 1;
+  string idempotency_key = 2;
+  string question = 3;
+  string user_answer = 4;
+  string correct_answer = 5;
+  repeated string knowledge_points = 6;
+  string teacher_suggestion = 7;
+}
+
+message ExerciseAnalysisResponse {
+  string encourage = 1;
+  string concept = 2;
+  repeated string steps = 3;
+  string root_cause = 4;
+  string next_practice = 5;
+
+  string error_code = 6;
+  string error_message = 7;
+}
+
+// ----------------------------------------
+// 3. AI 个性化出题服务 (AI Question Generator)
+// ----------------------------------------
+service AiQuestionService {
+  rpc Generate (AiQuestionGenerateRequest) returns (AiQuestionGenerateResponse);
+}
+
+message AiQuestionGenerateRequest {
+  string trace_id = 1;
+  string idempotency_key = 2;
+  string student_id = 3;
+  int32 count = 4;
+  string subject = 5;
+  string difficulty = 6; // "EASY", "MEDIUM", "HARD"
+  repeated string concept_tags = 7;
+  string weakness_profile = 8;
+  string teacher_suggestions = 9;
+}
+
+message GeneratedQuestion {
+  string question_type = 1; // e.g., "SINGLE_CHOICE", "SHORT_ANSWER"
+  string content = 2;
+  map<string, string> options = 3; // 例如 {"A":"...","B":"..."}
+  string correct_answer = 4;
+  string explanation = 5;
+  repeated string knowledge_points = 6;
+}
+
+message AiQuestionGenerateResponse {
+  repeated GeneratedQuestion questions = 1;
+  string router_decision = 2; // 模型路由原因
+
+  string error_code = 3;
+  string error_message = 4;
+}
+
+// ----------------------------------------
+// 4. 教案生成服务 (Lesson Plan Generator)
+// ----------------------------------------
+service LessonPlanService {
+  rpc Generate (LessonPlanGenerateRequest) returns (LessonPlanGenerateResponse);
+}
+
+message LessonPlanGenerateRequest {
+  string trace_id = 1;
+  string idempotency_key = 2;
+  string topic = 3;
+  string grade_level = 4;
+  int32 duration_mins = 5;
+  string teacher_id = 6;
+}
+
+message LessonPlanGenerateResponse {
+  string content_md = 1;
+  string provider = 2;
+  string model = 3;
+  int32 latency_ms = 4;
+
+  string error_code = 5;
+  string error_message = 6;
+}
+
+// ----------------------------------------
+// 5. 知识库服务 (Knowledge Base)
+// ----------------------------------------
+service KnowledgeBaseService {
+  rpc Ingest (KbIngestRequest) returns (KbIngestResponse);
+  rpc Delete (KbDeleteRequest) returns (KbDeleteResponse);
+}
+
+message KbIngestRequest {
+  string trace_id = 1;
+  string idempotency_key = 2;
+  string job_id = 3;
+  string document_id = 4;
+  string teacher_id = 5;
+  string class_id = 6;
+  string filename = 7;
+  string file_type = 8;
+  bytes file_content = 9;
+}
+
+message KbIngestResponse {
+  string status = 1;
+  string job_id = 2;
+  bool background = 3;
+  int32 chunks = 4;
+
+  string error_code = 5;
+  string error_message = 6;
+}
+
+message KbDeleteRequest {
+  string trace_id = 1;
+  string idempotency_key = 2;
+  string document_id = 3;
+}
+
+message KbDeleteResponse {
+  string status = 1;
+
+  string error_code = 2;
+  string error_message = 3;
+}

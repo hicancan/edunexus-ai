@@ -1,0 +1,47 @@
+server:
+  address: ${APP_HOST:0.0.0.0}
+  port: ${APP_PORT:8080}
+
+spring:
+  application:
+    name: edunexus-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DB:edunexus}}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+  threads:
+    virtual:
+      enabled: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  jwt-secret: ${JWT_SECRET:change-this-to-a-strong-random-secret}
+  jwt-expires-in: ${JWT_EXPIRES_IN:15m}
+  refresh-token-expires-in: ${REFRESH_TOKEN_EXPIRES_IN:14d}
+  ai-service-grpc-host: ${AI_SERVICE_GRPC_HOST:127.0.0.1}
+  ai-service-grpc-port: ${AI_SERVICE_GRPC_PORT:50051}
+  ai-service-token: ${AI_SERVICE_TOKEN:change-this-in-local-too}
+  ai-question-timeout-seconds: ${AI_QUESTION_TIMEOUT_SECONDS:150}
+  lesson-plan-timeout-seconds: ${LESSON_PLAN_TIMEOUT_SECONDS:90}
+  kb-ingest-timeout-seconds: ${KB_INGEST_TIMEOUT_SECONDS:180}
+  kb-delete-timeout-seconds: ${KB_DELETE_TIMEOUT_SECONDS:60}
+  cors-allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://127.0.0.1:5173,http://localhost:5173,http://*:5173}
+  s3:
+    endpoint: ${S3_ENDPOINT:http://127.0.0.1:9000}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    bucket: ${S3_BUCKET:edunexus-kb}
+    force-path-style: ${S3_FORCE_PATH_STYLE:true}
+
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}

@@ -1,0 +1,56 @@
+[project]
+name = "edunexus-ai-service"
+version = "1.0.0"
+description = "EduNexus AI Service — RAG, LLM routing, embedding, and document processing"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi==0.116.1",
+    "uvicorn[standard]==0.35.0",
+    "httpx==0.28.1",
+    "qdrant-client==1.17.0",
+    "python-dotenv==1.1.1",
+    "pypdf==5.5.0",
+    "python-docx==1.2.0",
+    "grpcio>=1.63.0",
+    "grpcio-tools>=1.63.0",
+    "grpcio-reflection>=1.63.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "ruff>=0.6.9",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "ai_service/*_pb2.py",
+    "ai_service/*_pb2.pyi",
+    "ai_service/*_grpc.py",
+]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "UP", "S", "PT", "SIM", "RUF"]
+ignore = [
+  "E501",    # line-too-long — handled by formatter
+  "S101",    # assert — used in tests
+  "S104",    # bind-to-all-interfaces — intentional for container deployment
+  "S105",    # hardcoded-password-string — test fixtures use dummy tokens
+  "S106",    # hardcoded-password-func-arg — test fixtures use dummy tokens
+  "S603",    # subprocess-without-shell-equals-true — not applicable
+  "S324",    # insecure-hash — sha1 used for content dedup, not security
+  "RUF001",  # ambiguous-unicode-char — CJK characters in Chinese prompt strings
+  "RUF002",  # ambiguous-unicode-char-docstring — CJK fullwidth punctuation
+  "RUF003",  # ambiguous-unicode-char-comment — CJK fullwidth punctuation
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
