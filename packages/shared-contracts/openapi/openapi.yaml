@@ -1421,39 +1421,39 @@ components:
           type: string
           format: date-time
 
-      AiQuestionSessionVO:
-        type: object
-        description: AI 出题会话
-        properties:
-          id:
-            type: string
-            format: uuid
-          subject:
-            type: string
-          difficulty:
-            type: string
-            nullable: true
-            enum: [EASY, MEDIUM, HARD]
-          questionCount:
-            type: integer
-          completed:
-            type: boolean
-          correctRate:
-            type: number
-            format: float
-            nullable: true
-            description: 正确率（0-100）
-          score:
-            type: integer
-            nullable: true
-          recordId:
-            type: string
-            format: uuid
-            nullable: true
-            description: 最近一次提交记录 ID；未提交时为空
-          generatedAt:
-            type: string
-            format: date-time
+    AiQuestionSessionVO:
+      type: object
+      description: AI 出题会话
+      properties:
+        id:
+          type: string
+          format: uuid
+        subject:
+          type: string
+        difficulty:
+          type: string
+          nullable: true
+          enum: [EASY, MEDIUM, HARD]
+        questionCount:
+          type: integer
+        completed:
+          type: boolean
+        correctRate:
+          type: number
+          format: float
+          nullable: true
+          description: 正确率（0-100）
+        score:
+          type: integer
+          nullable: true
+        recordId:
+          type: string
+          format: uuid
+          nullable: true
+          description: 最近一次提交记录 ID；未提交时为空
+        generatedAt:
+          type: string
+          format: date-time
 
     AiQuestionGenerateResultVO:
       type: object
