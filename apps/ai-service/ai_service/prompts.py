@@ -78,7 +78,16 @@ def aiq_prompt(
     concept_tags: list[str],
     weakness_profile: list[dict[str, Any]],
     teacher_suggestions: list[dict[str, Any]],
+    existing_questions: list[str] | None = None,
 ) -> str:
+    existing_questions = [
+        sanitize_text(item, 180) for item in (existing_questions or []) if sanitize_text(item, 180)
+    ]
+    existing_text = (
+        json.dumps(existing_questions[:12], ensure_ascii=False)
+        if existing_questions
+        else "[]"
+    )
     return (
         "你是资深命题老师。请基于输入生成个性化习题。\n"
         "必须只输出 JSON 数组，禁止 Markdown 代码块。\n"
@@ -88,12 +97,15 @@ def aiq_prompt(
         "MULTIPLE_CHOICE 的 correct_answer 必须是按字母升序拼接的字符串，例如 AC。\n"
         "SHORT_ANSWER 的 options 填空对象 {}。\n"
         "knowledge_points 必须是非空字符串数组。\n\n"
+        "若 existing_questions 非空，表示这些题目已经生成完成。你必须继续补齐剩余题目，"
+        "且新题的题干、知识点组合和设问角度都不能与 existing_questions 重复。\n\n"
         f"subject={sanitize_text(subject, 80)}\n"
         f"difficulty={sanitize_text(difficulty, 20)}\n"
         f"count={count}\n"
         f"concept_tags={json.dumps(concept_tags, ensure_ascii=False)}\n"
         f"weakness_profile={json.dumps(weakness_profile[:20], ensure_ascii=False)}\n"
-        f"teacher_suggestions={json.dumps(teacher_suggestions[:10], ensure_ascii=False)}"
+        f"teacher_suggestions={json.dumps(teacher_suggestions[:10], ensure_ascii=False)}\n"
+        f"existing_questions={existing_text}"
     )
 
 
@@ -106,6 +118,29 @@ def aiq_repair_prompt(raw_output: str, count: int) -> str:
         "MULTIPLE_CHOICE 的 correct_answer 必须是按字母升序拼接的字符串，例如 AC。\n"
         f"题目数量必须为 {count}。\n"
         f"原始输出：{sanitize_text(raw_output, 8000)}"
+    )
+
+
+def teacher_suggestion_prompt(candidates: list[dict[str, Any]]) -> str:
+    return (
+        "你是资深教研教师，请基于班级学情生成教师可直接确认的干预建议草案。\n"
+        "必须只输出 JSON 数组，禁止 Markdown 代码块或额外说明。\n"
+        "数组中的每个元素必须包含字段：knowledge_point, suggestion_template。\n"
+        "knowledge_point 必须与输入保持完全一致。\n"
+        "suggestion_template 必须是 1-2 句中文教学建议，强调先复讲、再诊断、后分层再练，避免空话和口号。\n"
+        "建议要能直接发给学生或用于课堂复讲，不要出现模型、自我说明、提示词等内容。\n\n"
+        f"candidates={json.dumps(candidates[:8], ensure_ascii=False)}"
+    )
+
+
+def teacher_suggestion_repair_prompt(raw_output: str, knowledge_points: list[str]) -> str:
+    return (
+        "将下面内容修复为合法 JSON 数组，不要输出任何解释。\n"
+        "每个元素必须包含：knowledge_point, suggestion_template。\n"
+        "knowledge_point 必须且只能从以下集合中选择，并保持完全一致："
+        f"{json.dumps(knowledge_points, ensure_ascii=False)}。\n"
+        "suggestion_template 必须是 1-2 句中文教学建议。\n"
+        f"原始输出：{sanitize_text(raw_output, 6000)}"
     )
 
 
@@ -160,6 +195,67 @@ def sanitize_lesson_plan_markdown(content: str) -> str:
     return normalized
 
 
+def coerce_lesson_plan_markdown(
+    content: str, topic: str, grade_level: str, duration_mins: int
+) -> str:
+    normalized = sanitize_lesson_plan_markdown(content)
+    sections = _split_level2_sections(normalized)
+    goals = _find_section_body(sections, ("教学目标", "目标"))
+    key_points = _find_section_body(sections, ("重难点", "重点难点", "教学重难点"))
+    flow = _find_section_body(sections, ("教学流程", "教学过程", "流程设计"))
+    homework = _find_section_body(sections, ("作业与评估", "作业与反馈", "评估与作业"))
+
+    step_blocks = _extract_step_blocks(flow or normalized)
+    step_blocks = _ensure_minimum_step_blocks(step_blocks, topic)
+    step_durations = _normalize_step_durations(step_blocks, duration_mins)
+
+    lines: list[str] = [
+        "## 1. 教学目标",
+        *_normalize_section_lines(
+            goals,
+            [
+                f"理解「{topic}」的核心概念、关键条件与常见应用场景。",
+                f"能够结合{grade_level}课堂题型完成基础判断、表达或计算。",
+                "能在教师支架下复盘易错点，并完成一次针对性再练。",
+            ],
+        ),
+        "",
+        "## 2. 重难点",
+        *_normalize_section_lines(
+            key_points,
+            [
+                f"重点：梳理「{topic}」的关键概念、公式或判断依据。",
+                "难点：把课堂概念迁移到题目条件识别、分析与规范表达中。",
+            ],
+        ),
+        "",
+        "## 3. 教学流程（含时间分配）",
+    ]
+
+    numerals = ["一", "二", "三", "四", "五", "六"]
+    for index, step in enumerate(step_blocks):
+        numeral = numerals[index] if index < len(numerals) else str(index + 1)
+        lines.append(
+            f"### 步骤{numeral}：{step['title']}（{step_durations[index]} 分钟）"
+        )
+        lines.extend(_normalize_step_lines(step["body"], topic, index))
+        lines.append("")
+
+    lines.extend(
+        [
+            "## 4. 作业与评估",
+            *_normalize_section_lines(
+                homework,
+                [
+                    f"完成 1 组围绕「{topic}」的分层练习，并提交错因复盘记录。",
+                    "根据课堂反馈记录 1 条仍需教师支架支持的问题，作为下次课前诊断依据。",
+                ],
+            ),
+        ]
+    )
+    return "\n".join(lines).strip()
+
+
 def has_required_plan_sections(content: str) -> bool:
     normalized = sanitize_lesson_plan_markdown(content)
     required = [
@@ -186,3 +282,127 @@ def has_valid_plan_structure(content: str, duration_mins: int) -> bool:
         return False
     durations = extract_lesson_plan_step_durations(content)
     return len(durations) >= 4 and sum(durations) == duration_mins
+
+
+def _split_level2_sections(content: str) -> dict[str, str]:
+    sections: dict[str, str] = {}
+    matches = list(re.finditer(r"^##\s+(.+)$", content, flags=re.MULTILINE))
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
+        title = re.sub(r"^[0-9.\s、]+", "", match.group(1)).strip()
+        sections[title] = content[start:end].strip()
+    return sections
+
+
+def _find_section_body(sections: dict[str, str], aliases: tuple[str, ...]) -> str:
+    for title, body in sections.items():
+        if any(alias in title for alias in aliases):
+            return body
+    return ""
+
+
+def _extract_step_blocks(flow_content: str) -> list[dict[str, str | int | None]]:
+    if not flow_content:
+        return []
+    matches = list(re.finditer(r"^###\s+(.+)$", flow_content, flags=re.MULTILINE))
+    steps: list[dict[str, str | int | None]] = []
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(flow_content)
+        heading = match.group(1).strip()
+        duration_match = re.search(r"[（(](\d+)\s*分钟[）)]", heading)
+        title = re.sub(r"[（(]\d+\s*分钟[）)]", "", heading)
+        title = re.sub(r"^步骤[一二三四五六七八九十0-9]+[:：]?", "", title).strip("：: -")
+        steps.append(
+            {
+                "title": title or f"教学步骤{index + 1}",
+                "body": flow_content[start:end].strip(),
+                "duration": int(duration_match.group(1)) if duration_match else None,
+            }
+        )
+    return steps
+
+
+def _ensure_minimum_step_blocks(
+    step_blocks: list[dict[str, str | int | None]], topic: str
+) -> list[dict[str, str | int | None]]:
+    default_steps = [
+        ("导入与诊断", f"通过贴近课堂的情境或追问，引出「{topic}」的学习任务与已有认知。"),
+        ("概念建构", f"围绕「{topic}」梳理核心概念、关键条件与常见误区。"),
+        ("分层练习", f"结合基础题与迁移题开展分层练习，并针对易错点进行点拨。"),
+        ("总结与评估", "回顾本节重点，完成课堂反馈，并布置后续巩固任务。"),
+    ]
+    normalized = step_blocks[:4]
+    while len(normalized) < 4:
+        title, body = default_steps[len(normalized)]
+        normalized.append({"title": title, "body": body, "duration": None})
+    return normalized
+
+
+def _normalize_step_durations(
+    step_blocks: list[dict[str, str | int | None]], duration_mins: int
+) -> list[int]:
+    provided = [step.get("duration") for step in step_blocks]
+    if all(isinstance(value, int) and value > 0 for value in provided):
+        bases = [int(value) for value in provided]
+    else:
+        default_weights = [0.2, 0.35, 0.25, 0.2]
+        bases = []
+        for index, value in enumerate(provided):
+            if isinstance(value, int) and value > 0:
+                bases.append(value)
+            else:
+                weight = default_weights[index] if index < len(default_weights) else 1 / len(step_blocks)
+                bases.append(weight)
+    return _allocate_duration(duration_mins, bases)
+
+
+def _allocate_duration(total_minutes: int, bases: list[int | float]) -> list[int]:
+    if not bases:
+        return []
+    total_weight = float(sum(float(base) for base in bases)) or float(len(bases))
+    raw = [total_minutes * float(base) / total_weight for base in bases]
+    floors = [max(1, int(value)) for value in raw]
+    current = sum(floors)
+
+    if current > total_minutes:
+        order = sorted(range(len(floors)), key=lambda index: floors[index], reverse=True)
+        for index in order:
+            while current > total_minutes and floors[index] > 1:
+                floors[index] -= 1
+                current -= 1
+    elif current < total_minutes:
+        fractions = sorted(
+            range(len(raw)),
+            key=lambda index: raw[index] - int(raw[index]),
+            reverse=True,
+        )
+        pointer = 0
+        while current < total_minutes:
+            target = fractions[pointer % len(fractions)]
+            floors[target] += 1
+            current += 1
+            pointer += 1
+
+    return floors
+
+
+def _normalize_section_lines(body: str, fallback_lines: list[str]) -> list[str]:
+    lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
+    if not lines:
+        lines = fallback_lines
+    return [line if line.startswith(("-", "*")) else f"- {line}" for line in lines[:4]]
+
+
+def _normalize_step_lines(body: str, topic: str, index: int) -> list[str]:
+    fallback_by_index = [
+        f"通过 1 个贴近课堂的问题或情境，引导学生聚焦「{topic}」的学习目标。",
+        f"结合板书、示例或类比，讲清「{topic}」的关键概念与判断依据。",
+        "组织基础到提升的分层练习，并根据学生反馈进行点拨。",
+        "回顾本节核心要点，完成课堂反馈并说明课后任务。",
+    ]
+    lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
+    if not lines:
+        lines = [fallback_by_index[index] if index < len(fallback_by_index) else fallback_by_index[-1]]
+    return [line if line.startswith(("-", "*")) else f"- {line}" for line in lines[:4]]

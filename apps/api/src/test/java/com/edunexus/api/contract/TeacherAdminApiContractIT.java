@@ -101,6 +101,9 @@ class TeacherAdminApiContractIT extends ApiContractIntegrationBase {
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data.id", notNullValue()))
                         .andExpect(jsonPath("$.data.contentMd", notNullValue()))
+                        .andExpect(jsonPath("$.data.provider", notNullValue()))
+                        .andExpect(jsonPath("$.data.model", notNullValue()))
+                        .andExpect(jsonPath("$.data.executionLane", notNullValue()))
                         .andReturn()
                         .getResponse()
                         .getContentAsString();
@@ -204,6 +207,8 @@ class TeacherAdminApiContractIT extends ApiContractIntegrationBase {
                                         .header("Authorization", "Bearer " + teacherToken))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("$.data[0].knowledgePoint", notNullValue()))
+                        .andExpect(jsonPath("$.data[0].generationSource").value("AI"))
+                        .andExpect(jsonPath("$.data[0].provider", notNullValue()))
                         .andReturn()
                         .getResponse()
                         .getContentAsString();
@@ -228,14 +233,42 @@ class TeacherAdminApiContractIT extends ApiContractIntegrationBase {
                                                         "建议先复盘核心定义，再完成三组递进训练"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.knowledgePoint").value(bulkKnowledgePoint))
+                .andExpect(jsonPath("$.data.affectedCount", greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.data.createdCount", greaterThanOrEqualTo(1)));
+
+        String refreshedRecommendationsBody =
+                mockMvc.perform(
+                                get("/api/v1/teacher/interventions/recommendations")
+                                        .header("Authorization", "Bearer " + teacherToken))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        JsonNode refreshedRecommendation =
+                java.util.stream.StreamSupport.stream(
+                                objectMapper
+                                        .readTree(refreshedRecommendationsBody)
+                                        .path("data")
+                                        .spliterator(),
+                                false)
+                        .filter(node -> bulkKnowledgePoint.equals(node.path("knowledgePoint").asText()))
+                        .findFirst()
+                        .orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(
+                refreshedRecommendation.path("dispatchedStudentCount").asInt() >= 1);
+        org.junit.jupiter.api.Assertions.assertTrue(
+                refreshedRecommendation.path("fullyDispatched").isBoolean());
+        org.junit.jupiter.api.Assertions.assertFalse(
+                refreshedRecommendation.path("lastDispatchedAt").isMissingNode());
 
         mockMvc.perform(
                         get("/api/v1/teacher/students/{studentId}/analytics", studentId)
                                 .header("Authorization", "Bearer " + teacherToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.studentId", notNullValue()))
-                .andExpect(jsonPath("$.data.topWeakPoints", notNullValue()));
+                .andExpect(jsonPath("$.data.topWeakPoints", notNullValue()))
+                .andExpect(jsonPath("$.data.supportStage.label", notNullValue()))
+                .andExpect(jsonPath("$.data.behaviorSignals", notNullValue()));
 
         mockMvc.perform(
                         get("/api/v1/teacher/students/{studentId}/attribution", studentId)
@@ -354,6 +387,26 @@ class TeacherAdminApiContractIT extends ApiContractIntegrationBase {
                 .andExpect(jsonPath("$.data.totalQuestions", notNullValue()))
                 .andExpect(jsonPath("$.data.totalAiQuestionSessions", notNullValue()))
                 .andExpect(jsonPath("$.data.totalKnowledgeChunks", notNullValue()))
-                .andExpect(jsonPath("$.data.totalVectors", notNullValue()));
+                .andExpect(jsonPath("$.data.totalVectors", notNullValue()))
+                .andExpect(jsonPath("$.data.executionDistribution", notNullValue()))
+                .andExpect(jsonPath("$.data.executionDistribution[0].sampleCount", notNullValue()))
+                .andExpect(jsonPath("$.data.executionDistribution[0].dataState", notNullValue()))
+                .andExpect(jsonPath("$.data.responseBenchmarks", notNullValue()))
+                .andExpect(jsonPath("$.data.responseBenchmarks[0].dataState", notNullValue()))
+                .andExpect(jsonPath("$.data.strategyComparison", notNullValue()))
+                .andExpect(jsonPath("$.data.governanceSummary", notNullValue()))
+                .andExpect(jsonPath("$.data.governanceSummary.retentionTaskSamples", notNullValue()))
+                .andExpect(jsonPath("$.data.governanceSummary.retrievalHitSamples", notNullValue()))
+                .andExpect(
+                        jsonPath(
+                                "$.data.governanceSummary.suggestionExecutionSamples",
+                                notNullValue()))
+                .andExpect(jsonPath("$.data.interventionOutcomes", notNullValue()))
+                .andExpect(jsonPath("$.data.flowLinkage", notNullValue()))
+                .andExpect(jsonPath("$.data.flowLinkage[0].stage", notNullValue()))
+                .andExpect(jsonPath("$.data.flowLinkage[0].dataState", notNullValue()))
+                .andExpect(jsonPath("$.data.experimentComparisons", notNullValue()))
+                .andExpect(jsonPath("$.data.experimentComparisons[0].metric", notNullValue()))
+                .andExpect(jsonPath("$.data.experimentComparisons[0].dataState", notNullValue()));
     }
 }

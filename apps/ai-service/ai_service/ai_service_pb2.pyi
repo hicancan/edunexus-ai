@@ -63,7 +63,7 @@ class Citation(_message.Message):
     def __init__(self, document_id: _Optional[str] = ..., filename: _Optional[str] = ..., chunk_index: _Optional[int] = ..., content: _Optional[str] = ..., score: _Optional[float] = ...) -> None: ...
 
 class ChatResponse(_message.Message):
-    __slots__ = ("answer", "citations", "provider", "model", "token_usage", "latency_ms")
+    __slots__ = ("answer", "citations", "provider", "model", "token_usage", "latency_ms", "error_code", "error_message")
     class TokenUsage(_message.Message):
         __slots__ = ("prompt", "completion")
         PROMPT_FIELD_NUMBER: _ClassVar[int]
@@ -77,13 +77,17 @@ class ChatResponse(_message.Message):
     MODEL_FIELD_NUMBER: _ClassVar[int]
     TOKEN_USAGE_FIELD_NUMBER: _ClassVar[int]
     LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     answer: str
     citations: _containers.RepeatedCompositeFieldContainer[Citation]
     provider: str
     model: str
     token_usage: ChatResponse.TokenUsage
     latency_ms: int
-    def __init__(self, answer: _Optional[str] = ..., citations: _Optional[_Iterable[_Union[Citation, _Mapping]]] = ..., provider: _Optional[str] = ..., model: _Optional[str] = ..., token_usage: _Optional[_Union[ChatResponse.TokenUsage, _Mapping]] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+    error_code: str
+    error_message: str
+    def __init__(self, answer: _Optional[str] = ..., citations: _Optional[_Iterable[_Union[Citation, _Mapping]]] = ..., provider: _Optional[str] = ..., model: _Optional[str] = ..., token_usage: _Optional[_Union[ChatResponse.TokenUsage, _Mapping]] = ..., latency_ms: _Optional[int] = ..., error_code: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class ChatStreamResponse(_message.Message):
     __slots__ = ("delta", "citations")
@@ -112,18 +116,22 @@ class ExerciseAnalysisRequest(_message.Message):
     def __init__(self, trace_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., question: _Optional[str] = ..., user_answer: _Optional[str] = ..., correct_answer: _Optional[str] = ..., knowledge_points: _Optional[_Iterable[str]] = ..., teacher_suggestion: _Optional[str] = ...) -> None: ...
 
 class ExerciseAnalysisResponse(_message.Message):
-    __slots__ = ("encourage", "concept", "steps", "root_cause", "next_practice")
+    __slots__ = ("encourage", "concept", "steps", "root_cause", "next_practice", "error_code", "error_message")
     ENCOURAGE_FIELD_NUMBER: _ClassVar[int]
     CONCEPT_FIELD_NUMBER: _ClassVar[int]
     STEPS_FIELD_NUMBER: _ClassVar[int]
     ROOT_CAUSE_FIELD_NUMBER: _ClassVar[int]
     NEXT_PRACTICE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     encourage: str
     concept: str
     steps: _containers.RepeatedScalarFieldContainer[str]
     root_cause: str
     next_practice: str
-    def __init__(self, encourage: _Optional[str] = ..., concept: _Optional[str] = ..., steps: _Optional[_Iterable[str]] = ..., root_cause: _Optional[str] = ..., next_practice: _Optional[str] = ...) -> None: ...
+    error_code: str
+    error_message: str
+    def __init__(self, encourage: _Optional[str] = ..., concept: _Optional[str] = ..., steps: _Optional[_Iterable[str]] = ..., root_cause: _Optional[str] = ..., next_practice: _Optional[str] = ..., error_code: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class AiQuestionGenerateRequest(_message.Message):
     __slots__ = ("trace_id", "idempotency_key", "student_id", "count", "subject", "difficulty", "concept_tags", "weakness_profile", "teacher_suggestions")
@@ -171,12 +179,64 @@ class GeneratedQuestion(_message.Message):
     def __init__(self, question_type: _Optional[str] = ..., content: _Optional[str] = ..., options: _Optional[_Mapping[str, str]] = ..., correct_answer: _Optional[str] = ..., explanation: _Optional[str] = ..., knowledge_points: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class AiQuestionGenerateResponse(_message.Message):
-    __slots__ = ("questions", "router_decision")
+    __slots__ = ("questions", "router_decision", "error_code", "error_message")
     QUESTIONS_FIELD_NUMBER: _ClassVar[int]
     ROUTER_DECISION_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     questions: _containers.RepeatedCompositeFieldContainer[GeneratedQuestion]
     router_decision: str
-    def __init__(self, questions: _Optional[_Iterable[_Union[GeneratedQuestion, _Mapping]]] = ..., router_decision: _Optional[str] = ...) -> None: ...
+    error_code: str
+    error_message: str
+    def __init__(self, questions: _Optional[_Iterable[_Union[GeneratedQuestion, _Mapping]]] = ..., router_decision: _Optional[str] = ..., error_code: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...
+
+class TeachingSuggestionCandidate(_message.Message):
+    __slots__ = ("knowledge_point", "student_count", "total_wrong_count")
+    KNOWLEDGE_POINT_FIELD_NUMBER: _ClassVar[int]
+    STUDENT_COUNT_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_WRONG_COUNT_FIELD_NUMBER: _ClassVar[int]
+    knowledge_point: str
+    student_count: int
+    total_wrong_count: int
+    def __init__(self, knowledge_point: _Optional[str] = ..., student_count: _Optional[int] = ..., total_wrong_count: _Optional[int] = ...) -> None: ...
+
+class GeneratedTeachingSuggestion(_message.Message):
+    __slots__ = ("knowledge_point", "suggestion_template")
+    KNOWLEDGE_POINT_FIELD_NUMBER: _ClassVar[int]
+    SUGGESTION_TEMPLATE_FIELD_NUMBER: _ClassVar[int]
+    knowledge_point: str
+    suggestion_template: str
+    def __init__(self, knowledge_point: _Optional[str] = ..., suggestion_template: _Optional[str] = ...) -> None: ...
+
+class TeachingSuggestionGenerateRequest(_message.Message):
+    __slots__ = ("trace_id", "idempotency_key", "teacher_id", "candidates")
+    TRACE_ID_FIELD_NUMBER: _ClassVar[int]
+    IDEMPOTENCY_KEY_FIELD_NUMBER: _ClassVar[int]
+    TEACHER_ID_FIELD_NUMBER: _ClassVar[int]
+    CANDIDATES_FIELD_NUMBER: _ClassVar[int]
+    trace_id: str
+    idempotency_key: str
+    teacher_id: str
+    candidates: _containers.RepeatedCompositeFieldContainer[TeachingSuggestionCandidate]
+    def __init__(self, trace_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., teacher_id: _Optional[str] = ..., candidates: _Optional[_Iterable[_Union[TeachingSuggestionCandidate, _Mapping]]] = ...) -> None: ...
+
+class TeachingSuggestionGenerateResponse(_message.Message):
+    __slots__ = ("suggestions", "provider", "model", "latency_ms", "router_decision", "error_code", "error_message")
+    SUGGESTIONS_FIELD_NUMBER: _ClassVar[int]
+    PROVIDER_FIELD_NUMBER: _ClassVar[int]
+    MODEL_FIELD_NUMBER: _ClassVar[int]
+    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    ROUTER_DECISION_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    suggestions: _containers.RepeatedCompositeFieldContainer[GeneratedTeachingSuggestion]
+    provider: str
+    model: str
+    latency_ms: int
+    router_decision: str
+    error_code: str
+    error_message: str
+    def __init__(self, suggestions: _Optional[_Iterable[_Union[GeneratedTeachingSuggestion, _Mapping]]] = ..., provider: _Optional[str] = ..., model: _Optional[str] = ..., latency_ms: _Optional[int] = ..., router_decision: _Optional[str] = ..., error_code: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class LessonPlanGenerateRequest(_message.Message):
     __slots__ = ("trace_id", "idempotency_key", "topic", "grade_level", "duration_mins", "teacher_id")
@@ -195,16 +255,20 @@ class LessonPlanGenerateRequest(_message.Message):
     def __init__(self, trace_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., topic: _Optional[str] = ..., grade_level: _Optional[str] = ..., duration_mins: _Optional[int] = ..., teacher_id: _Optional[str] = ...) -> None: ...
 
 class LessonPlanGenerateResponse(_message.Message):
-    __slots__ = ("content_md", "provider", "model", "latency_ms")
+    __slots__ = ("content_md", "provider", "model", "latency_ms", "error_code", "error_message")
     CONTENT_MD_FIELD_NUMBER: _ClassVar[int]
     PROVIDER_FIELD_NUMBER: _ClassVar[int]
     MODEL_FIELD_NUMBER: _ClassVar[int]
     LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     content_md: str
     provider: str
     model: str
     latency_ms: int
-    def __init__(self, content_md: _Optional[str] = ..., provider: _Optional[str] = ..., model: _Optional[str] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+    error_code: str
+    error_message: str
+    def __init__(self, content_md: _Optional[str] = ..., provider: _Optional[str] = ..., model: _Optional[str] = ..., latency_ms: _Optional[int] = ..., error_code: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class KbIngestRequest(_message.Message):
     __slots__ = ("trace_id", "idempotency_key", "job_id", "document_id", "teacher_id", "class_id", "filename", "file_type", "file_content")
@@ -229,16 +293,20 @@ class KbIngestRequest(_message.Message):
     def __init__(self, trace_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., job_id: _Optional[str] = ..., document_id: _Optional[str] = ..., teacher_id: _Optional[str] = ..., class_id: _Optional[str] = ..., filename: _Optional[str] = ..., file_type: _Optional[str] = ..., file_content: _Optional[bytes] = ...) -> None: ...
 
 class KbIngestResponse(_message.Message):
-    __slots__ = ("status", "job_id", "background", "chunks")
+    __slots__ = ("status", "job_id", "background", "chunks", "error_code", "error_message")
     STATUS_FIELD_NUMBER: _ClassVar[int]
     JOB_ID_FIELD_NUMBER: _ClassVar[int]
     BACKGROUND_FIELD_NUMBER: _ClassVar[int]
     CHUNKS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     status: str
     job_id: str
     background: bool
     chunks: int
-    def __init__(self, status: _Optional[str] = ..., job_id: _Optional[str] = ..., background: bool = ..., chunks: _Optional[int] = ...) -> None: ...
+    error_code: str
+    error_message: str
+    def __init__(self, status: _Optional[str] = ..., job_id: _Optional[str] = ..., background: bool = ..., chunks: _Optional[int] = ..., error_code: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class KbDeleteRequest(_message.Message):
     __slots__ = ("trace_id", "idempotency_key", "document_id")
@@ -251,7 +319,11 @@ class KbDeleteRequest(_message.Message):
     def __init__(self, trace_id: _Optional[str] = ..., idempotency_key: _Optional[str] = ..., document_id: _Optional[str] = ...) -> None: ...
 
 class KbDeleteResponse(_message.Message):
-    __slots__ = ("status",)
+    __slots__ = ("status", "error_code", "error_message")
     STATUS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     status: str
-    def __init__(self, status: _Optional[str] = ...) -> None: ...
+    error_code: str
+    error_message: str
+    def __init__(self, status: _Optional[str] = ..., error_code: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...

@@ -1,6 +1,7 @@
 package com.edunexus.api.config;
 
 import java.net.URI;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +31,9 @@ public class AppConfig {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("doc-ingest-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
         executor.initialize();
         return executor;
     }
@@ -41,6 +45,9 @@ public class AppConfig {
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(200);
         executor.setThreadNamePrefix("chat-stream-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(15);
         executor.initialize();
         return executor;
     }
@@ -48,7 +55,7 @@ public class AppConfig {
     @Bean
     public WebMvcConfigurer corsConfigurer(
             @Value(
-                            "${app.cors-allowed-origin-patterns:http://127.0.0.1:5173,http://localhost:5173,http://*:5173}")
+                    "${app.cors-allowed-origin-patterns:http://127.0.0.1:*,http://localhost:*}")
                     String[] allowedOriginPatterns) {
         return new WebMvcConfigurer() {
             @Override

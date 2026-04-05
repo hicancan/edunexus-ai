@@ -21,6 +21,7 @@ class Settings:
     app_version: str
     log_level: str
 
+    runtime_strategy: str
     llm_provider: str
 
     ollama_base_url: str
@@ -71,16 +72,14 @@ def load_settings() -> Settings:
         app_name="edunexus-ai-service",
         app_version="1.0.0",
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        runtime_strategy=os.getenv("APP_RUNTIME_STRATEGY", "云边端协同").strip(),
         llm_provider=os.getenv("LLM_PROVIDER", "auto").strip().lower(),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/"),
         ollama_embed_model=os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:0.6b"),
-        ollama_model=os.getenv("OLLAMA_MODEL", "qwen3:4b"),
-        ollama_rag_model=os.getenv("OLLAMA_RAG_MODEL", "qwen3:8b"),
-        ollama_structured_model=os.getenv("OLLAMA_STRUCTURED_MODEL", "qwen3:8b"),
-        ollama_lesson_plan_model=os.getenv(
-            "OLLAMA_LESSON_PLAN_MODEL",
-            os.getenv("OLLAMA_STRUCTURED_MODEL", "qwen3:8b"),
-        ),
+        ollama_model=os.getenv("OLLAMA_MODEL", "qwen3.5:4b"),
+        ollama_rag_model=os.getenv("OLLAMA_RAG_MODEL", "qwen3.5:4b"),
+        ollama_structured_model=os.getenv("OLLAMA_STRUCTURED_MODEL", "qwen3.5:4b"),
+        ollama_lesson_plan_model=os.getenv("OLLAMA_LESSON_PLAN_MODEL", "qwen3.5:9b"),
         ollama_complex_model=os.getenv("OLLAMA_COMPLEX_MODEL", "deepseek-r1:8b"),
         gemini_api_key=(os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")).strip(),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),

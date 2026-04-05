@@ -161,6 +161,25 @@ public abstract class ApiContractIntegrationBase {
                                 "routerDecision",
                                 "default"));
 
+        when(aiClient.generateTeacherSuggestions(any()))
+                .thenReturn(
+                        Map.of(
+                                "suggestions",
+                                List.of(
+                                        Map.of(
+                                                "knowledgePoint",
+                                                "牛顿第二定律",
+                                                "suggestionTemplate",
+                                                "先统一复讲受力分析和 F=ma 的含义，再用 1 道低门槛诊断题确认是否补齐关键环节。")),
+                                "provider",
+                                "deepseek",
+                                "model",
+                                "deepseek-chat",
+                                "latencyMs",
+                                1450,
+                                "routerDecision",
+                                "结构化生成任务优先使用更稳的非推理模型"));
+
         when(aiClient.generatePlan(any()))
                 .thenReturn(
                         Map.of(

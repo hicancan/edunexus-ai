@@ -91,7 +91,7 @@ function readAccessToken(): string {
         return parsed.token;
       }
     }
-  } catch (e) {
+  } catch {
     // Ignore parse errors
   }
   return localStorage.getItem(storageKeys.accessToken) || "";
@@ -110,7 +110,7 @@ function readRefreshToken(): string {
         return parsed.refreshToken;
       }
     }
-  } catch (e) {
+  } catch {
     // Ignore parse errors
   }
   return (

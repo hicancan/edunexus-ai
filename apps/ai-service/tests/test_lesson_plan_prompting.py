@@ -1,4 +1,5 @@
 from ai_service.prompts import (
+    coerce_lesson_plan_markdown,
     extract_lesson_plan_step_durations,
     has_valid_plan_structure,
     lesson_plan_repair_prompt,
@@ -48,3 +49,23 @@ def test_lesson_plan_repair_prompt_includes_duration_contract() -> None:
     prompt = lesson_plan_repair_prompt("原始内容", 45)
     assert "45 分钟" in prompt
     assert "步骤一：标题（X 分钟）" in prompt
+
+
+def test_coerce_lesson_plan_markdown_repairs_missing_structure() -> None:
+    raw = """
+## 教学目标
+理解牛顿第二定律。
+
+## 教学流程
+### 导入（8 分钟）
+提出课堂问题。
+
+### 讲解（12 分钟）
+讲解 F=ma。
+""".strip()
+
+    coerced = coerce_lesson_plan_markdown(raw, "牛顿第二定律", "高一", 45)
+
+    assert has_valid_plan_structure(coerced, 45) is True
+    assert "## 2. 重难点" in coerced
+    assert "## 4. 作业与评估" in coerced

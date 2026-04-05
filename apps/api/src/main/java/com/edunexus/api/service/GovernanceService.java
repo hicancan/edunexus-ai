@@ -4,18 +4,27 @@ import com.edunexus.api.common.CryptoUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GovernanceService {
     private final DbService db;
     private final ObjectMapper objectMapper;
+    private final String runtimeStrategy;
 
-    public GovernanceService(DbService db, ObjectMapper objectMapper) {
+    public GovernanceService(
+            DbService db,
+            ObjectMapper objectMapper,
+            @Value("${app.runtime-strategy:云边端协同}") String runtimeStrategy) {
         this.db = db;
         this.objectMapper = objectMapper;
+        this.runtimeStrategy = runtimeStrategy == null || runtimeStrategy.isBlank()
+                ? "云边端协同"
+                : runtimeStrategy.trim();
     }
 
     public Map<String, Object> getIdempotentReplay(
@@ -128,6 +137,35 @@ public class GovernanceService {
             String resourceId,
             String traceId,
             String ip) {
+        audit(actorId, actorRole, action, resourceType, resourceId, traceId, ip, Map.of());
+    }
+
+    public void audit(
+            UUID actorId,
+            String actorRole,
+            String action,
+            String resourceType,
+            String resourceId,
+            String traceId,
+            Map<String, Object> detailExtras) {
+        audit(actorId, actorRole, action, resourceType, resourceId, traceId, null, detailExtras);
+    }
+
+    public void audit(
+            UUID actorId,
+            String actorRole,
+            String action,
+            String resourceType,
+            String resourceId,
+            String traceId,
+            String ip,
+            Map<String, Object> detailExtras) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("traceId", traceId == null ? "" : traceId);
+        detail.put("runtimeStrategy", runtimeStrategy);
+        if (detailExtras != null && !detailExtras.isEmpty()) {
+            detail.putAll(detailExtras);
+        }
         db.update(
                 "insert into audit_logs(id,actor_id,actor_role,action,resource_type,resource_id,ip,detail) values (?,?,?,?,?,?,?,?::jsonb)",
                 db.newId(),
@@ -137,7 +175,7 @@ public class GovernanceService {
                 resourceType,
                 resourceId,
                 ip,
-                toJson(Map.of("traceId", traceId == null ? "" : traceId)));
+                toJson(detail));
     }
 
     /** 向后兼容：不传 IP 的重载 */
@@ -148,7 +186,7 @@ public class GovernanceService {
             String resourceType,
             String resourceId,
             String traceId) {
-        audit(actorId, actorRole, action, resourceType, resourceId, traceId, null);
+        audit(actorId, actorRole, action, resourceType, resourceId, traceId, (String) null);
     }
 
     public String requestHash(Object requestPayload) {

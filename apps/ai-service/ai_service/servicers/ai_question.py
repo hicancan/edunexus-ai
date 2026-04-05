@@ -64,33 +64,63 @@ class AiQuestionServicer(AiQuestionServiceServicer):
             except Exception:
                 return []
 
-        prompt = aiq_prompt(
-            subject=request.subject,
-            difficulty=request.difficulty,
-            count=request.count,
-            concept_tags=list(request.concept_tags),
-            weakness_profile=_parse_list(request.weakness_profile),
-            teacher_suggestions=_parse_list(request.teacher_suggestions),
-        )
+        weakness_profile = _parse_list(request.weakness_profile)
+        teacher_suggestions = _parse_list(request.teacher_suggestions)
+
         try:
-            parsed_array, result = await complete_with_json_repair(
-                self.llm,
-                prompt,
-                scene="ai_question",
-                trace_id=trace_id,
-                expect_array=True,
-                repair_prompt_fn=lambda text: aiq_repair_prompt(text, request.count),
-            )
-            questions = _validate_questions(parsed_array or [], request.count)
+            questions: list[GeneratedQuestion] = []
+            final_reason = ""
+            remaining = max(1, request.count)
+            max_batch_size = request.count if request.count > 10 else 5
+            empty_batch_attempts = 0
+            max_empty_batch_attempts = 2 if request.count > 10 else 3
+            scene = "ai_question_large" if request.count > 10 else "ai_question"
+            while remaining > 0 and empty_batch_attempts < max_empty_batch_attempts:
+                batch_count = min(max_batch_size, remaining)
+                prompt = aiq_prompt(
+                    subject=request.subject,
+                    difficulty=request.difficulty,
+                    count=batch_count,
+                    concept_tags=list(request.concept_tags),
+                    weakness_profile=weakness_profile,
+                    teacher_suggestions=teacher_suggestions,
+                    existing_questions=[question.content for question in questions],
+                )
+                parsed_array, result = await complete_with_json_repair(
+                    self.llm,
+                    prompt,
+                    scene=scene,
+                    trace_id=trace_id,
+                    expect_array=True,
+                    repair_prompt_fn=lambda text, expected=batch_count: aiq_repair_prompt(
+                        text, expected
+                    ),
+                )
+                batch_questions = _validate_questions(parsed_array or [], batch_count)
+                final_reason = result.reason
+                if not batch_questions:
+                    empty_batch_attempts += 1
+                    continue
+                empty_batch_attempts = 0
+                questions.extend(batch_questions)
+                remaining -= len(batch_questions)
+
+            questions = questions[: request.count]
             if not questions:
                 await context.abort(
                     grpc.StatusCode.INTERNAL,
                     "AI question output invalid after repair",
                 )
                 return AiQuestionGenerateResponse()
+            if len(questions) < request.count:
+                await context.abort(
+                    grpc.StatusCode.INTERNAL,
+                    f"AI question output insufficient: expected {request.count}, got {len(questions)}",
+                )
+                return AiQuestionGenerateResponse()
             return AiQuestionGenerateResponse(
                 questions=questions,
-                router_decision=result.reason,
+                router_decision=final_reason,
             )
         except InternalServiceError as error:
             await abort_internal_error(context, error)

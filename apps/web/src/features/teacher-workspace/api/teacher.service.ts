@@ -40,6 +40,10 @@ const LESSON_PLAN_TIMEOUT_MS = resolveTimeoutMs(
   import.meta.env.VITE_LESSON_PLAN_TIMEOUT_MS,
   120000
 );
+const TEACHER_SUGGESTION_TIMEOUT_MS = resolveTimeoutMs(
+  import.meta.env.VITE_TEACHER_SUGGESTION_TIMEOUT_MS,
+  90000
+);
 
 export async function listKnowledgeDocuments(status?: DocumentStatus): Promise<DocumentVO[]> {
   const response = await apiClient.get<ApiEnvelope<DocumentVO[]>>("/teacher/knowledge/documents", {
@@ -60,7 +64,10 @@ export async function listTeacherStudents(): Promise<TeacherStudentVO[]> {
 
 export async function listInterventionRecommendations(): Promise<InterventionRecommendationVO[]> {
   const response = await apiClient.get<ApiEnvelope<InterventionRecommendationVO[]>>(
-    "/teacher/interventions/recommendations"
+    "/teacher/interventions/recommendations",
+    {
+      timeout: TEACHER_SUGGESTION_TIMEOUT_MS
+    }
   );
   return unwrapResponse(response) || [];
 }

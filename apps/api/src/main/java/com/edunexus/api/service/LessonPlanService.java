@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class LessonPlanService {
 
+    public record PlanGenerationResult(
+            LessonPlan plan, String provider, String model, int latencyMs) {}
+
     private final LessonPlanRepository planRepo;
     private final AiClient aiClient;
     private final VoMapper voMapper;
@@ -29,7 +32,7 @@ public class LessonPlanService {
         this.pdfExportService = pdfExportService;
     }
 
-    public LessonPlan generateAndSave(
+    public PlanGenerationResult generateAndSave(
             UUID teacherId,
             String topic,
             String gradeLevel,
@@ -51,7 +54,11 @@ public class LessonPlanService {
             throw new DependencyException(ErrorCode.AI_OUTPUT_INVALID, "AI 教案内容为空");
         }
         UUID planId = planRepo.create(teacherId, topic, gradeLevel, durationMins, contentMd);
-        return planRepo.findById(planId);
+        return new PlanGenerationResult(
+                planRepo.findById(planId),
+                ApiDataMapper.asString(aiResp.get("provider")),
+                ApiDataMapper.asString(aiResp.get("model")),
+                ApiDataMapper.asInt(aiResp.get("latencyMs")));
     }
 
     public List<LessonPlan> list(UUID teacherId, int page, int size) {

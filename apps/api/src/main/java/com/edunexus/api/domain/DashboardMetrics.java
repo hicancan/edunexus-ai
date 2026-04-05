@@ -1,5 +1,8 @@
 package com.edunexus.api.domain;
 
+import java.util.List;
+import java.util.Map;
+
 public record DashboardMetrics(
         long totalUsers,
         long totalStudents,
@@ -12,4 +15,11 @@ public record DashboardMetrics(
         long totalDocuments,
         long totalKnowledgeChunks,
         long totalLessonPlans,
-        long totalAiQuestionSessions) {}
+        long totalAiQuestionSessions,
+        List<Map<String, Object>> executionDistribution,
+        List<Map<String, Object>> responseBenchmarks,
+        List<Map<String, Object>> strategyComparison,
+        Map<String, Object> governanceSummary,
+        List<Map<String, Object>> interventionOutcomes,
+        List<Map<String, Object>> flowLinkage,
+        List<Map<String, Object>> experimentComparisons) {}

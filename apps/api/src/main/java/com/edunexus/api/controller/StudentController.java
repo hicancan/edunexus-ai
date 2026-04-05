@@ -5,6 +5,7 @@ import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.Difficulty;
 import com.edunexus.api.common.ResourceNotFoundException;
+import com.edunexus.api.service.AnalyticsService;
 import com.edunexus.api.service.AiQuestionService;
 import com.edunexus.api.service.ChatService;
 import com.edunexus.api.service.ExerciseService;
@@ -20,6 +21,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/student")
 public class StudentController implements ControllerSupport {
 
+    private final AnalyticsService analyticsService;
     private final ChatService chatService;
     private final ExerciseService exerciseService;
     private final AiQuestionService aiQuestionService;
@@ -49,11 +52,13 @@ public class StudentController implements ControllerSupport {
     private final VoMapper voMapper;
 
     public StudentController(
+            AnalyticsService analyticsService,
             ChatService chatService,
             ExerciseService exerciseService,
             AiQuestionService aiQuestionService,
             GovernanceService governance,
             VoMapper voMapper) {
+        this.analyticsService = analyticsService;
         this.chatService = chatService;
         this.exerciseService = exerciseService;
         this.aiQuestionService = aiQuestionService;
@@ -133,8 +138,22 @@ public class StudentController implements ControllerSupport {
             return chatService.streamMessage(
                     sessionId, user.userId(), req.message(), trace(request));
         }
-        var data = chatService.sendMessage(sessionId, user.userId(), req.message(), trace(request));
-        return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
+        var result = chatService.sendMessage(sessionId, user.userId(), req.message(), trace(request));
+        Map<String, Object> auditDetail = new LinkedHashMap<>();
+        auditDetail.put("provider", result.provider());
+        auditDetail.put("model", result.model());
+        auditDetail.put("latencyMs", result.latencyMs());
+        auditDetail.put("citationCount", result.citationCount());
+        auditDetail.put("executionLane", executionLaneFromProvider(result.provider()));
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "SEND_CHAT_MESSAGE",
+                "CHAT_SESSION",
+                sessionId.toString(),
+                trace(request),
+                auditDetail);
+        return ResponseEntity.ok(ApiResponse.ok(result.payload(), trace(request)));
     }
 
     // ── Exercise ─────────────────────────────────────────────────────────────
@@ -198,7 +217,20 @@ public class StudentController implements ControllerSupport {
                 "SUBMIT_EXERCISE",
                 "EXERCISE_RECORD",
                 result.recordId().toString(),
-                trace(request));
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        "EDGE",
+                        "totalQuestions",
+                        result.totalQuestions(),
+                        "correctCount",
+                        result.correctCount(),
+                        "wrongCount",
+                        Math.max(0, result.totalQuestions() - result.correctCount()),
+                        "accuracyRate",
+                        percentage(result.correctCount(), result.totalQuestions()),
+                        "timeSpent",
+                        req.timeSpent() == null ? 0 : req.timeSpent()));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -272,6 +304,30 @@ public class StudentController implements ControllerSupport {
 
     // ── Profile ──────────────────────────────────────────────────────────────
 
+    @GetMapping("/profile/analytics")
+    public ResponseEntity<ApiResponse> profileAnalytics(HttpServletRequest request) {
+        requireRole("STUDENT");
+        AuthUser user = currentUser();
+        var data = analyticsService.getStudentAnalytics(user.userId());
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "VIEW_PROFILE_ANALYTICS",
+                "STUDENT_ANALYTICS",
+                user.userId().toString(),
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        "EDGE",
+                        "supportStage",
+                        supportStageLabel(data),
+                        "activeWrongCount",
+                        ApiDataMapper.asInt(data.get("wrongBookCount")),
+                        "recentAccuracy",
+                        ApiDataMapper.asDouble(data.get("recentAccuracy"))));
+        return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
+    }
+
     @GetMapping("/profile/weak-points")
     public ResponseEntity<ApiResponse> profileWeakPoints(HttpServletRequest request) {
         requireRole("STUDENT");
@@ -320,7 +376,20 @@ public class StudentController implements ControllerSupport {
                 "GENERATE_AIQ",
                 "AIQ_SESSION",
                 result.sessionId().toString(),
-                trace(request));
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        executionLaneFromRouterDecision(result.routerDecision()),
+                        "routerDecision",
+                        result.routerDecision() == null ? "" : result.routerDecision(),
+                        "latencyMs",
+                        result.latencyMs(),
+                        "questionCount",
+                        result.questions().size(),
+                        "subject",
+                        req.subject(),
+                        "difficulty",
+                        difficulty));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -382,7 +451,16 @@ public class StudentController implements ControllerSupport {
                 "SUBMIT_AIQ",
                 "AIQ_RECORD",
                 result.recordId().toString(),
-                trace(request));
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        "HYBRID",
+                        "totalQuestions",
+                        result.totalQuestions(),
+                        "correctCount",
+                        result.correctCount(),
+                        "accuracyRate",
+                        percentage(result.correctCount(), result.totalQuestions())));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -410,6 +488,44 @@ public class StudentController implements ControllerSupport {
         } catch (Exception ex) {
             throw new IllegalArgumentException(fieldName + " 必须是合法 UUID");
         }
+    }
+
+    private double percentage(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return 0D;
+        }
+        return Math.round((numerator * 10000D) / denominator) / 100D;
+    }
+
+    private String executionLaneFromProvider(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return "HYBRID";
+        }
+        String normalized = provider.trim().toLowerCase();
+        if ("ollama".equals(normalized)) {
+            return "EDGE";
+        }
+        return "CLOUD";
+    }
+
+    private String executionLaneFromRouterDecision(String routerDecision) {
+        String normalized = routerDecision == null ? "" : routerDecision.toLowerCase();
+        if (normalized.contains("本地") || normalized.contains("ollama")) {
+            return "EDGE";
+        }
+        if (normalized.contains("高推理") || normalized.contains("云")) {
+            return "CLOUD";
+        }
+        return "HYBRID";
+    }
+
+    private String supportStageLabel(Map<String, Object> analytics) {
+        Object stageObject = analytics.get("supportStage");
+        if (!(stageObject instanceof Map<?, ?> stage)) {
+            return "";
+        }
+        Object label = stage.get("label");
+        return label == null ? "" : String.valueOf(label);
     }
 
     // ── Request records ──────────────────────────────────────────────────────

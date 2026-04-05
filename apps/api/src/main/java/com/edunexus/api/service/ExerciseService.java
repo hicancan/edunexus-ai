@@ -28,6 +28,8 @@ public class ExerciseService {
     private final QuestionRepository questionRepo;
     private final WrongBookRepository wrongBookRepo;
     private final SuggestionRepository suggestionRepo;
+    private final RealtimeStudentStateService realtimeStateService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final JdbcTemplate jdbc;
 
     public ExerciseService(
@@ -35,11 +37,15 @@ public class ExerciseService {
             QuestionRepository questionRepo,
             WrongBookRepository wrongBookRepo,
             SuggestionRepository suggestionRepo,
+            RealtimeStudentStateService realtimeStateService,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper,
             JdbcTemplate jdbc) {
         this.exerciseRepo = exerciseRepo;
         this.questionRepo = questionRepo;
         this.wrongBookRepo = wrongBookRepo;
         this.suggestionRepo = suggestionRepo;
+        this.realtimeStateService = realtimeStateService;
+        this.objectMapper = objectMapper;
         this.jdbc = jdbc;
     }
 
@@ -66,6 +72,7 @@ public class ExerciseService {
         int correctCount = 0;
         int totalScore = 0;
         String subject = null;
+        List<String> wrongKnowledgePoints = new ArrayList<>();
         List<Map<String, Object>> items = new ArrayList<>();
 
         for (AnswerItem answerItem : answers) {
@@ -92,7 +99,12 @@ public class ExerciseService {
                     question.analysis(),
                     teacherSuggestion);
 
-            if (!isCorrect) wrongBookRepo.upsert(studentId, answerItem.questionId());
+            if (!isCorrect) {
+                wrongBookRepo.upsert(studentId, answerItem.questionId());
+                wrongKnowledgePoints.addAll(
+                        ApiDataMapper.parseNullableStringList(
+                                question.knowledgePointsJson(), objectMapper));
+            }
 
             items.add(
                     Map.of(
@@ -103,6 +115,11 @@ public class ExerciseService {
                             "score", score));
         }
         exerciseRepo.updateRecord(recordId, subject, correctCount, totalScore);
+        realtimeStateService.recordExerciseSubmission(
+                studentId,
+                answers.size(),
+                Math.max(0, answers.size() - correctCount),
+                wrongKnowledgePoints);
         return new SubmitResult(recordId, answers.size(), correctCount, totalScore, items);
     }
 

@@ -203,6 +203,18 @@ public class VoMapper {
         return out;
     }
 
+    public Map<String, Object> toLessonPlanVo(
+            LessonPlan p, String provider, String model, Integer latencyMs, String executionLane) {
+        Map<String, Object> out = toLessonPlanVo(p);
+        out.put("provider", provider == null || provider.isBlank() ? null : provider);
+        out.put("model", model == null || model.isBlank() ? null : model);
+        out.put("latencyMs", latencyMs);
+        out.put(
+                "executionLane",
+                executionLane == null || executionLane.isBlank() ? null : executionLane);
+        return out;
+    }
+
     public Map<String, Object> toDocumentVo(Document d) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", d.id().toString());
@@ -295,6 +307,13 @@ public class VoMapper {
         out.put("totalVectors", m.totalKnowledgeChunks());
         out.put("totalLessonPlans", m.totalLessonPlans());
         out.put("totalAiQuestionSessions", m.totalAiQuestionSessions());
+        out.put("executionDistribution", m.executionDistribution());
+        out.put("responseBenchmarks", m.responseBenchmarks());
+        out.put("strategyComparison", m.strategyComparison());
+        out.put("governanceSummary", m.governanceSummary());
+        out.put("interventionOutcomes", m.interventionOutcomes());
+        out.put("flowLinkage", m.flowLinkage());
+        out.put("experimentComparisons", m.experimentComparisons());
         return out;
     }
 }

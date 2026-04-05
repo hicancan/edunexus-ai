@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,10 +21,23 @@ public class JwtUtil {
     private final long accessMinutes;
     private final long refreshDays;
 
+    private static final String DEFAULT_SECRET = "change-this-to-a-strong-random-secret";
+
     public JwtUtil(
             @Value("${app.jwt-secret}") String secret,
             @Value("${app.jwt-expires-in:15m}") String access,
-            @Value("${app.refresh-token-expires-in:14d}") String refresh) {
+            @Value("${app.refresh-token-expires-in:14d}") String refresh,
+            Environment env) {
+        String appEnv =
+                env.getProperty("APP_ENV", env.getProperty("app.env", "local"));
+        boolean isLocal = "local".equalsIgnoreCase(appEnv);
+
+        if (!isLocal && (secret.length() < 32 || DEFAULT_SECRET.equals(secret))) {
+            throw new IllegalStateException(
+                    "JWT secret is too weak or still default for non-local environment. "
+                            + "Set a strong random value (>= 32 chars) via JWT_SECRET.");
+        }
+
         String fixed =
                 secret.length() < 32 ? (secret + "-edunexus-secret-padding-for-jwt") : secret;
         this.key = Keys.hmacShaKeyFor(fixed.getBytes(StandardCharsets.UTF_8));

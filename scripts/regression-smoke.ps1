@@ -190,7 +190,8 @@ $bulkSuggestion = Invoke-ApiJson -Method "Post" -Path "/api/v1/teacher/suggestio
   knowledgePoint = $bulkKnowledgePoint
   suggestion     = "建议先复盘概念定义，再完成三组递进训练"
 }
-Assert-True -Condition ($bulkSuggestion.data.createdCount -ge 1) -Message "bulk suggestion did not create any items"
+Assert-True -Condition ($bulkSuggestion.data.affectedCount -ge 1) -Message "bulk suggestion did not affect any students"
+Assert-True -Condition (($bulkSuggestion.data.createdCount + $bulkSuggestion.data.updatedCount) -ge 1) -Message "bulk suggestion neither created nor updated any items"
 $analytics = Invoke-ApiJson -Method "Get" -Path "/api/v1/teacher/students/$studentId/analytics" -Token $teacherToken
 $attribution = Invoke-ApiJson -Method "Get" -Path "/api/v1/teacher/students/$studentId/attribution" -Token $teacherToken
 Assert-True -Condition ($analytics.data.studentId.Length -gt 0) -Message "student analytics missing studentId"

@@ -8,6 +8,7 @@ from ..config import Settings
 from ..errors import InternalServiceError
 from ..llm import LLMService
 from ..prompts import (
+    coerce_lesson_plan_markdown,
     has_valid_plan_structure,
     lesson_plan_prompt,
     lesson_plan_repair_prompt,
@@ -54,10 +55,14 @@ class LessonPlanServicer(LessonPlanServiceServicer):
                 final_result = repaired
                 content = sanitize_lesson_plan_markdown(repaired.text.strip())
                 if not has_valid_plan_structure(content, request.duration_mins):
-                    await context.abort(
-                        grpc.StatusCode.INTERNAL,
-                        "Lesson plan structure is incomplete",
+                    content = coerce_lesson_plan_markdown(
+                        content, request.topic, request.grade_level, request.duration_mins
                     )
+                    if not has_valid_plan_structure(content, request.duration_mins):
+                        await context.abort(
+                            grpc.StatusCode.INTERNAL,
+                            "Lesson plan structure is incomplete",
+                        )
             return LessonPlanGenerateResponse(
                 content_md=content,
                 provider=final_result.provider,

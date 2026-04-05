@@ -38,7 +38,11 @@ def create_app() -> FastAPI:
             kb_service.ensure_collection()
         except InternalServiceError as ex:
             logger.warning("startup dependency warning code=%s message=%s", ex.code, ex.message)
-        logger.info("ai_service startup provider=%s", settings.llm_provider)
+        logger.info(
+            "ai_service startup provider=%s runtime_strategy=%s",
+            settings.llm_provider,
+            settings.runtime_strategy,
+        )
 
         import asyncio
 

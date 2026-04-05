@@ -11,14 +11,13 @@ import {
   NText,
   NAlert,
   NDataTable,
-  NTag,
   NModal,
   NRadioGroup,
   NRadioButton,
   useMessage,
   type DataTableColumns
 } from "naive-ui";
-import { Search, UserPlus, Settings, Save } from "lucide-vue-next";
+import { Search, UserPlus, Save } from "lucide-vue-next";
 import { adminCreateUserSchema } from "../../features/admin/model/admin.schemas";
 import type { Role, UserStatus, UserVO } from "../../services/contracts";
 import { useAdminStore } from "../../features/admin/model/admin";
@@ -216,7 +215,7 @@ const columns: DataTableColumns<UserVO> = [
         {
           value: edit.role,
           size: "small",
-          onUpdateValue: (v: any) => (edit.role = v)
+          onUpdateValue: (v: Role) => (edit.role = v)
         },
         {
           default: () => [
@@ -240,7 +239,7 @@ const columns: DataTableColumns<UserVO> = [
         {
           value: edit.status,
           size: "small",
-          onUpdateValue: (v: any) => (edit.status = v)
+          onUpdateValue: (v: UserStatus) => (edit.status = v)
         },
         {
           default: () => [

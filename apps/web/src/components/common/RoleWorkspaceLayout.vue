@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, ref, onMounted, onUnmounted } from "vue";
 import { useRoute, RouterLink } from "vue-router";
-import { NLayout, NLayoutHeader, NLayoutContent, NMenu, NButton, NSpace, NText } from "naive-ui";
+import { NLayout, NLayoutHeader, NLayoutContent, NMenu, NButton, NText } from "naive-ui";
 import { LogOut, Sparkle } from "lucide-vue-next";
 
 interface NavItem {
@@ -244,6 +244,7 @@ onUnmounted(() => {
   color: var(--color-text-main);
   background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 

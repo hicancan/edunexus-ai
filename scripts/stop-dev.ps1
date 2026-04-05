@@ -4,11 +4,41 @@ param(
   [switch]$ForcePortKill
 )
 
+$ProjectRoot = (Resolve-Path "$PSScriptRoot/..").Path
+
+function Import-DotEnv([string]$Path) {
+  if (-not (Test-Path $Path)) {
+    return
+  }
+
+  foreach ($rawLine in Get-Content $Path) {
+    $line = $rawLine.Trim()
+    if (-not $line -or $line.StartsWith("#")) {
+      continue
+    }
+
+    $idx = $line.IndexOf("=")
+    if ($idx -lt 1) {
+      continue
+    }
+
+    $key = $line.Substring(0, $idx).Trim()
+    $value = $line.Substring($idx + 1)
+    if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+      $value = $value.Substring(1, $value.Length - 2)
+    }
+
+    if (-not [Environment]::GetEnvironmentVariable($key, "Process")) {
+      Set-Item -Path "env:$key" -Value $value
+    }
+  }
+}
+
+Import-DotEnv (Join-Path $ProjectRoot ".env")
+
 $ApiPort = if ($env:APP_PORT) { [int]$env:APP_PORT } else { 8080 }
 $AiPort = if ($env:AI_SERVICE_PORT) { [int]$env:AI_SERVICE_PORT } else { 8000 }
 $WebPort = if ($env:WEB_PORT) { [int]$env:WEB_PORT } else { 5173 }
-
-$ProjectRoot = (Resolve-Path "$PSScriptRoot/..").Path
 
 function Get-ListenerInfo([int]$Port) {
   $listen = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -65,14 +95,52 @@ function Stop-ByPort(
   }
 }
 
+function Stop-ByProcessMarkers(
+  [string]$ServiceName,
+  [string[]]$ExpectedMarkers
+) {
+  $processes = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+    $command = if ($null -eq $_.CommandLine) { "" } else { [string]$_.CommandLine }
+    if ([string]::IsNullOrWhiteSpace($command)) {
+      return $false
+    }
+
+    $matchesAll = $true
+    foreach ($marker in $ExpectedMarkers) {
+      if (-not $command.ToLowerInvariant().Contains($marker.ToLowerInvariant())) {
+        $matchesAll = $false
+        break
+      }
+    }
+    return $matchesAll
+  }
+
+  if (-not $processes) {
+    Write-Host "${ServiceName}: no matching process found"
+    return
+  }
+
+  foreach ($proc in $processes) {
+    try {
+      Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
+      Write-Host "${ServiceName}: stopped $($proc.Name) pid=$($proc.ProcessId) by command-line match"
+    } catch {
+      Write-Warning "${ServiceName}: failed to stop pid=$($proc.ProcessId), error=$($_.Exception.Message)"
+    }
+  }
+}
+
 Write-Host "[1/4] Stop AI service..."
 Stop-ByPort "AI service" $AiPort @("ai_service.app:app", "uvicorn.exe")
+Stop-ByProcessMarkers "AI service" @($ProjectRoot.ToLowerInvariant(), "ai_service.app:app")
 
 Write-Host "[2/4] Stop API service..."
 Stop-ByPort "API service" $ApiPort @("com.edunexus.api.apiapplication", "spring-boot:run")
+Stop-ByProcessMarkers "API service" @($ProjectRoot.ToLowerInvariant(), "spring-boot:run")
 
 Write-Host "[3/4] Stop web service..."
 Stop-ByPort "Web service" $WebPort @("vite", "apps\\web")
+Stop-ByProcessMarkers "Web service" @($ProjectRoot.ToLowerInvariant(), "vite", "apps\\web")
 
 Write-Host "[4/4] Stop infrastructure..."
 if ($KeepInfra) {

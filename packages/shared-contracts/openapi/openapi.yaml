@@ -32,6 +32,7 @@ info:
     | GET /student/ai-questions | PagedData<AiQuestionSessionVO> |
     | POST /student/ai-questions/submit | AiQuestionResultVO |
     | GET /student/ai-questions/{id}/analysis | AiQuestionAnalysisVO |
+    | GET /student/profile/analytics | StudentAnalyticsVO |
     | GET /student/profile/weak-points | WeakPointVO[] |
     | GET /teacher/classrooms | TeacherClassroomVO[] |
     | GET /teacher/students | TeacherStudentVO[] |
@@ -486,6 +487,19 @@ paths:
       responses:
         '200':
           description: 查询成功。data → WeakPointVO 数组
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/profile/analytics:
+    get:
+      tags: [Student-Exercise]
+      summary: 获取学生动态学情画像
+      operationId: getStudentProfileAnalytics
+      responses:
+        '200':
+          description: 查询成功。data → StudentAnalyticsVO
           content:
             application/json:
               schema:
@@ -1607,6 +1621,18 @@ components:
         updatedAt:
           type: string
           format: date-time
+        provider:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        latencyMs:
+          type: integer
+          nullable: true
+        executionLane:
+          type: string
+          nullable: true
 
     ShareResultVO:
       type: object
@@ -1631,7 +1657,7 @@ components:
           type: string
         totalExercises:
           type: integer
-          description: 总做题次数
+          description: 总练习次数（含课堂练习与 AI 再练）
         totalQuestions:
           type: integer
           description: 总题目数
@@ -1645,6 +1671,60 @@ components:
         wrongBookCount:
           type: integer
           description: 当前错题本题数
+        masteredWrongCount:
+          type: integer
+          description: 已完成闭环的错题数
+        recentAccuracy:
+          type: number
+          format: float
+          description: 最近一次练习正确率（0-100）
+        rollingAccuracy:
+          type: number
+          format: float
+          description: 滚动正确率（0-100）
+        aiCompletionRate:
+          type: number
+          format: float
+          description: AI 练习完成率（0-100）
+        recentChatMessageCount:
+          type: integer
+          description: 近 7 天课堂提问次数
+        recentAiQuestionCount:
+          type: integer
+          description: 近 7 天 AI 个性化练习触发次数
+        recentExerciseCount:
+          type: integer
+          description: 近 7 天练习次数
+        activeDays7d:
+          type: integer
+          description: 近 7 天活跃学习日数量
+        latestActivityAt:
+          type: string
+          format: date-time
+          nullable: true
+        teacherSuggestionCount:
+          type: integer
+          description: 已形成的教师干预建议数
+        interactionProfile:
+          type: string
+          description: 当前主要互动模式
+        behaviorSignals:
+          type: array
+          description: 行为序列归纳出的可读信号
+          items:
+            type: string
+        recommendedActions:
+          type: array
+          description: 面向学生或教师的下一步建议
+          items:
+            type: string
+        supportStage:
+          $ref: '#/components/schemas/StudentSupportStageVO'
+        recentPerformance:
+          type: array
+          description: 最近 6 次练习 / AI 再练表现轨迹
+          items:
+            $ref: '#/components/schemas/StudentPerformancePointVO'
         topWeakPoints:
           type: array
           description: 高频错题知识点
@@ -1655,6 +1735,94 @@ components:
                 type: string
               wrongCount:
                 type: integer
+              errorRate:
+                type: number
+                format: float
+        realtimeState:
+          $ref: '#/components/schemas/StudentRealtimeStateVO'
+
+    StudentSupportStageVO:
+      type: object
+      description: 学习支持阶段
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        tone:
+          type: string
+          enum: [danger, warning, success]
+        supportZone:
+          type: string
+
+    StudentPerformancePointVO:
+      type: object
+      description: 近期练习表现点
+      properties:
+        recordId:
+          type: string
+          format: uuid
+        totalQuestions:
+          type: integer
+        correctCount:
+          type: integer
+        totalScore:
+          type: integer
+        accuracyRate:
+          type: number
+          format: float
+        createdAt:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [EXERCISE, AI_PRACTICE]
+
+    StudentRealtimeHotspotVO:
+      type: object
+      description: 近时态课堂热点知识点
+      properties:
+        knowledgePoint:
+          type: string
+        eventCount:
+          type: integer
+
+    StudentRealtimeStateVO:
+      type: object
+      description: 基于 Redis 聚合的近 10 分钟课堂态画像
+      properties:
+        dataState:
+          type: string
+          enum: [LIVE, NO_ACTIVITY, UNAVAILABLE]
+        windowMinutes:
+          type: integer
+        recentChatQuestions:
+          type: integer
+          nullable: true
+        recentExerciseSubmissions:
+          type: integer
+          nullable: true
+        recentAiInteractions:
+          type: integer
+          nullable: true
+        recentWrongCount:
+          type: integer
+          nullable: true
+        recentQuestionAttempts:
+          type: integer
+          nullable: true
+        recentErrorDensity:
+          type: number
+          format: float
+          nullable: true
+        hotspotKnowledgePoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentRealtimeHotspotVO'
+        signals:
+          type: array
+          items:
+            type: string
 
     InterventionRecommendationVO:
       type: object
@@ -1668,6 +1836,29 @@ components:
           type: integer
         suggestionTemplate:
           type: string
+        generationSource:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        latencyMs:
+          type: integer
+        routerDecision:
+          type: string
+        dispatchedStudentCount:
+          type: integer
+          description: 当前知识点已在后端登记建议的学生数量
+        dispatchedCoverageRate:
+          type: number
+          format: double
+          nullable: true
+        fullyDispatched:
+          type: boolean
+        lastDispatchedAt:
+          type: string
+          format: date-time
+          nullable: true
 
     StudentAttributionExampleVO:
       type: object
@@ -1732,7 +1923,11 @@ components:
       properties:
         knowledgePoint:
           type: string
+        affectedCount:
+          type: integer
         createdCount:
+          type: integer
+        updatedCount:
           type: integer
         studentIds:
           type: array
@@ -1798,6 +1993,242 @@ components:
           type: integer
         totalAiQuestionSessions:
           type: integer
+        executionDistribution:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardExecutionMetricVO'
+        responseBenchmarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardResponseMetricVO'
+        strategyComparison:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardStrategyComparisonVO'
+        governanceSummary:
+          $ref: '#/components/schemas/DashboardGovernanceSummaryVO'
+        interventionOutcomes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardOutcomeMetricVO'
+        flowLinkage:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardFlowMetricVO'
+        experimentComparisons:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardExperimentMetricVO'
+
+    DashboardExecutionMetricVO:
+      type: object
+      description: 云边端执行分布
+      properties:
+        lane:
+          type: string
+          enum: [EDGE, CLOUD, HYBRID, HUMAN_IN_LOOP]
+        label:
+          type: string
+        taskCount:
+          type: integer
+        share:
+          type: number
+          format: double
+        sampleCount:
+          type: integer
+        dataState:
+          type: string
+          enum: [MEASURED, NO_SAMPLES]
+        description:
+          type: string
+
+    DashboardResponseMetricVO:
+      type: object
+      description: 关键场景响应统计
+      properties:
+        scene:
+          type: string
+        avgLatencyMs:
+          type: number
+          format: double
+          nullable: true
+        p95LatencyMs:
+          type: number
+          format: double
+          nullable: true
+        sampleCount:
+          type: integer
+        source:
+          type: string
+        dataState:
+          type: string
+          enum: [MEASURED, NO_SAMPLES]
+
+    DashboardStrategyComparisonVO:
+      type: object
+      description: 部署策略效果对比（含测算说明）
+      properties:
+        strategy:
+          type: string
+        avgLatencyMs:
+          type: number
+          format: double
+          nullable: true
+        completionRate:
+          type: number
+          format: double
+          nullable: true
+        privacyRetentionRate:
+          type: number
+          format: double
+          nullable: true
+        unitCostIndex:
+          type: number
+          format: double
+          nullable: true
+        sampleCount:
+          type: integer
+        basis:
+          type: string
+        dataState:
+          type: string
+          enum: [MEASURED, NO_SAMPLES]
+
+    DashboardGovernanceSummaryVO:
+      type: object
+      description: 治理与教师在环摘要
+      properties:
+        traceCoverageRate:
+          type: number
+          format: double
+          nullable: true
+        teacherAdoptionRate:
+          type: number
+          format: double
+          nullable: true
+        localRetentionRate:
+          type: number
+          format: double
+          nullable: true
+        sensitiveOutboundRate:
+          type: number
+          format: double
+          nullable: true
+        retrievalHitRate:
+          type: number
+          format: double
+          nullable: true
+        suggestionExecutionRate:
+          type: number
+          format: double
+          nullable: true
+        auditedActions:
+          type: integer
+        traceCoverageSamples:
+          type: integer
+        suggestionDispatchCount:
+          type: integer
+        teacherAdoptionSamples:
+          type: integer
+        teacherAdoptedCount:
+          type: integer
+        readyDocuments:
+          type: integer
+        activeRiskStudents:
+          type: integer
+        studentChatTurnCount:
+          type: integer
+        diagnosisInteractionCount:
+          type: integer
+        completionCompletedUnits:
+          type: integer
+        completionUnitSamples:
+          type: integer
+        retentionTaskSamples:
+          type: integer
+        retrievalHitSamples:
+          type: integer
+        retrievalHitCount:
+          type: integer
+        suggestionExecutionSamples:
+          type: integer
+        suggestionExecutedCount:
+          type: integer
+
+    DashboardOutcomeMetricVO:
+      type: object
+      description: 干预闭环结果指标
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+          format: double
+          nullable: true
+        target:
+          type: number
+          format: double
+        unit:
+          type: string
+        insight:
+          type: string
+        dataState:
+          type: string
+          enum: [MEASURED, NO_SAMPLES]
+
+    DashboardFlowMetricVO:
+      type: object
+      description: 教学支持全流程联动效果
+      properties:
+        stage:
+          type: string
+          enum: [PRE_CLASS, IN_CLASS, PRACTICE, TEACHER_LOOP, POST_CLASS]
+        label:
+          type: string
+        count:
+          type: integer
+        rate:
+          type: number
+          format: double
+          nullable: true
+        insight:
+          type: string
+        dataState:
+          type: string
+          enum: [MEASURED, NO_SAMPLES]
+
+    DashboardExperimentMetricVO:
+      type: object
+      description: 实验指标对比结果
+      properties:
+        category:
+          type: string
+        metric:
+          type: string
+        baselineValue:
+          type: number
+          format: double
+          nullable: true
+        currentValue:
+          type: number
+          format: double
+          nullable: true
+        unit:
+          type: string
+        betterDirection:
+          type: string
+          enum: [higher, lower]
+        delta:
+          type: number
+          format: double
+          nullable: true
+        evidence:
+          type: string
+        sampleCount:
+          type: integer
+        dataState:
+          type: string
+          enum: [MEASURED, NO_SAMPLES]
 
     AdminResourceVO:
       type: object

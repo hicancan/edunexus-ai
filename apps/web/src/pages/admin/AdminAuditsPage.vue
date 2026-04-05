@@ -15,6 +15,20 @@ import { useAdminStore } from "../../features/admin/model/admin";
 
 const adminStore = useAdminStore();
 
+interface AuditRow {
+  action?: string;
+  actorId?: string | null;
+  actorRole?: string | null;
+  resourceType?: string | null;
+  resourceId?: string | null;
+  createdAt?: string | null;
+  detail?: {
+    executionLane?: string;
+    latencyMs?: number;
+    traceId?: string;
+  } | null;
+}
+
 const filters = reactive({
   page: 1,
   size: 20
@@ -67,7 +81,7 @@ function getActionColor(action: string): "default" | "error" | "info" | "success
   return "default";
 }
 
-const columns: DataTableColumns<any> = [
+const columns: DataTableColumns<AuditRow> = [
   {
     title: "操作类型",
     key: "action",
@@ -77,7 +91,7 @@ const columns: DataTableColumns<any> = [
         h(Activity, { size: 14, style: "color: #94a3b8" }),
         h(
           NTag,
-          { type: getActionColor(row.action), size: "small", bordered: false },
+          { type: getActionColor(row.action || ""), size: "small", bordered: false },
           { default: () => row.action || "UNKNOWN" }
         )
       ]);
@@ -127,6 +141,41 @@ const columns: DataTableColumns<any> = [
     width: 180,
     render(row) {
       return h(NText, { depth: 3 }, { default: () => row.createdAt });
+    }
+  },
+  {
+    title: "链路详情",
+    key: "detail",
+    minWidth: 220,
+    render(row) {
+      const detail = (row.detail || {}) as {
+        executionLane?: string;
+        latencyMs?: number;
+        traceId?: string;
+      };
+      return h(NSpace, { vertical: true, size: 4 }, () => [
+        detail.executionLane
+          ? h(
+              NTag,
+              { size: "small", bordered: false, type: "info" },
+              { default: () => detail.executionLane }
+            )
+          : null,
+        detail.latencyMs
+          ? h(
+              NText,
+              { depth: 3, style: "font-size: 12px;" },
+              { default: () => `时延 ${detail.latencyMs} ms` }
+            )
+          : null,
+        detail.traceId
+          ? h(
+              NText,
+              { depth: 3, code: true, style: "font-size: 11px;" },
+              { default: () => detail.traceId }
+            )
+          : null
+      ]);
     }
   }
 ];

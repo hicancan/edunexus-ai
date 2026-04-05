@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted, reactive, ref, watch } from "vue";
+import { h, onMounted, reactive, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   NCard,
@@ -17,7 +17,7 @@ import {
   useMessage,
   type DataTableColumns
 } from "naive-ui";
-import { Search, Check, RefreshCw } from "lucide-vue-next";
+import { Search, Check } from "lucide-vue-next";
 import { readQueryInt, readQueryString, replaceQuery } from "../../app/providers/query-state";
 import { useExerciseStore } from "../../features/student/model/exercise";
 import type { WrongBookEntryVO } from "../../services/contracts";
@@ -144,7 +144,7 @@ function confirmMarkMastered(questionId: string): void {
           size: filters.size
         });
         message.success("已成功移出当前错题本");
-      } catch (e) {
+      } catch {
         message.error("操作失败");
       }
     }

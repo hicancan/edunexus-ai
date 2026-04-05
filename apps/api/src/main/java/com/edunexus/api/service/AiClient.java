@@ -22,6 +22,10 @@ import com.edunexus.api.grpc.ai.v1.LessonPlanGenerateRequest;
 import com.edunexus.api.grpc.ai.v1.LessonPlanGenerateResponse;
 import com.edunexus.api.grpc.ai.v1.LessonPlanServiceGrpc;
 import com.edunexus.api.grpc.ai.v1.RagChatServiceGrpc;
+import com.edunexus.api.grpc.ai.v1.TeachingSuggestionCandidate;
+import com.edunexus.api.grpc.ai.v1.TeachingSuggestionGenerateRequest;
+import com.edunexus.api.grpc.ai.v1.TeachingSuggestionGenerateResponse;
+import com.edunexus.api.grpc.ai.v1.TeachingSuggestionServiceGrpc;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -37,7 +41,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +61,8 @@ public class AiClient {
     private final RagChatServiceGrpc.RagChatServiceBlockingStub chatStub;
     private final ExerciseAnalysisServiceGrpc.ExerciseAnalysisServiceBlockingStub analysisStub;
     private final AiQuestionServiceGrpc.AiQuestionServiceBlockingStub aiQuestionStub;
+    private final TeachingSuggestionServiceGrpc.TeachingSuggestionServiceBlockingStub
+            teachingSuggestionStub;
     private final LessonPlanServiceGrpc.LessonPlanServiceBlockingStub lessonPlanStub;
     private final KnowledgeBaseServiceGrpc.KnowledgeBaseServiceBlockingStub kbStub;
 
@@ -82,6 +88,7 @@ public class AiClient {
         this.chatStub = RagChatServiceGrpc.newBlockingStub(grpcChannel);
         this.analysisStub = ExerciseAnalysisServiceGrpc.newBlockingStub(grpcChannel);
         this.aiQuestionStub = AiQuestionServiceGrpc.newBlockingStub(grpcChannel);
+        this.teachingSuggestionStub = TeachingSuggestionServiceGrpc.newBlockingStub(grpcChannel);
         this.lessonPlanStub = LessonPlanServiceGrpc.newBlockingStub(grpcChannel);
         this.kbStub = KnowledgeBaseServiceGrpc.newBlockingStub(grpcChannel);
     }
@@ -219,6 +226,7 @@ public class AiClient {
 
     public Map<String, Object> generateQuestions(Map<String, Object> body) {
         String traceId = getString(body, "traceId", UUID.randomUUID().toString());
+        long startMs = System.currentTimeMillis();
         try {
             AiQuestionGenerateRequest.Builder reqBuilder =
                     AiQuestionGenerateRequest.newBuilder()
@@ -246,6 +254,7 @@ public class AiClient {
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("routerDecision", response.getRouterDecision());
+            result.put("latencyMs", (System.currentTimeMillis() - startMs));
 
             List<Map<String, Object>> questions = new ArrayList<>();
             for (GeneratedQuestion question : response.getQuestionsList()) {
@@ -292,6 +301,60 @@ public class AiClient {
             return result;
         } catch (StatusRuntimeException ex) {
             throw fromGrpcError("generatePlan", ex);
+        }
+    }
+
+    public Map<String, Object> generateTeacherSuggestions(Map<String, Object> body) {
+        String traceId = getString(body, "traceId", UUID.randomUUID().toString());
+        try {
+            TeachingSuggestionGenerateRequest.Builder reqBuilder =
+                    TeachingSuggestionGenerateRequest.newBuilder()
+                            .setTraceId(traceId)
+                            .setIdempotencyKey(getString(body, "idempotencyKey", ""))
+                            .setTeacherId(getString(body, "teacherId", ""));
+
+            if (body.get("candidates") instanceof List<?> rawCandidates) {
+                for (Object rawCandidate : rawCandidates) {
+                    if (!(rawCandidate instanceof Map<?, ?> candidate)) {
+                        continue;
+                    }
+                    String knowledgePoint = getString(candidate, "knowledgePoint", "").trim();
+                    if (knowledgePoint.isBlank()) {
+                        continue;
+                    }
+                    reqBuilder.addCandidates(
+                            TeachingSuggestionCandidate.newBuilder()
+                                    .setKnowledgePoint(knowledgePoint)
+                                    .setStudentCount(getInt(candidate, "studentCount", 0))
+                                    .setTotalWrongCount(getInt(candidate, "totalWrongCount", 0))
+                                    .build());
+                }
+            }
+
+            TeachingSuggestionGenerateResponse response =
+                    authorize(teachingSuggestionStub, traceId, "")
+                            .withDeadlineAfter(aiQuestionTimeoutSeconds, TimeUnit.SECONDS)
+                            .generate(reqBuilder.build());
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put(
+                    "suggestions",
+                    response.getSuggestionsList().stream()
+                            .map(
+                                    item ->
+                                            Map.of(
+                                                    "knowledgePoint",
+                                                    item.getKnowledgePoint(),
+                                                    "suggestionTemplate",
+                                                    item.getSuggestionTemplate()))
+                            .toList());
+            result.put("provider", response.getProvider());
+            result.put("model", response.getModel());
+            result.put("latencyMs", response.getLatencyMs());
+            result.put("routerDecision", response.getRouterDecision());
+            return result;
+        } catch (StatusRuntimeException ex) {
+            throw fromGrpcError("generateTeacherSuggestions", ex);
         }
     }
 
@@ -437,5 +500,23 @@ public class AiClient {
             return defaultVal;
         }
         return String.valueOf(val);
+    }
+
+    private int getInt(Map<?, ?> map, String key, int defaultVal) {
+        if (map == null) {
+            return defaultVal;
+        }
+        Object val = map.get(key);
+        if (val instanceof Number number) {
+            return number.intValue();
+        }
+        if (val == null) {
+            return defaultVal;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(val));
+        } catch (NumberFormatException ex) {
+            return defaultVal;
+        }
     }
 }

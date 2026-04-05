@@ -142,6 +142,31 @@ class LessonPlanRequest(BaseModel):
     )
 
 
+class TeachingSuggestionCandidate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    knowledge_point: str = Field(
+        validation_alias=AliasChoices("knowledgePoint", "knowledge_point")
+    )
+    student_count: int = Field(
+        default=0, ge=0, validation_alias=AliasChoices("studentCount", "student_count")
+    )
+    total_wrong_count: int = Field(
+        default=0, ge=0, validation_alias=AliasChoices("totalWrongCount", "total_wrong_count")
+    )
+
+
+class TeachingSuggestionRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    trace_id: str | None = Field(default=None, validation_alias=AliasChoices("traceId", "trace_id"))
+    scene: str = "teacher_suggestion"
+    teacher_id: str | None = Field(
+        default=None, validation_alias=AliasChoices("teacherId", "teacher_id")
+    )
+    candidates: list[TeachingSuggestionCandidate] = Field(default_factory=list)
+
+
 class KbIngestRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
@@ -322,6 +347,25 @@ class AIQuestionItem(BaseModel):
         if value not in options:
             raise ValueError("correct_answer must exist in options")
         return value
+
+
+class TeachingSuggestionItem(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    knowledge_point: str = Field(
+        validation_alias=AliasChoices("knowledge_point", "knowledgePoint")
+    )
+    suggestion_template: str = Field(
+        validation_alias=AliasChoices("suggestion_template", "suggestionTemplate")
+    )
+
+    @field_validator("knowledge_point", "suggestion_template", mode="before")
+    @classmethod
+    def _required_suggestion_text(cls, value: Any) -> str:
+        cleaned = _clean_text(value)
+        if not cleaned:
+            raise ValueError("suggestion field cannot be empty")
+        return cleaned
 
 
 class WrongAnalyzeResponse(BaseModel):

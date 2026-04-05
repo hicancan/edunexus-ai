@@ -20,9 +20,17 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Service
 public class ChatService {
 
+    public record SendMessageResult(
+            Map<String, Object> payload,
+            String provider,
+            String model,
+            int latencyMs,
+            int citationCount) {}
+
     private final ChatRepository chatRepo;
     private final AiClient aiClient;
     private final GovernanceService governance;
+    private final RealtimeStudentStateService realtimeStateService;
     private final VoMapper voMapper;
     private final ObjectMapper objectMapper;
     private final TaskExecutor chatStreamExecutor;
@@ -31,12 +39,14 @@ public class ChatService {
             ChatRepository chatRepo,
             AiClient aiClient,
             GovernanceService governance,
+            RealtimeStudentStateService realtimeStateService,
             VoMapper voMapper,
             ObjectMapper objectMapper,
             @org.springframework.beans.factory.annotation.Qualifier("chatStreamExecutor") TaskExecutor chatStreamExecutor) {
         this.chatRepo = chatRepo;
         this.aiClient = aiClient;
         this.governance = governance;
+        this.realtimeStateService = realtimeStateService;
         this.voMapper = voMapper;
         this.objectMapper = objectMapper;
         this.chatStreamExecutor = chatStreamExecutor;
@@ -79,7 +89,7 @@ public class ChatService {
         return session;
     }
 
-    public Map<String, Object> sendMessage(
+    public SendMessageResult sendMessage(
             UUID sessionId, UUID studentId, String message, String traceId) {
         UUID userMessageId = chatRepo.createUserMessage(sessionId, message);
         Map<String, Object> chatBody = buildChatBody(sessionId, studentId, message, traceId, false);
@@ -92,7 +102,15 @@ public class ChatService {
         List<Map<String, Object>> citations =
                 ApiDataMapper.parseObjectList(aiResult.get("citations"), objectMapper);
         int tokenUsage = parseTokenUsage(aiResult.get("tokenUsage"));
-        return persistAssistantReply(sessionId, userMessageId, answer, citations, tokenUsage);
+        Map<String, Object> payload =
+                persistAssistantReply(sessionId, userMessageId, answer, citations, tokenUsage);
+        realtimeStateService.recordChatQuestion(studentId);
+        return new SendMessageResult(
+                payload,
+                ApiDataMapper.asString(aiResult.get("provider")),
+                ApiDataMapper.asString(aiResult.get("model")),
+                ApiDataMapper.asInt(aiResult.get("latencyMs")),
+                citations.size());
     }
 
     public SseEmitter streamMessage(
@@ -139,6 +157,7 @@ public class ChatService {
                         Map<String, Object> data =
                                 persistAssistantReply(
                                         sessionId, userMessageId, answer, citations, 0);
+                        realtimeStateService.recordChatQuestion(studentId);
                         sendSseEvent(
                                 emitter, Map.of("done", true, "data", data, "traceId", traceId));
                         sendSseEvent(emitter, "[DONE]");

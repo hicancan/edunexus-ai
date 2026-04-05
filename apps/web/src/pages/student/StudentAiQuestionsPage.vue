@@ -17,7 +17,6 @@ import {
   NRadioGroup,
   NRadio,
   NTag,
-  NDivider,
   NInputNumber,
   NDataTable,
   useMessage,
@@ -29,7 +28,6 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
-  Search,
   FileText,
   Eye
 } from "lucide-vue-next";
@@ -254,7 +252,7 @@ function getDifficultyType(diff: string): "success" | "warning" | "error" | "def
   return "default";
 }
 
-const historyColumns: DataTableColumns<any> = [
+const historyColumns: DataTableColumns<Record<string, unknown>> = [
   {
     title: "学科",
     key: "subject",
@@ -314,7 +312,7 @@ const historyColumns: DataTableColumns<any> = [
     align: "center",
     width: 100,
     render(row) {
-      const recordId = row.recordId;
+      const recordId = row.recordId as string | undefined;
       if (!row.completed || !recordId) {
         return h(NText, { depth: 3 }, { default: () => "--" });
       }

@@ -17,7 +17,7 @@ import {
   useMessage,
   type DataTableColumns
 } from "naive-ui";
-import { Search, Eye, CheckCircle, AlertCircle } from "lucide-vue-next";
+import { Search, Eye } from "lucide-vue-next";
 import { readQueryInt, readQueryString, replaceQuery } from "../../app/providers/query-state";
 import { useExerciseStore } from "../../features/student/model/exercise";
 import type { ExerciseRecordVO } from "../../services/contracts";
@@ -25,7 +25,7 @@ import type { ExerciseRecordVO } from "../../services/contracts";
 const route = useRoute();
 const router = useRouter();
 const exerciseStore = useExerciseStore();
-const message = useMessage();
+const _message = useMessage();
 
 const filters = reactive({
   dateRange: null as [number, number] | null,

@@ -23,6 +23,7 @@ import {
   type ExerciseSubmitRequest,
   type PagedResult,
   type QuestionVO,
+  type StudentAnalyticsVO,
   type WeakPointVO,
   type WrongBookEntryVO,
   type WrongStatus,
@@ -339,4 +340,11 @@ export async function listAiQuestionHistory(
 export async function listProfileWeakPoints(): Promise<WeakPointVO[]> {
   const response = await apiClient.get<ApiEnvelope<WeakPointVO[]>>("/student/profile/weak-points");
   return unwrapResponse(response) || [];
+}
+
+export async function getProfileAnalytics(): Promise<StudentAnalyticsVO> {
+  const response = await apiClient.get<ApiEnvelope<StudentAnalyticsVO>>(
+    "/student/profile/analytics"
+  );
+  return unwrapResponse(response);
 }

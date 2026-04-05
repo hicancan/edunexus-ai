@@ -9,6 +9,9 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://${POSTGRES_HOST:127.0.0.1}:${POSTGRES_PORT:5432}/${POSTGRES_DB:edunexus}}
     username: ${POSTGRES_USER:postgres}
     password: ${POSTGRES_PASSWORD:postgres}
+  data:
+    redis:
+      url: ${REDIS_URL:redis://127.0.0.1:6379/0}
   threads:
     virtual:
       enabled: true
@@ -23,17 +26,18 @@ management:
         include: health,info
 
 app:
+  runtime-strategy: ${APP_RUNTIME_STRATEGY:云边端协同}
   jwt-secret: ${JWT_SECRET:change-this-to-a-strong-random-secret}
   jwt-expires-in: ${JWT_EXPIRES_IN:15m}
   refresh-token-expires-in: ${REFRESH_TOKEN_EXPIRES_IN:14d}
   ai-service-grpc-host: ${AI_SERVICE_GRPC_HOST:127.0.0.1}
   ai-service-grpc-port: ${AI_SERVICE_GRPC_PORT:50051}
   ai-service-token: ${AI_SERVICE_TOKEN:change-this-in-local-too}
-  ai-question-timeout-seconds: ${AI_QUESTION_TIMEOUT_SECONDS:150}
+  ai-question-timeout-seconds: ${AI_QUESTION_TIMEOUT_SECONDS:180}
   lesson-plan-timeout-seconds: ${LESSON_PLAN_TIMEOUT_SECONDS:90}
   kb-ingest-timeout-seconds: ${KB_INGEST_TIMEOUT_SECONDS:180}
   kb-delete-timeout-seconds: ${KB_DELETE_TIMEOUT_SECONDS:60}
-  cors-allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://127.0.0.1:5173,http://localhost:5173,http://*:5173}
+  cors-allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://127.0.0.1:*,http://localhost:*}
   s3:
     endpoint: ${S3_ENDPOINT:http://127.0.0.1:9000}
     region: ${S3_REGION:us-east-1}

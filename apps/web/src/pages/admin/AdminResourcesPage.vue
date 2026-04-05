@@ -109,7 +109,7 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
   DOCUMENT: "文档"
 };
 
-function getResourceIcon(type: string): any {
+function getResourceIcon(type: string): typeof FileText {
   if (type === "LESSON_PLAN") return BookOpen;
   if (type === "QUESTION") return Database;
   if (type === "DOCUMENT") return FileText;
@@ -123,7 +123,15 @@ function getResourceTagType(type: string): "info" | "success" | "warning" | "err
   return "default";
 }
 
-const columns: DataTableColumns<any> = [
+interface ResourceRow {
+  title?: string;
+  resourceId?: string;
+  resourceType?: string;
+  creatorUsername?: string;
+  createdAt?: string;
+}
+
+const columns: DataTableColumns<ResourceRow> = [
   {
     title: "资源名称",
     key: "title",
@@ -155,7 +163,7 @@ const columns: DataTableColumns<any> = [
       return h(
         NTag,
         { type: getResourceTagType(row.resourceType || ""), bordered: false, size: "small" },
-        { default: () => RESOURCE_TYPE_LABELS[row.resourceType] || row.resourceType }
+        { default: () => RESOURCE_TYPE_LABELS[row.resourceType || ""] || row.resourceType }
       );
     }
   },

@@ -1,4 +1,4 @@
-# EduNexus AI
+# EduNexus-AI：面向课堂即时诊断与个性化干预的智能辅学系统
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](https://github.com/hicancan/edunexus-ai)
 [![Frontend](https://img.shields.io/badge/Frontend-Vue%203.5%20%7C%20Vite%206-42b883)](https://github.com/hicancan/edunexus-ai)
@@ -7,19 +7,21 @@
 [![Python](https://img.shields.io/badge/Python-3.12-yellow)](https://www.python.org/downloads/release/python-3120/)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue)](./LICENSE)
 
-EduNexus AI 是一个面向学生、教师、管理员三类角色的一体化教育工作台。它将**智能问答、练习判卷、AI 出题、知识库维护、教案生成、学情分析、教师干预建议、资源治理和审计追踪**整合入统一平台，完整覆盖“学习 -> 教学 -> 管理”全链路。
+EduNexus-AI 是一套以**“课堂即时诊断与个性化干预”**为核心问题构建的实战级云边端协同智能辅学系统。它的设计理念从最初的“大模型试题生成”全面跃升为**面向学习支持的形成性评价数字中枢**。系统以服务学生认知建构、问题暴露、学习调节与教师干预为导向，全面覆盖教与学的微观过程。
 
-## 项目目标与角色闭环
+## 🎓 核心教育与系统理念
 
-- **👨‍🎓 学生侧闭环**：围绕知识检索、练习、错题、AI 个性化出题和个人数字画像形成学习闭环。
-- **👩‍🏫 教师侧闭环**：围绕文档入库、智能化结构教案生成、学情洞察和针对性干预建议下发形成教学支持闭环。
-- **🛡️ 管理侧闭环**：围绕账号治理、系统资源治理、流式指标看板和系统审计日志形成平台运维闭环。
+本作品彻底摒弃了单纯向学生投喂资源的粗放推荐模型，转而引入了三大成熟的教育工程与规制思想：
+
+- **Teacher-in-the-Loop（教师主导的干预机制）**：AI 只做高频分析与诊断建议下发的前置，最核心的教学路线规划与直接干预建议必须经过主责教师确认。
+- **时间敏感的动态画像**：告别刻板的“高分/差生”静态属性标签，依托系统构建出对课堂内最后 10 分钟状态灵敏的“序列化学习特征”，抓住纠偏的最佳窗口期。
+- **教育场景下数据分治的“云边端协同”**：强敏感度的个人识别与短交互拦截驻留在边端（Spring Boot + Redis）；而教案撰写、跨用户共度错因大模型归因则上浮至大模型核心层。
 
 ---
 
-## 核心架构设计
+## 🏗️ 全局系统架构与依赖感知任务图 (DG-EduSched)
 
-本项目采用**前后端分离 + 领域驱动设计 (DDD/简化版) + AI 微服务架构**，确保各职责模块的高内聚与低耦合。
+为化解云侧大模型时延无法适配课堂极速诊断以及合规性隐私的痛点，系统底层设计了独创的带约束图调度引擎，其工作流流转严格按照隔离职责划定。
 
 ```mermaid
 graph TB
@@ -30,242 +32,135 @@ graph TB
     classDef db fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c
     classDef external fill:#eceff1,stroke:#607d8b,stroke-width:2px,color:#263238
 
-    subgraph client_tier [🌐 用户终端层]
-        Client["💻 Web 客户端<br/>(Vue 3 SPA)"]:::client
+    subgraph client_tier [🌐 统一教学工作台与端侧]
+        Client["Web 交互层<br/>(Vue 3.5 / Naive UI)"]:::client
     end
 
-    subgraph business_tier [⚙️ 核心系统与业务流转层]
-        API["☕ Spring Boot 核心 API<br/>(Java 21 / Virtual Threads)"]:::api
+    subgraph business_tier [⚙️ 核心业务与控制面 (近端/边侧主导)]
+        API["Spring Boot 环境中枢<br/>(Java 21 Virtual Threads)"]:::api
     end
 
-    subgraph ai_tier [🧠 AI 模型调度与 RAG 计算层]
-        AI["🐍 FastAPI 智能微服务<br/>(Python 3.12 / uv)"]:::ai
+    subgraph ai_tier [🧠 RAG 与诊断推理层 (远/边缘混合)]
+        AI["FastAPI 教育智能微服务<br/>(Python 3.12 / Qdrant)"]:::ai
     end
 
-    subgraph infrastructure_tier [💾 基础设施与持久化层]
-        PG[("🐘 PostgreSQL 17<br/>(关系型业务数据 / 审计记录)")]:::db
-        Redis[("⚡ Redis 7.2<br/>(高频缓存 / 分布式锁 / 会话)")]:::db
-        MinIO[("🪣 MinIO<br/>(文件对象物理落盘 / 兼容S3)")]:::db
-        Qdrant[("🔍 Qdrant 1.17<br/>(高维向量特征集 / 倒排索引)")]:::db
+    subgraph infrastructure_tier [💾 泛在持久化层]
+        PG[("PostgreSQL 17<br/>主业务 / 审计库")]:::db
+        Redis[("Redis 7.2<br/>课堂短态时序聚集")]:::db
+        MinIO[("MinIO<br/>教材讲义源物料存管")]:::db
+        Qdrant[("Qdrant 1.17<br/>课件 RAG 高维向量引擎")]:::db
     end
 
-    subgraph llm_tier [🤖 外部大模型算力池]
-        LLM["主流 LLM API 矩阵<br/>(Ollama / Deepseek / OpenAI)"]:::external
+    subgraph llm_tier [🤖 大模型算力与分析引擎]
+        LLM["DeepSeek / 泛用型基座模型"]:::external
     end
 
-    %% 分层通信链路与协议说明
-    Client -- "HTTP/REST<br/>(JWT 鉴权无状态请求)" --> API
-
-    API -- "JDBC<br/>(HikariCP 连接池)" --> PG
-    API -- "Lettuce/RESP<br/>(异步 K-V 读写)" --> Redis
-    API -- "MinIO SDK / S3<br/>(文档流读写预签名)" --> MinIO
-
-    API -- "gRPC / Protobuf<br/>(微服务 RPC 通信 / 传输文档二进制流)" --> AI
-
-    AI -- "Qdrant Client<br/>(向量存取 / KNN 快速近似检索)" --> Qdrant
-    AI -- "HTTP API<br/>(大模型 Prompt 构建与 SSE 流式响应)" --> LLM
+    Client -- "身份与诊断交互" --> API
+    API -- "业务落地与审计" --> PG
+    API -- "状态驻留与缓存" --> Redis
+    API -- "物理文件上载" --> MinIO
+    API -- "生成式协同子任务" --> AI
+    AI -- "教育资源特征抽取" --> Qdrant
+    AI -- "复杂因果归纳 (DG-EduSched)" --> LLM
 ```
 
 ---
 
-## 技术栈与基础设施
+## 🎨 场景化截图矩阵 (Playwright 自动化生成)
 
-该项目坚持使用前沿且稳定的技术栈构建：
+### 学生侧闭环体验
 
-### 🎨 前端架构 (`apps/web`)
+学生可以直接进行基于教学范围的互动问答、自动根据个人短板重构的分层练习以及深度剖析做题错误本质的错题本等。
 
-- 核心框架：**Vue 3.5** + **Composition API**
-- 语言基座：**TypeScript 5**
-- 构建工具：**Vite 6**
-- 状态管理：**Pinia**
-- UI 组件库：**Naive UI** (定制化 Glassmorphism 毛玻璃主题)
-- 数据可视化：**ECharts** + **Vue-ECharts**
-- 工程化规范：**ESLint 9 (Flat Config)** + **Prettier** + **Vitest**
+|                智能问答与学案辅导                |                    学生自适应答题大厅                    |
+| :----------------------------------------------: | :------------------------------------------------------: |
+| ![学生问答](doc/picture/readme/student-chat.png) | ![自动出题](doc/picture/readme/student-ai-questions.png) |
 
-### ☕ 核心后端 (`apps/api`)
+|               短板诊断画像与进度面板                |                收敛于原因的系统错题本                |
+| :-------------------------------------------------: | :--------------------------------------------------: |
+| ![学情画像](doc/picture/readme/student-profile.png) | ![错题本](doc/picture/readme/student-wrong-book.png) |
 
-- 核心框架：**Spring Boot 3.4** + **Java 21** (利用 Virtual Threads)
-- 安全认证：**Spring Security** + **JWT** 鉴权体系
-- 数据持久化：**Spring Data JDBC** (避开臃肿的 JPA)
-- 数据库版本控释：**Flyway**
-- 接口契约：**OpenAPI / SpringDoc** (契约驱动，生成 TS 类型)
-- 微服务通信：**gRPC + Protobuf** 协议
-- 工程化规范：**Maven** + **Spotless (Google Java Format)**
+### 教师侧与教务闭环
 
-### 🧠 智能服务 (`apps/ai-service`)
+教师可在后台对自有教学主材执行 RAG 的语义知识剥离进库配置。通过即时查看全班错误聚合趋势，直接确认下发建议并一键智能生成配套教案。
 
-- 核心架构：**FastAPI** + **Python 3.12**
-- AI/RAG 集成：
-  - 本地优先大语言模型路由（支持 Ollama / Deepseek / OpenAI / Gemini 动态切换）
-  - Qdrant 官方客户端进行高维向量检索
-  - 智能文件解析提取 (pypdf, python-docx)
-- 依赖管理：**uv** (极速 Python 包与环境管理)
-- 工程化规范：**Ruff** (超快 Linter & Formatter), **Pytest**
+|                各类格式文档与讲义入库                 |              班级薄弱项预警与状态宏观               |
+| :---------------------------------------------------: | :-------------------------------------------------: |
+| ![资料接入](doc/picture/readme/teacher-knowledge.png) | ![分析仪](doc/picture/readme/teacher-analytics.png) |
 
-### 🐳 本地基础设施调度 (`docker-compose.yml`)
+|                  AI 辅助教案导出                  |                教务干预与建议人工确认流                 |
+| :-----------------------------------------------: | :-----------------------------------------------------: |
+| ![教案配置](doc/picture/readme/teacher-plans.png) | ![预警干预](doc/picture/readme/teacher-suggestions.png) |
 
-- 数据库：**PostgreSQL 17**
-- 缓存/消息：**Redis 7.2**
-- 向量库：**Qdrant 1.17**
-- 对象存储：**MinIO (兼容 S3)**
+### 高级业务治理与审计追踪
+
+面向 IT 管理员提供全景式平台时延监控矩阵和系统数据调用审计体系，这对于合规和落地不可或缺。
+
+|               V3.8版响应与协同控制可视化                |            合规资源流转与访问追踪底座            |
+| :-----------------------------------------------------: | :----------------------------------------------: |
+| ![资源监控面板](doc/picture/readme/admin-dashboard.png) | ![合规审查](doc/picture/readme/admin-audits.png) |
 
 ---
 
-## 页面总览与功能拓扑
+## 🛠 开发环境搭建与 Quick Start
 
-当前前端路由共设有 **18** 个功能页面，权限彼此严格隔离：
+### 1. 宿主机全量依赖
 
-### 🚪 公共入口页
+- **Node.js** >= 20
+- **JDK** >= 21
+- **Python** = 3.12 且安装 `uv` 以及 `grpcio-tools`
+- **Docker & Docker Compose** （用于一键拉起 PG / Redis / MinIO / Qdrant）
 
-- `/login`：统一认证入口，支持根据角色登录后自动路由。
-  - ![用户登录](doc/picture/readme/login.png)
-- `/register`：包含用户名、邮箱、角色的综合注册面板。
-  - ![用户注册](doc/picture/readme/register.png)
-- `/403` / `/404`：标准权限拦截与路由丢失兜底。
-  - ![403 无权限](doc/picture/readme/forbidden.png)
-  - ![404 未找到](doc/picture/readme/not-found.png)
+### 2. 构建与运行流程
 
-### 🎓 学生工作区
-
-- **代码路由**：`/student/*`
-- **核心页面**：
-  1. `智能问答 (/chat)`：支持上下文对话，通过 RAG 技术连接班级知识库。
-     - ![智能问答](doc/picture/readme/student-chat.png)
-  2. `练习大厅 (/exercise)`：支持多学科难度组合，进行无缝单/多选/简答作答。
-     - ![练习大厅](doc/picture/readme/student-exercise.png)
-  3. `做题记录 (/records)`：历史轨迹回溯与云端解析回顾。
-     - ![做题记录](doc/picture/readme/student-records.png)
-  4. `错题本 (/wrong-book)`：错题薄强化，支持“标记掌握”闭环操作。
-     - ![错题本](doc/picture/readme/student-wrong-book.png)
-  5. `AI 个性化出题 (/ai-questions)`：基于知识盲区主动调用大模型产出新题。
-     - ![AI 个性化出题](doc/picture/readme/student-ai-questions.png)
-  6. `学情画像 (/profile)`：数据雷达图呈现。
-     - ![学情画像](doc/picture/readme/student-profile.png)
-
-### 📋 教师工作区
-
-- **代码路由**：`/teacher/*`
-- **核心页面**：
-  1. `知识库管理 (/knowledge)`：核心 RAG 数据源输入口，支持多格式解析与切片管理。
-     - ![知识库管理](doc/picture/readme/teacher-knowledge.png)
-  2. `教案管理 (/plans)`：引导大模型依据教育大纲产出结构化授课教案。
-     - ![教案管理](doc/picture/readme/teacher-plans.png)
-  3. `全盘学情分析 (/analytics)`：从班级宏观维度分析学生的错题率与易错知识点。
-     - ![全盘学情分析](doc/picture/readme/teacher-analytics.png)
-  4. `干预建议与下发 (/suggestions)`：结合大模型的建议流自动分配给学生主页。
-     - ![干预建议与下发](doc/picture/readme/teacher-suggestions.png)
-
-### ⚙️ 管理员操作台
-
-- **代码路由**：`/admin/*`
-- **核心页面**：
-  1. `用户管理 (/users)`：平台角色的审查与封禁解封。
-     - ![用户管理](doc/picture/readme/admin-users.png)
-  2. `资源审计 (/resources)`：追踪 MinIO 底层的真实物理存储分布与利用率。
-     - ![资源审计](doc/picture/readme/admin-resources.png)
-  3. `流式数据看板 (/dashboard)`：实时掌控系统的调用规模、吞吐及 API 开销。
-     - ![流式数据看板](doc/picture/readme/admin-dashboard.png)
-  4. `合规审计日志 (/audits)`：溯源敏感操作，落实系统合规性。
-     - ![合规审计日志](doc/picture/readme/admin-audits.png)
-
----
-
-## 代码风格与持续集成 (CI) 统一规范
-
-本项目秉承 **"Best Practices & Top-tier Design"** 理念，建立了一套强制的自动化代码校验流程，保障所有语言风格高度对齐。
-
-### 1. 规约与工具矩阵
-
-| 模块          | 校验工具                | 核心规则描述                                                                                                                   |
-| ------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Web 前端**  | `ESLint 9` + `Prettier` | 遵循 Vue 3 Recommended，剔除未使用变量 (`no-unused-vars` 阻塞或警告)，严格 100 字符行宽限定。                                  |
-| **API 服务**  | `Spotless`              | 强制使用 **Google Java Format** 标准风格，自动移除死导入，严格 LF 换行。                                                       |
-| **AI 微服务** | `Ruff`                  | 远超基础 PEP8。开启了 `S` (安全)、`PT` (Pytest 语法)、`SIM` (代码简化规则) 等深度检查，拒绝任何魔法硬编码 (Hardcoded Tokens)。 |
-| **基础文件**  | `.editorconfig`         | 在 IDE 层面强制保障所有端 2/4 空格进位以及无尾随空格现象。                                                                     |
-
-### 2. 本地快速校验命令
-
-我们在根目录 `/scripts` 提供了全栈格式化流水线钩子：
-
-**一键格式化全栈代码 (Format All)**
+_说明：本项目核心启动脚本针对 Windows (PowerShell) 环境专门深度融合构建。_
 
 ```powershell
-pwsh -NoProfile -File .\scripts\format-all.ps1
+# 1. 准备环境变量与关键配置
+cp .env.example .env
+
+# 2. 安装全部前端与 Python 相关依赖，并生成 Prisma 类的通信 Protobuf / OpenAPI Types
+./scripts/run-dev.ps1 -InstallDeps
+
+# 3. 直接通过容器拉起底层 4 大件 (Redis/PG/MinIO/Qdrant) 并全量启动所有的 Web 与后端微服务
+./scripts/run-dev.ps1 -StartUp -Wait
 ```
 
-**一键审查全栈代码合规性 (Check Only)**
+_默认访问地址:_
 
-```powershell
-pwsh -NoProfile -File .\scripts\format-check.ps1
-```
-
-### 3. GitHub Actions CI 拦截网
-
-我们为项目部署了严苛的 CI 屏障 (`.github/workflows/ci.yml`)，拦截不合规的 Pull Request：
-
-- **格式与静态扫描层**：`web-lint`, `api-format`, `ai-format`，外加 `gitleaks` (全库密钥泄露扫描)。
-- **编译与类型校验层**：Vue 的 `web-typecheck` + Java 的单元测试编译。
-- **服务测试用例层**：前端 Vitest (`web-test`) + Python Pytest (`ai-test`) 无缝结合。
+- 🖥️ 前端平台： `http://localhost:4174` (默认提供测试三角色内置快速填充账户)
+- ⚙️ API Swagger：`http://localhost:8080/swagger-ui.html`
+- 🧠 AI 服务热调试：`http://localhost:8000/docs`
 
 ---
 
-## 快速运行与环境部署
+## 🚀 进阶与格式化指令 (工程规制)
 
-### 1. 前置依赖项
+EduNexus 所有代码严守商业落地软件级别的格式化标尺，前端依赖 ESlint (Flat Config) + Prettier 联动，后端通过 Spotless 对齐 Google 格式纲要。
+在推送与编译前，您可以使用下述自动化质量检测链路：
 
-> 在开始前，请核对您的开发环境。
-
-- **Docker Desktop** (用于拉起存储及数据库)
-- **Java 21 JDK**
-- **Node.js 20+** (LTS)
-- **Python 3.12+**
-- **uv** (推荐 `pip install uv` 安装)
-- **Maven 3.9+**
-
-### 2. 点火启动
-
-1. 初始化环境变量 (首次部署必要步骤)
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-2. 运行一键联调编排脚本
-   ```powershell
-   .\scripts\run-dev.ps1
-   ```
-   _(该脚本将自动验证 Docker 并行拉起 Postgres/Redis/MinIO/Qdrant，并于终端启动 SpringBoot 和 Web 端)_
-
-### 3. 本地全链路冒烟测试
-
-为确保各跨端微服务 (Vue -> SpringBoot -> gRPC -> Python) 的连通性，可执行回归脚本：
-
-```powershell
-pwsh -NoProfile -File .\scripts\regression-smoke.ps1
+```bash
+# 进入前端执行核心校验与构建
+cd apps/web
+npm run lint:fix        # 执行修复型静态分析代码规范
+npm run format          # 从配置文件强校验并覆盖缩进规则
+npm run typecheck       # Typescript 全量底层类型推导检查
+npm run build           # 打包发布版，检验工程稳定性
 ```
 
 ---
 
-## 默认账号及端口指南
+## 📌 项目里程碑与 V3.8 版本变更纪要
 
-### 端口字典
+本次系统自 V3.8 版本起正式成为全形态交付作品。在这个迭代中：
 
-| 服务名称                          | 默认端口映射            |
-| --------------------------------- | ----------------------- |
-| **Frontend Web** (Vite Server)    | `http://127.0.0.1:5173` |
-| **Spring Boot API** (Core System) | `http://127.0.0.1:8080` |
-| **Python AI Service** (FastAPI)   | `http://127.0.0.1:8000` |
-| **MinIO Console** (对象存储面板)  | `http://127.0.0.1:9001` |
+- 将**ECharts 图表排版自适应重叠重构**完成工业级收尾。
+- 脱离死板的自动化机制，建立 `Teacher-In-The-Loop` 功能干预断点。
+- 前后端对接了带 `/api/v1` 的稳定网关，重构鉴权与 Token 下发。
+- E2E 功能完全由外部多角色并发 Playwright-cli 系统级驱动执行快照审计通过。
 
-### 快捷测试账户
+> 最终声明：项目核心交互入口、逻辑引擎、调度链路全为原生手写；大模型接入（DeepSeek，可切换 Ollama）仅在此架构下承担复杂归纳任务，整个架构体系不受单一模型锁定限制。
 
-| 扮演角色      | 登录名      | 密码       |
-| ------------- | ----------- | ---------- |
-| 🛡️ 平台管理员 | `admin`     | `12345678` |
-| 👨‍🏫 高级教师   | `teacher01` | `12345678` |
-| 🎓 在读学生   | `student01` | `12345678` |
+## 📄 授权与许可
 
----
-
-## 许可协议 (License)
-
-本项目代码受到 **GNU Affero General Public License v3.0 (AGPL-3.0)** 的全面保护与开源许可。任何对于系统代码的修改部署和公网分发都必须遵从 AGPL-3.0 条例强制开源同等代码。
-详情参阅仓库内的 [LICENSE](./LICENSE) 源文件。
+该项目遵循 **AGPL v3** 开源协议，所有学术交流、私有化教学改革实施等行为均被许可，详见 LICENSE。

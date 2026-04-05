@@ -138,7 +138,43 @@ message AiQuestionGenerateResponse {
 }
 
 // ----------------------------------------
-// 4. 教案生成服务 (Lesson Plan Generator)
+// 4. 教师干预建议草案生成服务 (Teaching Suggestion Generator)
+// ----------------------------------------
+service TeachingSuggestionService {
+  rpc Generate (TeachingSuggestionGenerateRequest) returns (TeachingSuggestionGenerateResponse);
+}
+
+message TeachingSuggestionCandidate {
+  string knowledge_point = 1;
+  int32 student_count = 2;
+  int32 total_wrong_count = 3;
+}
+
+message GeneratedTeachingSuggestion {
+  string knowledge_point = 1;
+  string suggestion_template = 2;
+}
+
+message TeachingSuggestionGenerateRequest {
+  string trace_id = 1;
+  string idempotency_key = 2;
+  string teacher_id = 3;
+  repeated TeachingSuggestionCandidate candidates = 4;
+}
+
+message TeachingSuggestionGenerateResponse {
+  repeated GeneratedTeachingSuggestion suggestions = 1;
+  string provider = 2;
+  string model = 3;
+  int32 latency_ms = 4;
+  string router_decision = 5;
+
+  string error_code = 6;
+  string error_message = 7;
+}
+
+// ----------------------------------------
+// 5. 教案生成服务 (Lesson Plan Generator)
 // ----------------------------------------
 service LessonPlanService {
   rpc Generate (LessonPlanGenerateRequest) returns (LessonPlanGenerateResponse);
@@ -164,7 +200,7 @@ message LessonPlanGenerateResponse {
 }
 
 // ----------------------------------------
-// 5. 知识库服务 (Knowledge Base)
+// 6. 知识库服务 (Knowledge Base)
 // ----------------------------------------
 service KnowledgeBaseService {
   rpc Ingest (KbIngestRequest) returns (KbIngestResponse);

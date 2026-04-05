@@ -29,6 +29,7 @@ public class AiQuestionService {
     private final QuestionRepository questionRepo;
     private final WrongBookRepository wrongBookRepo;
     private final SuggestionRepository suggestionRepo;
+    private final RealtimeStudentStateService realtimeStateService;
     private final AiClient aiClient;
     private final VoMapper voMapper;
     private final ObjectMapper objectMapper;
@@ -39,6 +40,7 @@ public class AiQuestionService {
             QuestionRepository questionRepo,
             WrongBookRepository wrongBookRepo,
             SuggestionRepository suggestionRepo,
+            RealtimeStudentStateService realtimeStateService,
             AiClient aiClient,
             VoMapper voMapper,
             ObjectMapper objectMapper,
@@ -47,13 +49,15 @@ public class AiQuestionService {
         this.questionRepo = questionRepo;
         this.wrongBookRepo = wrongBookRepo;
         this.suggestionRepo = suggestionRepo;
+        this.realtimeStateService = realtimeStateService;
         this.aiClient = aiClient;
         this.voMapper = voMapper;
         this.objectMapper = objectMapper;
         this.jdbc = jdbc;
     }
 
-    public record GenerateResult(UUID sessionId, List<Map<String, Object>> questions) {}
+    public record GenerateResult(
+            UUID sessionId, List<Map<String, Object>> questions, String routerDecision, int latencyMs) {}
 
     public GenerateResult generateQuestions(
             UUID studentId,
@@ -104,6 +108,8 @@ public class AiQuestionService {
         aiBody.put("idempotencyKey", idempotencyKey == null ? "" : idempotencyKey);
 
         Map<String, Object> aiResult = aiClient.generateQuestions(aiBody);
+        String routerDecision = ApiDataMapper.asString(aiResult.get("routerDecision"));
+        int latencyMs = ApiDataMapper.asInt(aiResult.get("latencyMs"));
         List<Map<String, Object>> generated =
                 ApiDataMapper.parseObjectList(aiResult.get("questions"), objectMapper);
         if (generated.isEmpty()) {
@@ -142,7 +148,8 @@ public class AiQuestionService {
             throw new DependencyException(ErrorCode.AI_OUTPUT_INVALID, "AI 未生成有效题目");
         }
         aiqRepo.updateSessionQuestionCount(sessionId, questionVos.size());
-        return new GenerateResult(sessionId, questionVos);
+        realtimeStateService.recordAiQuestionGeneration(studentId);
+        return new GenerateResult(sessionId, questionVos, routerDecision, latencyMs);
     }
 
     public List<AiQuestionSession> listSessions(
@@ -176,6 +183,7 @@ public class AiQuestionService {
         UUID recordId = aiqRepo.createRecord(sessionId, studentId, answers.size());
         int correctCount = 0;
         int totalScore = 0;
+        List<String> wrongKnowledgePoints = new ArrayList<>();
         List<Map<String, Object>> items = new ArrayList<>();
 
         for (AnswerItem answerItem : answers) {
@@ -197,6 +205,13 @@ public class AiQuestionService {
                     isCorrect,
                     score);
 
+            if (!isCorrect) {
+                wrongBookRepo.upsert(studentId, answerItem.questionId());
+                wrongKnowledgePoints.addAll(
+                        ApiDataMapper.parseNullableStringList(
+                                question.knowledgePointsJson(), objectMapper));
+            }
+
             items.add(
                     Map.of(
                             "questionId", answerItem.questionId().toString(),
@@ -214,6 +229,11 @@ public class AiQuestionService {
                                 .setScale(2, RoundingMode.HALF_UP)
                                 .doubleValue();
         aiqRepo.completeSession(sessionId, rate, totalScore);
+        realtimeStateService.recordAiQuestionSubmission(
+                studentId,
+                answers.size(),
+                Math.max(0, answers.size() - correctCount),
+                wrongKnowledgePoints);
         return new SubmitResult(
                 recordId, sessionId, answers.size(), correctCount, totalScore, items);
     }

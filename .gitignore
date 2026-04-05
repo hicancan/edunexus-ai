@@ -12,13 +12,15 @@ Thumbs.db
 *.tmp
 *.bak
 
+# Logs (all levels)
+*.log
+
 # Java
 apps/api/target/
 apps/api/data/
 apps/api/.classpath
 apps/api/.project
 apps/api/.settings/
-*.log
 
 # Python
 __pycache__/
@@ -42,3 +44,11 @@ apps/web/.vite/
 .idea/
 .vscode/
 *.iml
+
+# Temp / debug files
+tmp-*
+.tmp/
+project_structure.txt
+
+# Other
+doc/papers/

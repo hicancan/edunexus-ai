@@ -12,6 +12,14 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class SuggestionService {
+    public record SaveResult(TeacherSuggestion suggestion, boolean created) {}
+
+    public record BulkResult(
+            String knowledgePoint,
+            int affectedCount,
+            int createdCount,
+            int updatedCount,
+            List<String> studentIds) {}
 
     private final SuggestionRepository suggestionRepo;
     private final TeacherStudentRepository teacherStudentRepo;
@@ -32,13 +40,21 @@ public class SuggestionService {
             UUID questionId,
             String knowledgePoint,
             String suggestion) {
-        teacherStudentRepo.ensureLinked(teacherId, studentId);
-        UUID id =
-                suggestionRepo.create(teacherId, studentId, questionId, knowledgePoint, suggestion);
-        return suggestionRepo.findById(id);
+        return save(teacherId, studentId, questionId, knowledgePoint, suggestion).suggestion();
     }
 
-    public record BulkResult(String knowledgePoint, int createdCount, List<String> studentIds) {}
+    public SaveResult save(
+            UUID teacherId,
+            UUID studentId,
+            UUID questionId,
+            String knowledgePoint,
+            String suggestion) {
+        teacherStudentRepo.ensureLinked(teacherId, studentId);
+        var result =
+                suggestionRepo.saveOrUpdate(
+                        teacherId, studentId, questionId, knowledgePoint, suggestion);
+        return new SaveResult(result.suggestion(), result.created());
+    }
 
     public BulkResult createBulk(UUID teacherId, String knowledgePoint, String suggestion) {
         List<Map<String, Object>> students =
@@ -61,11 +77,19 @@ public class SuggestionService {
         }
 
         List<String> studentIds = new ArrayList<>();
+        int createdCount = 0;
+        int updatedCount = 0;
         for (Map<String, Object> row : students) {
             UUID studentId = (UUID) row.get("student_id");
             studentIds.add(studentId.toString());
-            suggestionRepo.create(teacherId, studentId, null, knowledgePoint, suggestion);
+            var result = save(teacherId, studentId, null, knowledgePoint, suggestion);
+            if (result.created()) {
+                createdCount++;
+            } else {
+                updatedCount++;
+            }
         }
-        return new BulkResult(knowledgePoint, studentIds.size(), studentIds);
+        return new BulkResult(
+                knowledgePoint, studentIds.size(), createdCount, updatedCount, studentIds);
     }
 }

@@ -10,6 +10,7 @@ from .ai_service_pb2_grpc import (
     add_KnowledgeBaseServiceServicer_to_server,
     add_LessonPlanServiceServicer_to_server,
     add_RagChatServiceServicer_to_server,
+    add_TeachingSuggestionServiceServicer_to_server,
 )
 from .config import Settings
 from .idempotency import IdempotencyStore
@@ -21,6 +22,7 @@ from .servicers import (
     KnowledgeBaseServicer,
     LessonPlanServicer,
     RagChatServicer,
+    TeachingSuggestionServicer,
 )
 from .worker import AsyncWorker
 
@@ -49,6 +51,10 @@ async def serve_grpc(
     )
     add_AiQuestionServiceServicer_to_server(
         AiQuestionServicer(llm_service, settings),
+        server,
+    )
+    add_TeachingSuggestionServiceServicer_to_server(
+        TeachingSuggestionServicer(llm_service, settings),
         server,
     )
     add_KnowledgeBaseServiceServicer_to_server(

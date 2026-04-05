@@ -16,6 +16,10 @@ interface AnalyticsState {
   analyticsLoading: boolean;
   analyticsError: string;
 
+  classroomAnalytics: StudentAnalyticsVO[];
+  classroomLoading: boolean;
+  classroomError: string;
+
   attributionByStudent: Record<string, StudentAttributionVO>;
   attributionLoading: boolean;
   attributionError: string;
@@ -32,6 +36,10 @@ export const useAnalyticsStore = defineStore("teacher-analytics", {
     analytics: null,
     analyticsLoading: false,
     analyticsError: "",
+
+    classroomAnalytics: [],
+    classroomLoading: false,
+    classroomError: "",
 
     attributionByStudent: {},
     attributionLoading: false,
@@ -54,6 +62,25 @@ export const useAnalyticsStore = defineStore("teacher-analytics", {
         this.analyticsError = toErrorMessage(error, "加载学情分析失败");
       } finally {
         this.analyticsLoading = false;
+      }
+    },
+
+    async loadClassroomAnalytics(studentIds: string[]): Promise<void> {
+      this.classroomLoading = true;
+      this.classroomError = "";
+      try {
+        if (studentIds.length === 0) {
+          this.classroomAnalytics = [];
+          return;
+        }
+        const snapshots = await Promise.all(
+          studentIds.map((studentId) => getStudentAnalytics(studentId))
+        );
+        this.classroomAnalytics = snapshots;
+      } catch (error) {
+        this.classroomError = toErrorMessage(error, "加载班级学情失败");
+      } finally {
+        this.classroomLoading = false;
       }
     },
 

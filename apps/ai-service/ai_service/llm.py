@@ -17,6 +17,8 @@ SCENE_TIMEOUT_SECONDS: dict[str, float] = {
     "chat_rag": 25.0,
     "wrong_analysis": 30.0,
     "ai_question": 120.0,
+    "ai_question_large": 180.0,
+    "teacher_suggestion": 60.0,
     "lesson_plan": 60.0,
 }
 
@@ -24,6 +26,8 @@ SCENE_RETRY_DELAY_SECONDS: dict[str, float] = {
     "chat_rag": 0.5,
     "wrong_analysis": 0.8,
     "ai_question": 1.0,
+    "ai_question_large": 1.2,
+    "teacher_suggestion": 1.0,
     "lesson_plan": 1.2,
 }
 
@@ -31,6 +35,8 @@ SCENE_PROVIDER_TIMEOUT_CAP_SECONDS: dict[str, float] = {
     "chat_rag": 12.0,
     "wrong_analysis": 18.0,
     "ai_question": 40.0,
+    "ai_question_large": 75.0,
+    "teacher_suggestion": 24.0,
     "lesson_plan": 28.0,
 }
 
@@ -63,6 +69,10 @@ class LLMService:
             return self.settings.wrong_analysis_timeout_seconds
         if scene == "ai_question":
             return self.settings.ai_question_timeout_seconds
+        if scene == "ai_question_large":
+            return self.settings.ai_question_timeout_seconds
+        if scene == "teacher_suggestion":
+            return min(self.settings.ai_question_timeout_seconds, 60.0)
         if scene == "lesson_plan":
             return self.settings.lesson_plan_timeout_seconds
         return SCENE_TIMEOUT_SECONDS.get(scene, 45.0)

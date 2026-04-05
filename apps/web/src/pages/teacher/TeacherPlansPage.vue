@@ -38,6 +38,12 @@ const editor = reactive({
 });
 
 const showEditorModal = ref(false);
+const latestGeneratedMeta = ref<{
+  provider?: string | null;
+  model?: string | null;
+  latencyMs?: number | null;
+  executionLane?: string | null;
+} | null>(null);
 
 const exportOptions = [
   { label: "Markdown (.md)", key: "md" },
@@ -79,6 +85,13 @@ async function createPlan(): Promise<void> {
 
   const created = await teacherStore.createPlan(parsed.data);
   if (!created) return;
+
+  latestGeneratedMeta.value = {
+    provider: created.provider,
+    model: created.model,
+    latencyMs: created.latencyMs,
+    executionLane: created.executionLane
+  };
 
   editor.planId = created.id || "";
   editor.topic = created.topic || "";
@@ -212,6 +225,19 @@ onMounted(loadPlans);
       <n-alert v-if="teacherStore.operationError" type="error" :show-icon="true">{{
         teacherStore.operationError
       }}</n-alert>
+      <n-alert
+        v-if="latestGeneratedMeta?.provider || latestGeneratedMeta?.model"
+        type="info"
+        :show-icon="true"
+      >
+        本次生成链路：
+        {{ latestGeneratedMeta.executionLane || "UNKNOWN" }} /
+        {{ latestGeneratedMeta.provider || "unknown-provider" }} /
+        {{ latestGeneratedMeta.model || "unknown-model" }}
+        <span v-if="latestGeneratedMeta.latencyMs"
+          >，耗时 {{ latestGeneratedMeta.latencyMs }} ms</span
+        >
+      </n-alert>
       <n-alert v-if="latestShareText" type="success" :show-icon="true">
         分享链接：<a :href="latestShareText" target="_blank" rel="noopener noreferrer">{{
           latestShareText

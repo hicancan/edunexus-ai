@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -87,24 +88,82 @@ public class TeacherController implements ControllerSupport {
     public ResponseEntity<ApiResponse> studentAnalytics(
             @PathVariable("studentId") UUID studentId, HttpServletRequest request) {
         requireRole("TEACHER");
-        analyticsService.ensureStudentLinked(currentUser().userId(), studentId);
-        return ResponseEntity.ok(
-                ApiResponse.ok(analyticsService.getStudentAnalytics(studentId), trace(request)));
+        AuthUser user = currentUser();
+        analyticsService.ensureStudentLinked(user.userId(), studentId);
+        var data = analyticsService.getStudentAnalytics(studentId);
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "VIEW_STUDENT_ANALYTICS",
+                "STUDENT_ANALYTICS",
+                studentId.toString(),
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        "HUMAN_IN_LOOP",
+                        "supportStage",
+                        supportStageLabel(data),
+                        "activeWrongCount",
+                        ApiDataMapper.asInt(data.get("wrongBookCount")),
+                        "interactionProfile",
+                        ApiDataMapper.asString(data.get("interactionProfile"))));
+        return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
     @GetMapping("/students/{studentId}/attribution")
     public ResponseEntity<ApiResponse> studentAttribution(
             @PathVariable("studentId") UUID studentId, HttpServletRequest request) {
         requireRole("TEACHER");
-        analyticsService.ensureStudentLinked(currentUser().userId(), studentId);
-        return ResponseEntity.ok(
-                ApiResponse.ok(analyticsService.getStudentAttribution(studentId), trace(request)));
+        AuthUser user = currentUser();
+        analyticsService.ensureStudentLinked(user.userId(), studentId);
+        var data = analyticsService.getStudentAttribution(studentId);
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "VIEW_STUDENT_ATTRIBUTION",
+                "STUDENT_ATTRIBUTION",
+                studentId.toString(),
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        "HUMAN_IN_LOOP",
+                        "knowledgePoint",
+                        ApiDataMapper.asString(data.get("knowledgePoint")),
+                        "impactCount",
+                        ApiDataMapper.asInt(data.get("impactCount"))));
+        return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
     @GetMapping("/interventions/recommendations")
     public ResponseEntity<ApiResponse> interventionRecommendations(HttpServletRequest request) {
         requireRole("TEACHER");
-        var data = analyticsService.getInterventionRecommendations(currentUser().userId());
+        AuthUser user = currentUser();
+        var data = analyticsService.getInterventionRecommendations(user.userId());
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "VIEW_INTERVENTION_RECOMMENDATIONS",
+                "TEACHER_SUGGESTION",
+                "classroom",
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        data.isEmpty()
+                                ? "HUMAN_IN_LOOP"
+                                : executionLaneFromProvider(
+                                        ApiDataMapper.asString(data.getFirst().get("provider"))),
+                        "recommendationCount",
+                        data.size(),
+                        "provider",
+                        data.isEmpty() ? "" : ApiDataMapper.asString(data.getFirst().get("provider")),
+                        "model",
+                        data.isEmpty() ? "" : ApiDataMapper.asString(data.getFirst().get("model")),
+                        "latencyMs",
+                        data.isEmpty() ? 0 : ApiDataMapper.asInt(data.getFirst().get("latencyMs")),
+                        "routerDecision",
+                        data.isEmpty()
+                                ? ""
+                                : ApiDataMapper.asString(data.getFirst().get("routerDecision"))));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -124,20 +183,33 @@ public class TeacherController implements ControllerSupport {
                 (req.questionId() != null && !req.questionId().isBlank())
                         ? UUID.fromString(req.questionId())
                         : null;
-        var suggestion =
-                suggestionService.create(
+        var saveResult =
+                suggestionService.save(
                         user.userId(),
                         studentId,
                         questionId,
                         req.knowledgePoint(),
                         req.suggestion());
+        var suggestion = saveResult.suggestion();
+        Map<String, Object> auditDetail = new LinkedHashMap<>();
+        auditDetail.put("executionLane", "HUMAN_IN_LOOP");
+        auditDetail.put("studentId", req.studentId());
+        if (req.questionId() != null && !req.questionId().isBlank()) {
+            auditDetail.put("questionId", req.questionId());
+        }
+        if (req.knowledgePoint() != null && !req.knowledgePoint().isBlank()) {
+            auditDetail.put("knowledgePoint", req.knowledgePoint());
+        }
+        auditDetail.put("suggestionLength", req.suggestion().length());
+        auditDetail.put("created", saveResult.created());
         governance.audit(
                 user.userId(),
                 user.role(),
-                "CREATE_SUGGESTION",
+                saveResult.created() ? "CREATE_SUGGESTION" : "UPDATE_SUGGESTION",
                 "TEACHER_SUGGESTION",
                 suggestion.id().toString(),
-                trace(request));
+                trace(request),
+                auditDetail);
         return ResponseEntity.ok(
                 ApiResponse.ok(voMapper.toTeacherSuggestionVo(suggestion), trace(request)));
     }
@@ -157,14 +229,31 @@ public class TeacherController implements ControllerSupport {
                 "BULK_CREATE_SUGGESTION",
                 "TEACHER_SUGGESTION",
                 req.knowledgePoint(),
-                trace(request));
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        "HUMAN_IN_LOOP",
+                        "knowledgePoint",
+                        result.knowledgePoint(),
+                        "affectedCount",
+                        result.affectedCount(),
+                        "createdCount",
+                        result.createdCount(),
+                        "updatedCount",
+                        result.updatedCount(),
+                        "targetStudentCount",
+                        result.studentIds().size()));
         return ResponseEntity.ok(
                 ApiResponse.ok(
                         Map.of(
                                 "knowledgePoint",
                                 result.knowledgePoint(),
+                                "affectedCount",
+                                result.affectedCount(),
                                 "createdCount",
                                 result.createdCount(),
+                                "updatedCount",
+                                result.updatedCount(),
                                 "studentIds",
                                 result.studentIds()),
                         trace(request)));
@@ -240,7 +329,20 @@ public class TeacherController implements ControllerSupport {
                 "UPLOAD_DOCUMENT",
                 "DOCUMENT",
                 result.documentId().toString(),
-                trace(request));
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        "HYBRID",
+                        "filename",
+                        filename,
+                        "classId",
+                        classId.toString(),
+                        "className",
+                        result.document().classroomName() == null
+                                ? ""
+                                : result.document().classroomName(),
+                        "status",
+                        result.document().status()));
         return ResponseEntity.status(202).body(ApiResponse.accepted(data, trace(request)));
     }
 
@@ -298,7 +400,7 @@ public class TeacherController implements ControllerSupport {
                         "teacher.plan.generate", idempotencyKey, requestHash);
         if (replay != null) return ResponseEntity.ok(ApiResponse.ok(replay, trace(request)));
 
-        var plan =
+        var planResult =
                 lessonPlanService.generateAndSave(
                         user.userId(),
                         req.topic(),
@@ -306,7 +408,14 @@ public class TeacherController implements ControllerSupport {
                         req.durationMins(),
                         trace(request),
                         idempotencyKey);
-        var data = voMapper.toLessonPlanVo(plan);
+        String executionLane = executionLaneFromProvider(planResult.provider());
+        var data =
+                voMapper.toLessonPlanVo(
+                        planResult.plan(),
+                        planResult.provider(),
+                        planResult.model(),
+                        planResult.latencyMs(),
+                        executionLane);
         governance.storeIdempotency(
                 "teacher.plan.generate",
                 idempotencyKey,
@@ -318,8 +427,21 @@ public class TeacherController implements ControllerSupport {
                 user.role(),
                 "GENERATE_PLAN",
                 "LESSON_PLAN",
-                plan.id().toString(),
-                trace(request));
+                planResult.plan().id().toString(),
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        executionLane,
+                        "provider",
+                        planResult.provider() == null ? "" : planResult.provider(),
+                        "model",
+                        planResult.model() == null ? "" : planResult.model(),
+                        "latencyMs",
+                        planResult.latencyMs(),
+                        "topic",
+                        req.topic(),
+                        "durationMins",
+                        req.durationMins()));
         return ResponseEntity.ok(ApiResponse.ok(data, trace(request)));
     }
 
@@ -455,4 +577,20 @@ public class TeacherController implements ControllerSupport {
     public record BulkSuggestionReq(
             @NotBlank @Size(min = 1, max = 100) String knowledgePoint,
             @NotBlank @Size(min = 1, max = 2000) String suggestion) {}
+
+    private String executionLaneFromProvider(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return "HYBRID";
+        }
+        return "ollama".equalsIgnoreCase(provider) ? "EDGE" : "CLOUD";
+    }
+
+    private String supportStageLabel(Map<String, Object> analytics) {
+        Object stageObject = analytics.get("supportStage");
+        if (!(stageObject instanceof Map<?, ?> stage)) {
+            return "";
+        }
+        Object label = stage.get("label");
+        return label == null ? "" : String.valueOf(label);
+    }
 }

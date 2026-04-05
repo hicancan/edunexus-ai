@@ -18,7 +18,7 @@ import type { StudentAttributionVO, TeacherStudentVO } from "../../services/cont
 
 use([CanvasRenderer, RadarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent]);
 
-const props = defineProps<{
+defineProps<{
   selectedStudent: TeacherStudentVO | null;
   currentAttribution: StudentAttributionVO | null;
 }>();
@@ -103,7 +103,7 @@ const radarOption = computed(() => {
       <div class="metric-glass animate-pop">
         <PenTool :size="28" class="metric-icon info" />
         <div class="metric-data">
-          <span class="metric-label">练习次数</span>
+          <span class="metric-label">练习 / AI 再练次数</span>
           <span class="metric-value"
             >{{ analyticsStore.analytics!.totalExercises }} <span class="unit">次</span></span
           >

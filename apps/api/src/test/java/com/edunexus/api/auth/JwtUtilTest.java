@@ -5,11 +5,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.jsonwebtoken.Claims;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 
 class JwtUtilTest {
 
     private final JwtUtil jwtUtil =
-            new JwtUtil("test-secret-key-for-edunexus-with-enough-length-123456", "15m", "14d");
+            new JwtUtil(
+                    "test-secret-key-for-edunexus-with-enough-length-123456",
+                    "15m",
+                    "14d",
+                    new MockEnvironment().withProperty("APP_ENV", "test"));
 
     @Test
     void generateRefreshToken_shouldRotateByJti() {

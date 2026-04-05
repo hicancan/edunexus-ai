@@ -123,6 +123,16 @@ class StudentApiContractIT extends ApiContractIntegrationBase {
         String recordId = objectMapper.readTree(submitBody).path("data").path("recordId").asText();
 
         mockMvc.perform(
+                        get("/api/v1/student/profile/analytics")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.studentId", notNullValue()))
+                .andExpect(jsonPath("$.data.supportStage.label", notNullValue()))
+                .andExpect(jsonPath("$.data.recentPerformance", notNullValue()))
+                .andExpect(jsonPath("$.data.realtimeState.dataState", notNullValue()))
+                .andExpect(jsonPath("$.data.realtimeState.signals", notNullValue()));
+
+        mockMvc.perform(
                         get("/api/v1/student/profile/weak-points")
                                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
@@ -177,6 +187,19 @@ class StudentApiContractIT extends ApiContractIntegrationBase {
         String token = loginAndGetAccessToken("student01", "12345678");
         String generateIdempotencyKey = uniqueIdempotencyKey("aiq-generate");
         String submitIdempotencyKey = uniqueIdempotencyKey("aiq-submit");
+        String initialAnalyticsBody =
+                mockMvc.perform(
+                                get("/api/v1/student/profile/analytics")
+                                        .header("Authorization", "Bearer " + token))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        JsonNode initialAnalyticsJson = objectMapper.readTree(initialAnalyticsBody);
+        int initialTotalQuestions =
+                initialAnalyticsJson.path("data").path("totalQuestions").asInt();
+        int initialWrongBookCount =
+                initialAnalyticsJson.path("data").path("wrongBookCount").asInt();
 
         String generateBody =
                 mockMvc.perform(
@@ -221,8 +244,8 @@ class StudentApiContractIT extends ApiContractIntegrationBase {
             String questionType = question.path("questionType").asText();
             String userAnswer =
                     "SHORT_ANSWER".equals(questionType)
-                            ? "待补充"
-                            : question.path("options").fieldNames().next();
+                            ? "明显错误"
+                            : "__invalid__";
             answers.add(
                     Map.of("questionId", question.path("id").asText(), "userAnswer", userAnswer));
         }
@@ -263,5 +286,16 @@ class StudentApiContractIT extends ApiContractIntegrationBase {
                 .andExpect(jsonPath("$.data.content[0].completed").value(true))
                 .andExpect(jsonPath("$.data.content[0].recordId", notNullValue()))
                 .andExpect(jsonPath("$.data.content[0].correctRate", notNullValue()));
+
+        mockMvc.perform(
+                        get("/api/v1/student/profile/analytics")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.data.totalQuestions")
+                                .value(initialTotalQuestions + generatedQuestions.size()))
+                .andExpect(
+                        jsonPath("$.data.wrongBookCount")
+                                .value(initialWrongBookCount + generatedQuestions.size()));
     }
 }

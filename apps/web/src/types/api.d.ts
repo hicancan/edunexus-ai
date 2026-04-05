@@ -345,6 +345,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/student/profile/analytics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取学生动态学情画像 */
+    get: operations["getStudentProfileAnalytics"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/teacher/knowledge/documents": {
     parameters: {
       query?: never;
@@ -1031,6 +1048,10 @@ export interface components {
       createdAt?: string;
       /** Format: date-time */
       updatedAt?: string;
+      provider?: string | null;
+      model?: string | null;
+      latencyMs?: number | null;
+      executionLane?: string | null;
     };
     /** @description 教案分享结果 */
     ShareResultVO: {
@@ -1044,7 +1065,7 @@ export interface components {
       /** Format: uuid */
       studentId?: string;
       username?: string;
-      /** @description 总做题次数 */
+      /** @description 总练习次数（含课堂练习与 AI 再练） */
       totalExercises?: number;
       /** @description 总题目数 */
       totalQuestions?: number;
@@ -1057,11 +1078,94 @@ export interface components {
       averageScore?: number;
       /** @description 当前错题本题数 */
       wrongBookCount?: number;
+      /** @description 已完成闭环的错题数 */
+      masteredWrongCount?: number;
+      /**
+       * Format: float
+       * @description 最近一次练习正确率（0-100）
+       */
+      recentAccuracy?: number;
+      /**
+       * Format: float
+       * @description 滚动正确率（0-100）
+       */
+      rollingAccuracy?: number;
+      /**
+       * Format: float
+       * @description AI 练习完成率（0-100）
+       */
+      aiCompletionRate?: number;
+      /** @description 近 7 天课堂提问次数 */
+      recentChatMessageCount?: number;
+      /** @description 近 7 天 AI 个性化练习触发次数 */
+      recentAiQuestionCount?: number;
+      /** @description 近 7 天练习次数 */
+      recentExerciseCount?: number;
+      /** @description 近 7 天活跃学习日数量 */
+      activeDays7d?: number;
+      /** Format: date-time */
+      latestActivityAt?: string | null;
+      /** @description 已形成的教师干预建议数 */
+      teacherSuggestionCount?: number;
+      /** @description 当前主要互动模式 */
+      interactionProfile?: string;
+      /** @description 行为序列归纳出的可读信号 */
+      behaviorSignals?: string[];
+      /** @description 面向学生或教师的下一步建议 */
+      recommendedActions?: string[];
+      supportStage?: components["schemas"]["StudentSupportStageVO"];
+      /** @description 最近 6 次练习 / AI 再练表现轨迹 */
+      recentPerformance?: components["schemas"]["StudentPerformancePointVO"][];
       /** @description 高频错题知识点 */
       topWeakPoints?: {
         knowledgePoint?: string;
         wrongCount?: number;
+        /** Format: float */
+        errorRate?: number;
       }[];
+      realtimeState?: components["schemas"]["StudentRealtimeStateVO"];
+    };
+    /** @description 学习支持阶段 */
+    StudentSupportStageVO: {
+      label?: string;
+      description?: string;
+      /** @enum {string} */
+      tone?: "danger" | "warning" | "success";
+      supportZone?: string;
+    };
+    /** @description 近期练习表现点 */
+    StudentPerformancePointVO: {
+      /** Format: uuid */
+      recordId?: string;
+      totalQuestions?: number;
+      correctCount?: number;
+      totalScore?: number;
+      /** Format: float */
+      accuracyRate?: number;
+      /** Format: date-time */
+      createdAt?: string;
+      /** @enum {string} */
+      source?: "EXERCISE" | "AI_PRACTICE";
+    };
+    /** @description 近时态课堂热点知识点 */
+    StudentRealtimeHotspotVO: {
+      knowledgePoint?: string;
+      eventCount?: number;
+    };
+    /** @description 基于 Redis 聚合的近 10 分钟课堂态画像 */
+    StudentRealtimeStateVO: {
+      /** @enum {string} */
+      dataState?: "LIVE" | "NO_ACTIVITY" | "UNAVAILABLE";
+      windowMinutes?: number;
+      recentChatQuestions?: number | null;
+      recentExerciseSubmissions?: number | null;
+      recentAiInteractions?: number | null;
+      recentWrongCount?: number | null;
+      recentQuestionAttempts?: number | null;
+      /** Format: float */
+      recentErrorDensity?: number | null;
+      hotspotKnowledgePoints?: components["schemas"]["StudentRealtimeHotspotVO"][];
+      signals?: string[];
     };
     /** @description 教师干预建议聚合项 */
     InterventionRecommendationVO: {
@@ -1069,6 +1173,18 @@ export interface components {
       studentCount?: number;
       totalWrongCount?: number;
       suggestionTemplate?: string;
+      generationSource?: string;
+      provider?: string;
+      model?: string;
+      latencyMs?: number;
+      routerDecision?: string;
+      /** @description 当前知识点已在后端登记建议的学生数量 */
+      dispatchedStudentCount?: number;
+      /** Format: double */
+      dispatchedCoverageRate?: number | null;
+      fullyDispatched?: boolean;
+      /** Format: date-time */
+      lastDispatchedAt?: string | null;
     };
     /** @description 学生错因归因证据样本 */
     StudentAttributionExampleVO: {
@@ -1102,7 +1218,9 @@ export interface components {
     /** @description 批量建议下发结果 */
     BulkSuggestionResultVO: {
       knowledgePoint?: string;
+      affectedCount?: number;
       createdCount?: number;
+      updatedCount?: number;
       studentIds?: string[];
     };
     /** @description 审计日志 */
@@ -1135,6 +1253,127 @@ export interface components {
       totalVectors?: number;
       totalLessonPlans?: number;
       totalAiQuestionSessions?: number;
+      executionDistribution?: components["schemas"]["DashboardExecutionMetricVO"][];
+      responseBenchmarks?: components["schemas"]["DashboardResponseMetricVO"][];
+      strategyComparison?: components["schemas"]["DashboardStrategyComparisonVO"][];
+      governanceSummary?: components["schemas"]["DashboardGovernanceSummaryVO"];
+      interventionOutcomes?: components["schemas"]["DashboardOutcomeMetricVO"][];
+      flowLinkage?: components["schemas"]["DashboardFlowMetricVO"][];
+      experimentComparisons?: components["schemas"]["DashboardExperimentMetricVO"][];
+    };
+    /** @description 云边端执行分布 */
+    DashboardExecutionMetricVO: {
+      /** @enum {string} */
+      lane?: "EDGE" | "CLOUD" | "HYBRID" | "HUMAN_IN_LOOP";
+      label?: string;
+      taskCount?: number;
+      /** Format: double */
+      share?: number;
+      sampleCount?: number;
+      /** @enum {string} */
+      dataState?: "MEASURED" | "NO_SAMPLES";
+      description?: string;
+    };
+    /** @description 关键场景响应统计 */
+    DashboardResponseMetricVO: {
+      scene?: string;
+      /** Format: double */
+      avgLatencyMs?: number | null;
+      /** Format: double */
+      p95LatencyMs?: number | null;
+      sampleCount?: number;
+      source?: string;
+      /** @enum {string} */
+      dataState?: "MEASURED" | "NO_SAMPLES";
+    };
+    /** @description 部署策略效果对比（含测算说明） */
+    DashboardStrategyComparisonVO: {
+      strategy?: string;
+      /** Format: double */
+      avgLatencyMs?: number | null;
+      /** Format: double */
+      completionRate?: number | null;
+      /** Format: double */
+      privacyRetentionRate?: number | null;
+      /** Format: double */
+      unitCostIndex?: number | null;
+      sampleCount?: number;
+      basis?: string;
+      /** @enum {string} */
+      dataState?: "MEASURED" | "NO_SAMPLES";
+    };
+    /** @description 治理与教师在环摘要 */
+    DashboardGovernanceSummaryVO: {
+      /** Format: double */
+      traceCoverageRate?: number | null;
+      /** Format: double */
+      teacherAdoptionRate?: number | null;
+      /** Format: double */
+      localRetentionRate?: number | null;
+      /** Format: double */
+      sensitiveOutboundRate?: number | null;
+      /** Format: double */
+      retrievalHitRate?: number | null;
+      /** Format: double */
+      suggestionExecutionRate?: number | null;
+      auditedActions?: number;
+      traceCoverageSamples?: number;
+      suggestionDispatchCount?: number;
+      teacherAdoptionSamples?: number;
+      teacherAdoptedCount?: number;
+      readyDocuments?: number;
+      activeRiskStudents?: number;
+      studentChatTurnCount?: number;
+      diagnosisInteractionCount?: number;
+      completionCompletedUnits?: number;
+      completionUnitSamples?: number;
+      retentionTaskSamples?: number;
+      retrievalHitSamples?: number;
+      retrievalHitCount?: number;
+      suggestionExecutionSamples?: number;
+      suggestionExecutedCount?: number;
+    };
+    /** @description 干预闭环结果指标 */
+    DashboardOutcomeMetricVO: {
+      label?: string;
+      /** Format: double */
+      value?: number | null;
+      /** Format: double */
+      target?: number;
+      unit?: string;
+      insight?: string;
+      /** @enum {string} */
+      dataState?: "MEASURED" | "NO_SAMPLES";
+    };
+    /** @description 教学支持全流程联动效果 */
+    DashboardFlowMetricVO: {
+      /** @enum {string} */
+      stage?: "PRE_CLASS" | "IN_CLASS" | "PRACTICE" | "TEACHER_LOOP" | "POST_CLASS";
+      label?: string;
+      count?: number;
+      /** Format: double */
+      rate?: number | null;
+      insight?: string;
+      /** @enum {string} */
+      dataState?: "MEASURED" | "NO_SAMPLES";
+    };
+    /** @description 实验指标对比结果 */
+    DashboardExperimentMetricVO: {
+      category?: string;
+      metric?: string;
+      /** Format: double */
+      baselineValue?: number | null;
+      /** Format: double */
+      currentValue?: number | null;
+      unit?: string;
+      /** @enum {string} */
+      betterDirection?: "higher" | "lower";
+      /** Format: double */
+      delta?: number | null;
+      evidence?: string;
+      sampleCount?: number;
+      /** @enum {string} */
+      dataState?: "MEASURED" | "NO_SAMPLES";
     };
     /** @description 管理端资源列表项 */
     AdminResourceVO: {
@@ -1836,6 +2075,26 @@ export interface operations {
     requestBody?: never;
     responses: {
       /** @description 查询成功。data → WeakPointVO 数组 */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ApiResponse"];
+        };
+      };
+    };
+  };
+  getStudentProfileAnalytics: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description 查询成功。data → StudentAnalyticsVO */
       200: {
         headers: {
           [name: string]: unknown;

@@ -13,7 +13,6 @@ interface SuggestionState {
   suggestionError: string;
   latestSuggestion: TeacherSuggestionVO | null;
   latestBulkSuggestion: BulkSuggestionResultVO | null;
-  dispatchedPoints: string[];
 }
 
 export const useSuggestionStore = defineStore("teacher-suggestions", {
@@ -21,8 +20,7 @@ export const useSuggestionStore = defineStore("teacher-suggestions", {
     suggestionLoading: false,
     suggestionError: "",
     latestSuggestion: null,
-    latestBulkSuggestion: null,
-    dispatchedPoints: []
+    latestBulkSuggestion: null
   }),
   actions: {
     async submitSuggestion(payload: TeacherSuggestionRequest): Promise<TeacherSuggestionVO | null> {
@@ -48,9 +46,6 @@ export const useSuggestionStore = defineStore("teacher-suggestions", {
       try {
         const result = await dispatchBulkSuggestion(payload);
         this.latestBulkSuggestion = result;
-        if (payload.knowledgePoint && !this.dispatchedPoints.includes(payload.knowledgePoint)) {
-          this.dispatchedPoints.push(payload.knowledgePoint);
-        }
         return result;
       } catch (error) {
         this.suggestionError = toErrorMessage(error, "批量发送失败");
@@ -59,9 +54,5 @@ export const useSuggestionStore = defineStore("teacher-suggestions", {
         this.suggestionLoading = false;
       }
     }
-  },
-  persist: {
-    key: "teacher-suggestions",
-    paths: ["dispatchedPoints"]
   }
 });

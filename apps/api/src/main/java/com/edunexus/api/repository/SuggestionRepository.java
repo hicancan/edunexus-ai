@@ -11,6 +11,10 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class SuggestionRepository {
+    public record SaveResult(TeacherSuggestion suggestion, boolean created) {}
+
+    public record DispatchSummary(
+            String knowledgePoint, int dispatchedStudentCount, java.time.Instant lastDispatchedAt) {}
 
     private static final RowMapper<TeacherSuggestion> ROW_MAPPER =
             (rs, rn) ->
@@ -27,6 +31,37 @@ public class SuggestionRepository {
 
     public SuggestionRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    public SaveResult saveOrUpdate(
+            UUID teacherId,
+            UUID studentId,
+            UUID questionId,
+            String knowledgePoint,
+            String suggestion) {
+        UUID existingId =
+                questionId != null
+                        ? findExistingQuestionSuggestionId(teacherId, studentId, questionId)
+                        : findExistingKnowledgeSuggestionId(teacherId, studentId, knowledgePoint);
+        if (existingId != null) {
+            jdbc.update(
+                    """
+                    update teacher_suggestions
+                    set question_id = ?,
+                        knowledge_point = ?,
+                        suggestion = ?,
+                        updated_at = now()
+                    where id = ?
+                    """,
+                    questionId,
+                    knowledgePoint,
+                    suggestion,
+                    existingId);
+            return new SaveResult(findById(existingId), false);
+        }
+
+        UUID id = create(teacherId, studentId, questionId, knowledgePoint, suggestion);
+        return new SaveResult(findById(id), true);
     }
 
     public UUID create(
@@ -47,6 +82,28 @@ public class SuggestionRepository {
         return id;
     }
 
+    public List<DispatchSummary> listDispatchSummaries(UUID teacherId) {
+        return jdbc.query(
+                """
+                select
+                  knowledge_point,
+                  count(distinct student_id) as dispatched_student_count,
+                  max(updated_at) as last_dispatched_at
+                from teacher_suggestions
+                where teacher_id = ?
+                  and question_id is null
+                  and knowledge_point is not null
+                  and btrim(knowledge_point) <> ''
+                group by knowledge_point
+                """,
+                (rs, rn) ->
+                        new DispatchSummary(
+                                rs.getString("knowledge_point"),
+                                rs.getInt("dispatched_student_count"),
+                                ApiDataMapper.toInstant(rs.getTimestamp("last_dispatched_at"))),
+                teacherId);
+    }
+
     public TeacherSuggestion findById(UUID id) {
         List<TeacherSuggestion> rows =
                 jdbc.query(
@@ -60,7 +117,7 @@ public class SuggestionRepository {
     public String fetchByStudentAndQuestion(UUID studentId, UUID questionId) {
         List<String> rows =
                 jdbc.queryForList(
-                        "select suggestion from teacher_suggestions where student_id=? and question_id=? order by created_at desc limit 1",
+                        "select suggestion from teacher_suggestions where student_id=? and question_id=? order by updated_at desc, created_at desc limit 1",
                         String.class,
                         studentId,
                         questionId);
@@ -69,9 +126,52 @@ public class SuggestionRepository {
 
     public List<TeacherSuggestion> listByStudent(UUID studentId, int limit) {
         return jdbc.query(
-                "select id,teacher_id,student_id,question_id,knowledge_point,suggestion,created_at from teacher_suggestions where student_id=? order by created_at desc limit ?",
+                "select id,teacher_id,student_id,question_id,knowledge_point,suggestion,created_at from teacher_suggestions where student_id=? order by updated_at desc, created_at desc limit ?",
                 ROW_MAPPER,
                 studentId,
                 limit);
+    }
+
+    private UUID findExistingQuestionSuggestionId(UUID teacherId, UUID studentId, UUID questionId) {
+        List<UUID> rows =
+                jdbc.queryForList(
+                        """
+                        select id
+                        from teacher_suggestions
+                        where teacher_id = ?
+                          and student_id = ?
+                          and question_id = ?
+                        order by updated_at desc, created_at desc
+                        limit 1
+                        """,
+                        UUID.class,
+                        teacherId,
+                        studentId,
+                        questionId);
+        return rows.isEmpty() ? null : rows.getFirst();
+    }
+
+    private UUID findExistingKnowledgeSuggestionId(
+            UUID teacherId, UUID studentId, String knowledgePoint) {
+        if (knowledgePoint == null || knowledgePoint.isBlank()) {
+            return null;
+        }
+        List<UUID> rows =
+                jdbc.queryForList(
+                        """
+                        select id
+                        from teacher_suggestions
+                        where teacher_id = ?
+                          and student_id = ?
+                          and question_id is null
+                          and knowledge_point = ?
+                        order by updated_at desc, created_at desc
+                        limit 1
+                        """,
+                        UUID.class,
+                        teacherId,
+                        studentId,
+                        knowledgePoint);
+        return rows.isEmpty() ? null : rows.getFirst();
     }
 }

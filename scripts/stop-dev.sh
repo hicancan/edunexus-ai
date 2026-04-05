@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
 set -e
 
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+load_env_file() {
+  local env_file="$1"
+  if [ ! -f "${env_file}" ]; then
+    return 0
+  fi
+
+  while IFS= read -r line || [ -n "${line}" ]; do
+    case "${line}" in
+      ''|\#*) continue ;;
+    esac
+    local key="${line%%=*}"
+    local value="${line#*=}"
+    if [ -z "${key}" ]; then
+      continue
+    fi
+    if [ -z "${!key+x}" ]; then
+      export "${key}=${value}"
+    fi
+  done < "${env_file}"
+}
+
+load_env_file "${PROJECT_ROOT}/.env"
+
 API_PORT="${APP_PORT:-8080}"
 AI_PORT="${AI_SERVICE_PORT:-8000}"
 WEB_PORT="${WEB_PORT:-5173}"
@@ -8,8 +33,6 @@ WEB_PORT="${WEB_PORT:-5173}"
 KEEP_INFRA="${KEEP_INFRA:-0}"
 DOWN_INFRA="${DOWN_INFRA:-0}"
 FORCE_PORT_KILL="${FORCE_PORT_KILL:-0}"
-
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 find_pid_by_port() {
   local port="$1"
