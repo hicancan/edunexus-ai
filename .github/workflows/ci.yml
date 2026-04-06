@@ -20,6 +20,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
       - name: ESLint Check
         run: npm run lint
@@ -71,6 +72,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
       - name: Unit tests
         run: npm run test
@@ -82,6 +84,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
       - name: Type check
         run: npm run typecheck
@@ -93,6 +96,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
       - name: Build
         run: npm run build
@@ -104,6 +108,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-web
       - name: Prod dependency audit
         run: npm audit --omit=dev --audit-level=high
