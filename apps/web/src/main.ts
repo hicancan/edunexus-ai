@@ -1,6 +1,7 @@
 import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { createApp } from "vue";
+import "./styles/tokens.css";
 import "./styles/base.css";
 import App from "./App.vue";
 import { createAppRouter } from "./app/router";
