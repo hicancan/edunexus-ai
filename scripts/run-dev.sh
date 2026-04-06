@@ -145,6 +145,20 @@ if postgres_port="$(compose_host_port postgres 5432)"; then
     export POSTGRES_HOST="127.0.0.1"
     export POSTGRES_PORT="${postgres_port}"
     export DATABASE_URL="jdbc:postgresql://127.0.0.1:${postgres_port}/${POSTGRES_DB:-edunexus}"
+    
+    echo "Waiting for database (127.0.0.1:${postgres_port}) to be ready..."
+    MAX_RETRIES=30
+    RETRY_COUNT=0
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+      if python3 -c "import socket; s = socket.socket(); s.settimeout(1); exit(0 if s.connect_ex(('127.0.0.1', ${postgres_port})) == 0 else 1)" 2>/dev/null || \
+         python -c "import socket; s = socket.socket(); s.settimeout(1); exit(0 if s.connect_ex(('127.0.0.1', ${postgres_port})) == 0 else 1)" 2>/dev/null; then
+        echo "Database is fully ready!"
+        break
+      fi
+      echo "Database not ready yet, waiting 1 second... ($((RETRY_COUNT + 1))/$MAX_RETRIES)"
+      sleep 1
+      RETRY_COUNT=$((RETRY_COUNT + 1))
+    done
   fi
 fi
 

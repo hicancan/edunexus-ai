@@ -332,6 +332,24 @@ if ($postgresPort -and (Should-UseComposeValue $env:DATABASE_URL @(
   Set-ProcessEnv "POSTGRES_HOST" "127.0.0.1"
   Set-ProcessEnv "POSTGRES_PORT" "$postgresPort"
   Set-ProcessEnv "DATABASE_URL" "jdbc:postgresql://127.0.0.1:$postgresPort/$dbName"
+
+  Write-Host "Waiting for database (127.0.0.1:$postgresPort) to be ready..."
+  $retryCount = 0
+  while ($retryCount -lt 30) {
+    $tcp = [System.Net.Sockets.TcpClient]::new()
+    try {
+      $tcp.Connect("127.0.0.1", $postgresPort)
+      $tcp.Close()
+      Write-Host "Database is fully ready!"
+      break
+    } catch {
+      Write-Host "Database not ready yet, waiting 1 second... ($($retryCount + 1)/30)"
+      Start-Sleep -Seconds 1
+      $retryCount++
+    } finally {
+      $tcp.Dispose()
+    }
+  }
 }
 
 $redisPort = Get-ComposeHostPort "redis" 6379

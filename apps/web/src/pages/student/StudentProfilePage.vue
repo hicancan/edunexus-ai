@@ -16,13 +16,7 @@ import { CanvasRenderer } from "echarts/renderers";
 import { LineChart, BarChart, GraphChart } from "echarts/charts";
 import { GridComponent, TooltipComponent, LegendComponent } from "echarts/components";
 import VChart from "vue-echarts";
-import {
-  RefreshCw,
-  User as UserIcon,
-  AlertTriangle,
-  Sparkles,
-  TrendingUp
-} from "lucide-vue-next";
+import { RefreshCw, User as UserIcon, AlertTriangle, Sparkles, TrendingUp } from "lucide-vue-next";
 import { getMe } from "../../features/auth/api/auth.service";
 import {
   getProfileAnalytics,
@@ -144,7 +138,6 @@ const recordsLineOption = computed(() => {
     ]
   };
 });
-
 
 async function loadProfile(): Promise<void> {
   loading.value = true;
