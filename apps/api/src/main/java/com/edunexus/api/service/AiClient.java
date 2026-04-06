@@ -114,7 +114,15 @@ public class AiClient {
     @PreDestroy
     public void shutdown() {
         if (grpcChannel != null) {
-            grpcChannel.shutdownNow();
+            grpcChannel.shutdown();
+            try {
+                if (!grpcChannel.awaitTermination(5, TimeUnit.SECONDS)) {
+                    grpcChannel.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                grpcChannel.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

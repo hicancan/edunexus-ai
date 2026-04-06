@@ -58,3 +58,12 @@ doc/papers/
 
 # Root-level Playwright dependencies
 /node_modules/
+/package-lock.json
+
+# CI / debug artefacts (never commit)
+ci_jobs.json
+ci_status*.json
+failed_logs.txt
+gh_log*.txt
+mvn_test_err.txt
+*_jobs.json

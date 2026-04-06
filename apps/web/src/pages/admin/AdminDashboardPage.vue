@@ -528,6 +528,7 @@ onMounted(loadMetrics);
   display: flex;
   gap: 14px;
   align-items: center;
+  margin-top: 0 !important;
 }
 
 .metric-icon {

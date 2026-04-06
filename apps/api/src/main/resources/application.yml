@@ -32,6 +32,8 @@ app:
   refresh-token-expires-in: ${REFRESH_TOKEN_EXPIRES_IN:14d}
   ai-service-grpc-host: ${AI_SERVICE_GRPC_HOST:127.0.0.1}
   ai-service-grpc-port: ${AI_SERVICE_GRPC_PORT:50051}
+  ai-service-http-host: ${AI_SERVICE_HOST:127.0.0.1}
+  ai-service-http-port: ${AI_SERVICE_PORT:8000}
   ai-service-token: ${AI_SERVICE_TOKEN:change-this-in-local-too}
   ai-question-timeout-seconds: ${AI_QUESTION_TIMEOUT_SECONDS:180}
   lesson-plan-timeout-seconds: ${LESSON_PLAN_TIMEOUT_SECONDS:90}

@@ -308,16 +308,23 @@ class LLMService:
         if not cleaned:
             return [0.0 for _ in range(self.settings.embedding_dim)]
 
+        embed_timeout = 30.0
         errors: list[str] = []
         try:
-            vector = await self._ollama.embed(cleaned, self.settings.ollama_embed_model)
+            vector = await asyncio.wait_for(
+                self._ollama.embed(cleaned, self.settings.ollama_embed_model),
+                timeout=embed_timeout,
+            )
             return self._normalize_dimension(vector)
         except Exception as ex:
             errors.append(f"ollama:{ex}")
 
         if self.settings.openai_api_key:
             try:
-                vector = await self._openai.embed(cleaned, self.settings.openai_embed_model)
+                vector = await asyncio.wait_for(
+                    self._openai.embed(cleaned, self.settings.openai_embed_model),
+                    timeout=embed_timeout,
+                )
                 return self._normalize_dimension(vector)
             except Exception as ex:
                 errors.append(f"openai:{ex}")

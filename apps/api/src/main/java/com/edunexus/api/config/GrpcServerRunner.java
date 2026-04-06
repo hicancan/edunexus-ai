@@ -30,7 +30,7 @@ public class GrpcServerRunner implements SmartLifecycle {
     public void start() {
         try {
             server = ServerBuilder.forPort(port).addService(jobStatusService).build().start();
-            log.info("gRPC Server started, listening on " + port);
+            log.info("gRPC Server started, listening on {}", port);
             isRunning = true;
         } catch (IOException e) {
             log.error("Failed to start gRPC server", e);
@@ -42,6 +42,14 @@ public class GrpcServerRunner implements SmartLifecycle {
     public void stop() {
         if (server != null) {
             server.shutdown();
+            try {
+                if (!server.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                    server.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                server.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
         isRunning = false;
     }

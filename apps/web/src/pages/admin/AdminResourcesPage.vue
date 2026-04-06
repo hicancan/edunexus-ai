@@ -233,7 +233,7 @@ onMounted(loadResources);
             <n-button
               type="primary"
               :loading="adminStore.resourcesLoading"
-              class="animate-pop glass-pill"
+              class="animate-pop"
               @click="applyFilters"
             >
               <template #icon><Search :size="16" /></template>

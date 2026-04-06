@@ -52,6 +52,12 @@ def create_app() -> FastAPI:
             serve_grpc(llm_service, kb_service, worker, idempotency_store, settings)
         )
 
+        def _grpc_err(t: asyncio.Task) -> None:
+            if not t.cancelled() and t.exception():
+                logger.error("gRPC server failed: %s", t.exception())
+
+        grpc_task.add_done_callback(_grpc_err)
+
         yield
 
         await llm_service.aclose()

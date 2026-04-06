@@ -3,7 +3,6 @@ description: "Sets up node, restores cache, and installs dependencies for web jo
 runs:
   using: "composite"
   steps:
-    - uses: actions/checkout@v4
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
