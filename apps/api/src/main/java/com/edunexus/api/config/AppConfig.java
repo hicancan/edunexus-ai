@@ -1,12 +1,11 @@
 package com.edunexus.api.config;
 
 import java.net.URI;
-import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -26,29 +25,15 @@ public class AppConfig {
 
     @Bean(name = "documentIngestExecutor")
     public TaskExecutor documentIngestExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(4);
-        executor.setQueueCapacity(100);
-        executor.setThreadNamePrefix("doc-ingest-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(30);
-        executor.initialize();
+        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("doc-ingest-");
+        executor.setVirtualThreads(true);
         return executor;
     }
 
     @Bean(name = "chatStreamExecutor")
     public TaskExecutor chatStreamExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(4);
-        executor.setMaxPoolSize(8);
-        executor.setQueueCapacity(200);
-        executor.setThreadNamePrefix("chat-stream-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(15);
-        executor.initialize();
+        SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor("chat-stream-");
+        executor.setVirtualThreads(true);
         return executor;
     }
 
@@ -63,7 +48,7 @@ public class AppConfig {
                         .allowedOriginPatterns(allowedOriginPatterns)
                         .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
-                        .exposedHeaders("X-Request-Id");
+                        .exposedHeaders("X-Request-Id", "X-Trace-Id");
             }
         };
     }

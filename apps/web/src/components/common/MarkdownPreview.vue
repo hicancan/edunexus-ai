@@ -126,6 +126,7 @@ const renderedHtml = computed(() => {
 </script>
 
 <template>
+  <!-- eslint-disable-next-line vue/no-v-html -->
   <div class="markdown-body" :class="{ 'markdown-plain': plain }" v-html="renderedHtml" />
 </template>
 

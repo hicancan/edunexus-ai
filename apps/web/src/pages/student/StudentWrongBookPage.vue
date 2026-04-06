@@ -183,8 +183,9 @@ async function openSocratic(row: WrongBookEntryVO) {
       role: "ai",
       text: String(res.data.probe_question || res.data.summary || JSON.stringify(res.data))
     });
-  } catch (err: any) {
-    message.error("追问失败: " + err.message);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    message.error("追问失败: " + msg);
   } finally {
     socraticState.loading = false;
   }
@@ -212,10 +213,11 @@ async function sendSocraticReply() {
     if (socraticState.round >= 3 || res.data.encouragement) {
       socraticState.isFinished = true;
     }
-  } catch (err: any) {
+  } catch (err) {
     socraticState.round -= 1;
     socraticState.messages.pop();
-    message.error("回复失败: " + err.message);
+    const msg = err instanceof Error ? err.message : String(err);
+    message.error("回复失败: " + msg);
   } finally {
     socraticState.loading = false;
   }

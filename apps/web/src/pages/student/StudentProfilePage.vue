@@ -21,8 +21,7 @@ import {
   User as UserIcon,
   AlertTriangle,
   Sparkles,
-  TrendingUp,
-  Network
+  TrendingUp
 } from "lucide-vue-next";
 import { getMe } from "../../features/auth/api/auth.service";
 import {
@@ -146,36 +145,6 @@ const recordsLineOption = computed(() => {
   };
 });
 
-const weakPointsBarOption = computed(() => ({
-  tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-  grid: { left: 24, right: 36, top: 20, bottom: 24, containLabel: true },
-  xAxis: { type: "value" },
-  yAxis: {
-    type: "category",
-    data: topWeakPoints.value.map((item) => item.knowledgePoint || "未命名知识点")
-  },
-  series: [
-    {
-      type: "bar",
-      data: topWeakPoints.value.map((item) => Number(item.errorRate || 0)),
-      barWidth: 18,
-      itemStyle: {
-        borderRadius: [0, 999, 999, 0],
-        color: {
-          type: "linear",
-          x: 0,
-          y: 0,
-          x2: 1,
-          y2: 0,
-          colorStops: [
-            { offset: 0, color: "#fb7185" },
-            { offset: 1, color: "#ef4444" }
-          ]
-        }
-      }
-    }
-  ]
-}));
 
 async function loadProfile(): Promise<void> {
   loading.value = true;
@@ -224,12 +193,14 @@ const topologyOption = computed(() => {
       {
         type: "graph",
         layout: "force",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: topologyData.value.nodes.map((n: any) => ({
           id: n.id,
           name: n.name,
           symbolSize: n.status === "weak" ? 40 : 25,
           itemStyle: { color: n.status === "weak" ? "#ef4444" : "#10b981" }
         })),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         links: topologyData.value.edges.map((e: any) => ({
           source: e.source,
           target: e.target,
