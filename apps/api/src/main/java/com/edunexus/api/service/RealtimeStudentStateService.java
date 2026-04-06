@@ -143,7 +143,7 @@ public class RealtimeStudentStateService {
                 recentQuestionAttempts += safeInt(event.totalQuestions());
                 int hotspotIncrement = Math.max(1, safeInt(event.wrongCount()));
                 for (String knowledgePoint : normalizeKnowledgePoints(event.knowledgePoints())) {
-                    knowledgeHotspots.merge(knowledgePoint, hotspotIncrement, Integer::sum);
+                    knowledgeHotspots.merge(knowledgePoint, hotspotIncrement, (a, b) -> a + b);
                 }
             }
 

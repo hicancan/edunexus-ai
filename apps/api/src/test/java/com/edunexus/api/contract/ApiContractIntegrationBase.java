@@ -66,6 +66,7 @@ public abstract class ApiContractIntegrationBase {
             return localTestDb;
         }
 
+        @SuppressWarnings("resource")
         PostgreSQLContainer<?> container =
                 new PostgreSQLContainer<>("postgres:17-alpine")
                         .withDatabaseName("edunexus_test")
