@@ -34,26 +34,26 @@ graph TB
     classDef db fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c
     classDef external fill:#eceff1,stroke:#607d8b,stroke-width:2px,color:#263238
 
-    subgraph client_tier [🌐 统一教学工作台与端侧]
+    subgraph client_tier ["🌐 统一教学工作台与端侧"]
         Client["Web 交互层<br/>(Vue 3.5 / Naive UI)"]:::client
     end
 
-    subgraph business_tier [⚙️ 核心业务与控制面 (近端/边侧主导)]
+    subgraph business_tier ["⚙️ 核心业务与控制面 (近端/边侧主导)"]
         API["Spring Boot 环境中枢<br/>(Java 21 Virtual Threads)"]:::api
     end
 
-    subgraph ai_tier [🧠 RAG 与诊断推理层 (远/边缘混合)]
+    subgraph ai_tier ["🧠 RAG 与诊断推理层 (远/边缘混合)"]
         AI["FastAPI 教育智能微服务<br/>(Python 3.12 / Qdrant)"]:::ai
     end
 
-    subgraph infrastructure_tier [💾 泛在持久化层]
+    subgraph infrastructure_tier ["💾 泛在持久化层"]
         PG[("PostgreSQL 17<br/>主业务 / 审计库")]:::db
         Redis[("Redis 7.2<br/>课堂短态时序聚集")]:::db
         MinIO[("MinIO<br/>教材讲义源物料存管")]:::db
         Qdrant[("Qdrant 1.17<br/>课件 RAG 高维向量引擎")]:::db
     end
 
-    subgraph llm_tier [🤖 大模型算力与分析引擎]
+    subgraph llm_tier ["🤖 大模型算力与分析引擎"]
         LLM["DeepSeek / 泛用型基座模型"]:::external
     end
 
