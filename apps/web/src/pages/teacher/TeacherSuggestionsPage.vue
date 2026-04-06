@@ -13,6 +13,8 @@ import {
 import { useAnalyticsStore } from "../../features/teacher-workspace/model/analytics";
 import { useSuggestionStore } from "../../features/teacher-workspace/model/suggestions";
 import { useClassroomStore } from "../../features/teacher-workspace/model/classroom";
+import { runInterventionSandbox } from "../../features/teacher-workspace/api/teacher.service";
+import type { SandboxStrategy } from "../../services/contracts";
 
 const analyticsStore = useAnalyticsStore();
 const suggestionStore = useSuggestionStore();
@@ -20,6 +22,8 @@ const classroomStore = useClassroomStore();
 const message = useMessage();
 const dispatchingPoint = ref("");
 const drafts = reactive<Record<string, string>>({});
+const sandboxLoading = ref(false);
+const sandboxStrategies = ref<SandboxStrategy[]>([]);
 
 const classroomSnapshots = computed(() => analyticsStore.classroomAnalytics);
 
@@ -127,6 +131,28 @@ async function dispatchIntervention(knowledgePoint: string): Promise<void> {
   }
 }
 
+async function runSandbox(): Promise<void> {
+  sandboxLoading.value = true;
+  try {
+    const totalStudents = classroomStore.students.length || 30;
+
+    if (analyticsStore.interventions.length === 0) {
+      message.warning("当前没有错题聚类数据，无法推演");
+      return;
+    }
+
+    const res = await runInterventionSandbox({ studentCount: totalStudents });
+    const rawData = (res as unknown as Record<string, unknown>).data;
+    sandboxStrategies.value = Array.isArray(rawData) ? rawData : [];
+    message.success(`沙盘推演完成，生成 ${sandboxStrategies.value.length} 条干预策略`);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    message.error("沙盘推演失败: " + errMsg);
+  } finally {
+    sandboxLoading.value = false;
+  }
+}
+
 onMounted(async () => {
   await Promise.all([analyticsStore.loadInterventions(), prepareContext()]);
 });
@@ -135,12 +161,38 @@ onMounted(async () => {
 <template>
   <div class="suggestions-page app-container">
     <div class="workspace-stack">
-      <div class="workspace-header">
+      <div class="workspace-header" style="justify-content: space-between; display: flex; align-items: center;">
         <div>
           <h1 class="workspace-title">教师干预建议</h1>
           <p class="workspace-subtitle">
             系统先诊断，教师再确认、改写并下发，保证关键干预始终在教师掌控中。
           </p>
+        </div>
+        <n-button type="primary" :loading="sandboxLoading" @click="runSandbox">
+          <template #icon><Sparkles :size="16" /></template>
+          一键生成干预沙盘推演
+        </n-button>
+      </div>
+
+      <!-- 沙盘推演结果展示 -->
+      <div v-if="sandboxStrategies.length > 0" class="intervention-grid" style="margin-bottom: 24px;">
+      <div v-for="(strat, idx) in sandboxStrategies" :key="idx" class="panel glass-card int-card" style="border-top-color: var(--color-primary);">
+           <div class="int-header">
+             <div class="int-title-area">
+               <h3 class="int-topic">{{ strat.strategy_name }}</h3>
+               <span class="int-meta" style="background: rgba(16, 185, 129, 0.1); color: var(--color-success);">预估修复率: {{ strat.estimated_fix_rate }}</span>
+               <span class="int-meta" style="margin-left: 8px;">预估耗时: {{ strat.estimated_minutes }} min</span>
+             </div>
+           </div>
+           <div class="int-body">
+             <div class="evidence-box" style="margin-top: -10px;">
+                <p class="evidence-title"><Sparkles :size="14" />AI 沙盘推演建议</p>
+                <p class="evidence-copy">{{ strat.description }}</p>
+                <p v-if="strat.target_knowledge_points?.length" class="evidence-copy" style="margin-top: 4px; opacity: 0.8;">
+                  涉及知识点：{{ strat.target_knowledge_points.join('、') }}
+                </p>
+             </div>
+           </div>
         </div>
       </div>
 

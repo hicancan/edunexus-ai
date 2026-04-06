@@ -56,6 +56,7 @@ class Settings:
     embedding_dim: int
 
     java_grpc_url: str
+    ai_grpc_listen_port: int
 
     service_token: str
 
@@ -95,18 +96,19 @@ def load_settings() -> Settings:
         deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1").rstrip("/"),
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
         deepseek_structured_model=os.getenv("DEEPSEEK_STRUCTURED_MODEL", "deepseek-chat"),
-        deepseek_complex_model=os.getenv("DEEPSEEK_COMPLEX_MODEL", "deepseek-chat"),
+        deepseek_complex_model=os.getenv("DEEPSEEK_COMPLEX_MODEL", "deepseek-reasoner"),
         qdrant_url=os.getenv("QDRANT_URL", "http://127.0.0.1:6333").rstrip("/"),
         qdrant_api_key=os.getenv("QDRANT_API_KEY", "").strip(),
         qdrant_collection=os.getenv("QDRANT_COLLECTION", "knowledge_chunks"),
         embedding_dim=int(os.getenv("EMBEDDING_DIM", "1024")),
         java_grpc_url=os.getenv("JAVA_GRPC_URL", "localhost:9090").strip(),
+        ai_grpc_listen_port=int(os.getenv("AI_GRPC_LISTEN_PORT", "50051")),
         service_token=os.getenv("AI_SERVICE_TOKEN", "change-this-in-local-too").strip(),
         python_runner=os.getenv("PYTHON_RUNNER", "uv").strip().lower(),
         chat_rag_timeout_seconds=float(os.getenv("CHAT_RAG_TIMEOUT_SECONDS", "25")),
         wrong_analysis_timeout_seconds=float(os.getenv("WRONG_ANALYSIS_TIMEOUT_SECONDS", "30")),
-        ai_question_timeout_seconds=float(os.getenv("AI_QUESTION_TIMEOUT_SECONDS", "120")),
-        lesson_plan_timeout_seconds=float(os.getenv("LESSON_PLAN_TIMEOUT_SECONDS", "60")),
+        ai_question_timeout_seconds=float(os.getenv("AI_QUESTION_TIMEOUT_SECONDS", "180")),
+        lesson_plan_timeout_seconds=float(os.getenv("LESSON_PLAN_TIMEOUT_SECONDS", "90")),
     )
 
 

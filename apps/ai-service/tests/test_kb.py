@@ -1,5 +1,5 @@
 from ai_service.chunking import chunk_text, sha1
-from ai_service.extraction import extract_text
+from ai_service.extraction import extract_text_from_bytes
 
 
 def test_chunk_text_single_short_paragraph() -> None:
@@ -42,6 +42,11 @@ def test_sha1_deterministic() -> None:
     assert len(h1) == 40
 
 
-def test_extract_text_missing_file() -> None:
-    result = extract_text("/nonexistent/path/to/file.pdf")
+def test_extract_text_from_bytes_empty_content() -> None:
+    result = extract_text_from_bytes("test.txt", b"")
     assert result == ""
+
+
+def test_extract_text_from_bytes_plain_text() -> None:
+    result = extract_text_from_bytes("test.txt", b"hello world")
+    assert result == "hello world"

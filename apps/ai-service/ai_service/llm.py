@@ -13,15 +13,6 @@ from .routing import provider_candidates, route_decision
 
 logger = logging.getLogger("edunexus.ai.llm")
 
-SCENE_TIMEOUT_SECONDS: dict[str, float] = {
-    "chat_rag": 25.0,
-    "wrong_analysis": 30.0,
-    "ai_question": 120.0,
-    "ai_question_large": 180.0,
-    "teacher_suggestion": 60.0,
-    "lesson_plan": 60.0,
-}
-
 SCENE_RETRY_DELAY_SECONDS: dict[str, float] = {
     "chat_rag": 0.5,
     "wrong_analysis": 0.8,
@@ -62,6 +53,13 @@ class LLMService:
         )
         self._gemini = GeminiClient(settings.gemini_api_key or "")
 
+    async def aclose(self) -> None:
+        """Gracefully close all provider HTTP clients."""
+        await self._ollama.aclose()
+        await self._openai.aclose()
+        await self._deepseek.aclose()
+        await self._gemini.aclose()
+
     def _scene_timeout_seconds(self, scene: str) -> float:
         if scene == "chat_rag":
             return self.settings.chat_rag_timeout_seconds
@@ -75,7 +73,7 @@ class LLMService:
             return min(self.settings.ai_question_timeout_seconds, 60.0)
         if scene == "lesson_plan":
             return self.settings.lesson_plan_timeout_seconds
-        return SCENE_TIMEOUT_SECONDS.get(scene, 45.0)
+        return 45.0
 
     async def complete(
         self,

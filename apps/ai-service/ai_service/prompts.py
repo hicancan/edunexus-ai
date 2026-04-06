@@ -330,7 +330,7 @@ def _ensure_minimum_step_blocks(
     default_steps = [
         ("导入与诊断", f"通过贴近课堂的情境或追问，引出「{topic}」的学习任务与已有认知。"),
         ("概念建构", f"围绕「{topic}」梳理核心概念、关键条件与常见误区。"),
-        ("分层练习", f"结合基础题与迁移题开展分层练习，并针对易错点进行点拨。"),
+        ("分层练习", "结合基础题与迁移题开展分层练习，并针对易错点进行点拨。"),
         ("总结与评估", "回顾本节重点，完成课堂反馈，并布置后续巩固任务。"),
     ]
     normalized = step_blocks[:4]
@@ -406,3 +406,120 @@ def _normalize_step_lines(body: str, topic: str, index: int) -> list[str]:
     if not lines:
         lines = [fallback_by_index[index] if index < len(fallback_by_index) else fallback_by_index[-1]]
     return [line if line.startswith(("-", "*")) else f"- {line}" for line in lines[:4]]
+
+
+# ── Socratic Scaffold Chain ──────────────────────────────────────────────
+
+
+def socratic_probe_prompt(
+    question: str,
+    user_answer: str,
+    correct_answer: str,
+    knowledge_points: list[str],
+    round_number: int,
+    student_responses: list[str],
+) -> str:
+    kp = [sanitize_text(x, 80) for x in knowledge_points if sanitize_text(x, 80)]
+    kp_text = ", ".join(kp) if kp else "未提供"
+
+    prev_dialogue = ""
+    for idx, resp in enumerate(student_responses):
+        prev_dialogue += f"第{idx + 1}轮学生回答：{sanitize_text(resp, 400)}\n"
+
+    if round_number == 1:
+        return (
+            "你是一位善于引导学生主动思考的资深教师。\n"
+            "学生做错了一道题，但你不能直接告诉他答案或原因。\n"
+            "你只能提出一个引导性问题，帮助他重新审视题目条件和自己的思路。\n"
+            "问题必须简短（50字以内），必须与该题的关键概念直接相关。\n"
+            "仅输出 JSON 对象，字段为 probe_question。\n\n"
+            f"题目：{sanitize_text(question, 1600)}\n"
+            f"学生答案：{sanitize_text(user_answer, 500)}\n"
+            f"标准答案：{sanitize_text(correct_answer, 500)}\n"
+            f"知识点：{kp_text}"
+        )
+    if round_number == 2:
+        return (
+            "你是一位善于引导学生主动思考的资深教师。\n"
+            "上一轮你对学生提出了引导问题，学生已回答。\n"
+            "根据学生的回答，判断他的思维偏差方向，并给出一个更聚焦的提示。\n"
+            "提示必须简短（80字以内），不能直接揭示答案，但要让学生离正确理解更近一步。\n"
+            "仅输出 JSON 对象，字段为 probe_question 和 thinking_direction"
+            "（thinking_direction 用20字描述学生当前的思维偏差）。\n\n"
+            f"题目：{sanitize_text(question, 1600)}\n"
+            f"学生答案：{sanitize_text(user_answer, 500)}\n"
+            f"标准答案：{sanitize_text(correct_answer, 500)}\n"
+            f"知识点：{kp_text}\n"
+            f"{prev_dialogue}"
+        )
+    # round_number >= 3: final reveal
+    return (
+        "你是一位善于引导学生主动思考的资深教师。\n"
+        "经过两轮追问，现在请给出完整的诊断分析。\n"
+        "仅输出 JSON 对象，字段必须包含：\n"
+        "summary（对学生思维路径的总结，100字以内），\n"
+        "root_cause（错误根因，80字以内），\n"
+        "corrected_thinking（正确思路，分步骤字符串数组，2-4步），\n"
+        "encouragement（鼓励语，30字以内）。\n\n"
+        f"题目：{sanitize_text(question, 1600)}\n"
+        f"学生答案：{sanitize_text(user_answer, 500)}\n"
+        f"标准答案：{sanitize_text(correct_answer, 500)}\n"
+        f"知识点：{kp_text}\n"
+        f"{prev_dialogue}"
+    )
+
+
+# ── Knowledge Topology Explorer ──────────────────────────────────────────
+
+
+def knowledge_topology_prompt(
+    knowledge_points: list[str],
+    mastery_data: list[dict[str, Any]],
+) -> str:
+    kp_list = json.dumps(
+        [sanitize_text(kp, 80) for kp in knowledge_points if sanitize_text(kp, 80)][:30],
+        ensure_ascii=False,
+    )
+    mastery_json = json.dumps(mastery_data[:30], ensure_ascii=False)
+    return (
+        "你是一位学科知识图谱专家。请分析以下知识点之间的逻辑关系。\n"
+        "仅输出 JSON 对象，包含两个字段：\n"
+        "nodes：数组，每个元素包含 id（知识点名称）、level（认知层级：记忆/理解/应用/分析/综合，选一个）。\n"
+        "edges：数组，每个元素包含 source、target、relation（三者都是字符串，\n"
+        "relation 只能是 prerequisite 前置依赖 / parallel 并列 / extension 拓展延伸 之一）。\n\n"
+        "分析规则：\n"
+        "1) 如果理解 B 必须先掌握 A，则 A->B 为 prerequisite。\n"
+        "2) 如果 A 和 B 可以独立学习但属于同一主题，则为 parallel。\n"
+        "3) 如果 B 是 A 的深层应用或拓展，则为 extension。\n"
+        "4) 每对知识点最多一条边，优先标 prerequisite。\n\n"
+        f"知识点列表：{kp_list}\n"
+        f"掌握情况：{mastery_json}"
+    )
+
+
+# ── Intervention Sandbox ─────────────────────────────────────────────────
+
+
+def intervention_sandbox_prompt(
+    class_wrong_clusters: list[dict[str, Any]],
+    student_count: int,
+) -> str:
+    clusters_json = json.dumps(class_wrong_clusters[:10], ensure_ascii=False)
+    return (
+        "你是一位资深教研组长，请基于班级错题聚类数据，生成 2-3 个可执行的干预策略。\n"
+        "仅输出 JSON 数组，每个元素必须包含以下字段：\n"
+        "strategy_name（策略名称，10字以内），\n"
+        "description（具体操作描述，50字以内），\n"
+        "target_knowledge_points（涉及的知识点数组），\n"
+        "estimated_minutes（预估所需课堂分钟数，整数），\n"
+        f"estimated_fix_rate（预估修复率百分比，0-100整数，基于{student_count}名学生的),\n"
+        "target_student_count（建议覆盖的学生数，整数），\n"
+        "priority（优先级：HIGH/MEDIUM/LOW）。\n\n"
+        "策略设计原则：\n"
+        "1) 策略之间应有差异化（如：集中复讲 vs 分层个性化练习 vs 概念类比重讲）。\n"
+        "2) 优先处理错误人数最多、错误次数最集中的知识点。\n"
+        "3) 时间估计要合理，单次不超过20分钟。\n\n"
+        f"班级错题聚类数据：{clusters_json}\n"
+        f"班级总人数：{student_count}"
+    )
+

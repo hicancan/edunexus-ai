@@ -4,6 +4,8 @@ import httpx
 
 from ..routing import scene_params
 
+_DEFAULT_POOL_LIMITS = httpx.Limits(max_connections=10, max_keepalive_connections=5)
+
 
 class OpenAICompatClient:
     """OpenAI-compatible client; works for OpenAI and DeepSeek."""
@@ -11,6 +13,12 @@ class OpenAICompatClient:
     def __init__(self, base_url: str, api_key: str) -> None:
         self._base_url = base_url
         self._api_key = api_key
+        self._client = httpx.AsyncClient(
+            base_url=base_url,
+            limits=_DEFAULT_POOL_LIMITS,
+            timeout=httpx.Timeout(120.0, connect=10.0),
+            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+        )
 
     async def complete(
         self, prompt: str, model: str, scene: str, *, timeout_seconds: float
@@ -31,13 +39,11 @@ class OpenAICompatClient:
             "top_p": cfg["top_p"],
             "max_tokens": int(cfg["max_tokens"]),
         }
-        headers = {"Authorization": f"Bearer {self._api_key}"}
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            response = await client.post(
-                f"{self._base_url}/chat/completions", json=payload, headers=headers
-            )
-            response.raise_for_status()
-            data = response.json()
+        response = await self._client.post(
+            "/chat/completions", json=payload, timeout=timeout_seconds
+        )
+        response.raise_for_status()
+        data = response.json()
         raw_usage = data.get("usage", {})
         usage = {
             "prompt_tokens": raw_usage.get("prompt_tokens", 0) or 0,
@@ -53,13 +59,9 @@ class OpenAICompatClient:
         if not self._api_key:
             raise RuntimeError("missing api key")
         payload = {"model": model, "input": text}
-        headers = {"Authorization": f"Bearer {self._api_key}"}
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.post(
-                f"{self._base_url}/embeddings", json=payload, headers=headers
-            )
-            response.raise_for_status()
-            data = response.json()
+        response = await self._client.post("/embeddings", json=payload, timeout=45.0)
+        response.raise_for_status()
+        data = response.json()
         rows = data.get("data", [])
         if not rows:
             raise ValueError("empty embedding response")
@@ -67,3 +69,6 @@ class OpenAICompatClient:
         if not isinstance(vector, list):
             raise ValueError("invalid embedding response")
         return [float(x) for x in vector]
+
+    async def aclose(self) -> None:
+        await self._client.aclose()

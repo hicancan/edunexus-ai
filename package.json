@@ -1,5 +1,8 @@
 {
-  "dependencies": {
+  "private": true,
+  "name": "edunexus-ai",
+  "description": "EduNexus AI monorepo root — only Playwright for doc screenshots",
+  "devDependencies": {
     "playwright": "^1.59.1"
   }
 }

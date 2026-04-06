@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
 
         yield
 
+        await llm_service.aclose()
         grpc_task.cancel()
 
     app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
@@ -126,6 +127,108 @@ def create_app() -> FastAPI:
     @app.get("/internal/v1/ping")
     async def internal_ping() -> dict[str, str]:
         return {"status": "ok"}
+
+    # ── Socratic Scaffold Chain ──────────────────────────────────────────
+
+    @app.post("/internal/v1/socratic-probe")
+    async def socratic_probe(request: Request) -> JSONResponse:
+        from .prompts import socratic_probe_prompt
+        from .repair import complete_with_json_repair
+
+        body = await request.json()
+        trace_id = request.headers.get("X-Trace-Id", "")
+        round_number = int(body.get("roundNumber", 1))
+        prompt = socratic_probe_prompt(
+            question=body.get("question", ""),
+            user_answer=body.get("userAnswer", ""),
+            correct_answer=body.get("correctAnswer", ""),
+            knowledge_points=body.get("knowledgePoints", []),
+            round_number=round_number,
+            student_responses=body.get("studentResponses", []),
+        )
+        parsed, result = await complete_with_json_repair(
+            llm_service,
+            prompt,
+            scene="socratic_probe",
+            trace_id=trace_id,
+            repair_prompt_fn=lambda text: (
+                "将下面文本转换为合法 JSON 对象：\n" + text
+            ),
+        )
+        return JSONResponse(content={
+            "data": parsed or {},
+            "roundNumber": round_number,
+            "provider": result.provider,
+            "model": result.model,
+            "reason": result.reason,
+            "latencyMs": result.latency_ms,
+            "traceId": trace_id,
+        })
+
+    # ── Knowledge Topology Explorer ──────────────────────────────────────
+
+    @app.post("/internal/v1/knowledge-topology")
+    async def knowledge_topology(request: Request) -> JSONResponse:
+        from .prompts import knowledge_topology_prompt
+        from .repair import complete_with_json_repair
+
+        body = await request.json()
+        trace_id = request.headers.get("X-Trace-Id", "")
+        prompt = knowledge_topology_prompt(
+            knowledge_points=body.get("knowledgePoints", []),
+            mastery_data=body.get("masteryData", []),
+        )
+        parsed, result = await complete_with_json_repair(
+            llm_service,
+            prompt,
+            scene="knowledge_topology",
+            trace_id=trace_id,
+            repair_prompt_fn=lambda text: (
+                "将下面文本转换为合法 JSON 对象，包含 nodes 和 edges 两个数组字段：\n" + text
+            ),
+        )
+        return JSONResponse(content={
+            "data": parsed or {"nodes": [], "edges": []},
+            "provider": result.provider,
+            "model": result.model,
+            "reason": result.reason,
+            "latencyMs": result.latency_ms,
+            "traceId": trace_id,
+        })
+
+    # ── Intervention Sandbox ─────────────────────────────────────────────
+
+    @app.post("/internal/v1/intervention-sandbox")
+    async def intervention_sandbox(request: Request) -> JSONResponse:
+        from .prompts import intervention_sandbox_prompt
+        from .repair import complete_with_json_repair
+
+        body = await request.json()
+        trace_id = request.headers.get("X-Trace-Id", "")
+        prompt = intervention_sandbox_prompt(
+            class_wrong_clusters=body.get("classWrongClusters", []),
+            student_count=int(body.get("studentCount", 0)),
+        )
+        parsed, result = await complete_with_json_repair(
+            llm_service,
+            prompt,
+            scene="intervention_sandbox",
+            trace_id=trace_id,
+            expect_array=True,
+            repair_prompt_fn=lambda text: (
+                "将下面文本转换为合法 JSON 数组，每个元素包含"
+                " strategy_name/description/target_knowledge_points/"
+                "estimated_minutes/estimated_fix_rate/target_student_count/priority：\n" + text
+            ),
+        )
+        return JSONResponse(content={
+            "data": parsed or [],
+            "provider": result.provider,
+            "model": result.model,
+            "reason": result.reason,
+            "latencyMs": result.latency_ms,
+            "traceId": trace_id,
+        })
 
     return app
 

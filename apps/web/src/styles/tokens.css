@@ -31,6 +31,16 @@
 
   --color-text-main: #1e293b;
   --color-text-muted: #64748b;
+  --color-text: #1e293b;
+
+  --color-border-strong: #cbd5e1;
+
+  --color-surface: rgba(255, 255, 255, 0.85);
+  --color-surface-strong: #f8fafc;
+
+  --color-danger-strong: #dc2626;
+
+  --shadow-focus: 0 0 0 3px rgba(92, 101, 246, 0.2);
 
   --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   --shadow-float: 0 20px 40px -20px rgba(0, 0, 0, 0.15);

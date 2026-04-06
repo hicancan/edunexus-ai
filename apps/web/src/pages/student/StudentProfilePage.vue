@@ -13,23 +13,25 @@ import {
 } from "naive-ui";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
-import { LineChart, BarChart } from "echarts/charts";
+import { LineChart, BarChart, GraphChart } from "echarts/charts";
 import { GridComponent, TooltipComponent, LegendComponent } from "echarts/components";
 import VChart from "vue-echarts";
-import { RefreshCw, User as UserIcon, AlertTriangle, Sparkles, TrendingUp } from "lucide-vue-next";
+import { RefreshCw, User as UserIcon, AlertTriangle, Sparkles, TrendingUp, Network } from "lucide-vue-next";
 import { getMe } from "../../features/auth/api/auth.service";
-import { getProfileAnalytics } from "../../features/student/api/student.service";
+import { getProfileAnalytics, getKnowledgeTopology } from "../../features/student/api/student.service";
 import { toErrorMessage } from "../../services/error-message";
-import type { StudentAnalyticsVO, UserVO } from "../../services/contracts";
+import type { StudentAnalyticsVO, UserVO, KnowledgeTopologyVO } from "../../services/contracts";
 import { useAuthStore } from "../../features/auth/model/auth";
 
-use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent]);
+use([CanvasRenderer, LineChart, BarChart, GraphChart, GridComponent, TooltipComponent, LegendComponent]);
 
 const auth = useAuthStore();
 const profile = ref<UserVO | null>(null);
 const analytics = ref<StudentAnalyticsVO | null>(null);
+const topologyData = ref<KnowledgeTopologyVO | null>(null);
 const loading = ref(false);
 const analyticsLoading = ref(false);
+const topologyLoading = ref(false);
 const error = ref("");
 
 const topWeakPoints = computed(() => analytics.value?.topWeakPoints?.slice(0, 5) || []);
@@ -183,8 +185,54 @@ async function loadAnalytics(): Promise<void> {
   }
 }
 
+async function loadTopology(): Promise<void> {
+  topologyLoading.value = true;
+  try {
+    topologyData.value = await getKnowledgeTopology();
+  } catch (e) {
+    console.error("加载知识拓扑失败", e);
+  } finally {
+    topologyLoading.value = false;
+  }
+}
+
+const topologyOption = computed(() => {
+  if (!topologyData.value || !topologyData.value.nodes || topologyData.value.nodes.length === 0) return {};
+  
+  return {
+    tooltip: { trigger: "item", formatter: "{b}" },
+    series: [
+      {
+        type: "graph",
+        layout: "force",
+        data: topologyData.value.nodes.map((n: any) => ({
+          id: n.id,
+          name: n.name,
+          symbolSize: n.status === "weak" ? 40 : 25,
+          itemStyle: { color: n.status === "weak" ? "#ef4444" : "#10b981" }
+        })),
+        links: topologyData.value.edges.map((e: any) => ({
+          source: e.source,
+          target: e.target,
+          label: { show: true, formatter: e.type, fontSize: 10 }
+        })),
+        roam: true,
+        label: { show: true, position: "right" },
+        force: {
+          repulsion: 300,
+          edgeLength: 120
+        },
+        lineStyle: {
+          color: "source",
+          curveness: 0.2
+        }
+      }
+    ]
+  };
+});
+
 async function refreshProfile(): Promise<void> {
-  await Promise.all([loadProfile(), loadAnalytics()]);
+  await Promise.all([loadProfile(), loadAnalytics(), loadTopology()]);
 }
 
 onMounted(async () => {
@@ -437,18 +485,18 @@ function realtimeDensityDisplay(value?: number | null): string {
           </n-spin>
         </section>
 
-        <section class="panel glass-card chart-panel">
+        <section class="panel glass-card chart-panel" style="grid-column: span 1;">
           <div class="panel-head">
             <div>
-              <h3 class="panel-title">薄弱知识域分布</h3>
-              <p class="panel-note">根据近期错题聚合得到当前应优先补齐的知识点。</p>
+              <h3 class="panel-title">知识点拓扑图谱 (Knowledge Topology)</h3>
+              <p class="panel-note">基于最近错题关联推理生成的前置与后置知识节点依赖关系。</p>
             </div>
           </div>
-          <n-spin :show="analyticsLoading">
-            <div v-if="topWeakPoints.length === 0" class="empty-block">
-              暂无薄弱知识点，继续保持练习。
+          <n-spin :show="topologyLoading">
+            <div v-if="!topologyData || !topologyData.nodes || topologyData.nodes.length === 0" class="empty-block">
+              暂无足够的错误数据生成拓扑关联。
             </div>
-            <v-chart v-else class="trend-chart" :option="weakPointsBarOption" autoresize />
+            <v-chart v-else class="trend-chart" :option="topologyOption" autoresize style="min-height: 300px;" />
           </n-spin>
         </section>
       </div>

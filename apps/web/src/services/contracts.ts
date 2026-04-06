@@ -52,6 +52,64 @@ export type AdminResourceVO = Schemas["AdminResourceVO"];
 export type AdminUserCreateRequest = Schemas["AdminUserCreateRequest"];
 export type AdminUserPatchRequest = Schemas["AdminUserPatchRequest"];
 
+// ── Knowledge Topology Explorer ──────────────────────────────────────────
+export interface TopologyNode {
+  id: string;
+  level?: string;
+  group?: string;
+  size?: number;
+}
+
+export interface TopologyEdge {
+  source: string;
+  target: string;
+  relation: string;
+}
+
+export interface KnowledgeTopologyVO {
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+}
+
+// ── Socratic Scaffold Chain ──────────────────────────────────────────────
+export interface SocraticProbeRequest {
+  roundNumber: number;
+  userAnswer?: string;
+  studentResponses?: string[];
+}
+
+export interface SocraticProbeVO {
+  data: Record<string, unknown>;
+  roundNumber: number;
+  provider?: string;
+  model?: string;
+  reason?: string;
+  latencyMs?: number;
+}
+
+// ── Intervention Sandbox ─────────────────────────────────────────────────
+export interface InterventionSandboxRequest {
+  studentCount: number;
+}
+
+export interface SandboxStrategy {
+  strategy_name: string;
+  description: string;
+  target_knowledge_points: string[];
+  estimated_minutes: number;
+  estimated_fix_rate: string | number;
+  target_student_count: number;
+  priority: string;
+}
+
+export interface InterventionSandboxVO {
+  data: SandboxStrategy[];
+  provider?: string;
+  model?: string;
+  reason?: string;
+  latencyMs?: number;
+}
+
 export interface ApiEnvelope<T = unknown> {
   code: number | string;
   message: string;

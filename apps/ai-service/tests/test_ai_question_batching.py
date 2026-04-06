@@ -80,6 +80,7 @@ def _settings() -> Settings:
         qdrant_collection="knowledge_chunks",
         embedding_dim=1024,
         java_grpc_url="127.0.0.1:9090",
+        ai_grpc_listen_port=50051,
         service_token="change-this-in-local-too",
         python_runner="uv",
         chat_rag_timeout_seconds=25.0,

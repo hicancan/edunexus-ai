@@ -4,10 +4,16 @@ import httpx
 
 from ..routing import scene_params
 
+_DEFAULT_POOL_LIMITS = httpx.Limits(max_connections=10, max_keepalive_connections=5)
+
 
 class GeminiClient:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
+        self._client = httpx.AsyncClient(
+            limits=_DEFAULT_POOL_LIMITS,
+            timeout=httpx.Timeout(120.0, connect=10.0),
+        )
 
     async def complete(
         self, prompt: str, model: str, scene: str, *, timeout_seconds: float
@@ -28,10 +34,9 @@ class GeminiClient:
             f"{model}:generateContent?key={self._api_key}"
         )
         try:
-            async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
-                data = response.json()
+            response = await self._client.post(url, json=payload, timeout=timeout_seconds)
+            response.raise_for_status()
+            data = response.json()
         except Exception as ex:
             # M-06: 脱敏——确保异常堆栈中不包含 API Key
             sanitized_url = (
@@ -51,3 +56,6 @@ class GeminiClient:
             return "", usage
         parts = candidates[0].get("content", {}).get("parts", [])
         return "".join(str(part.get("text", "")) for part in parts), usage
+
+    async def aclose(self) -> None:
+        await self._client.aclose()

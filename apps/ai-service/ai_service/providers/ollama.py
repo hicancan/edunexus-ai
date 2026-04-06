@@ -7,10 +7,17 @@ import httpx
 
 from ..routing import scene_params
 
+_DEFAULT_POOL_LIMITS = httpx.Limits(max_connections=10, max_keepalive_connections=5)
+
 
 class OllamaClient:
     def __init__(self, base_url: str) -> None:
         self._base_url = base_url
+        self._client = httpx.AsyncClient(
+            base_url=base_url,
+            limits=_DEFAULT_POOL_LIMITS,
+            timeout=httpx.Timeout(120.0, connect=10.0),
+        )
 
     def _build_payload(
         self, prompt: str, model: str, scene: str, *, stream: bool
@@ -34,10 +41,11 @@ class OllamaClient:
         self, prompt: str, model: str, scene: str, *, timeout_seconds: float
     ) -> tuple[str, dict[str, int]]:
         payload = self._build_payload(prompt, model, scene, stream=False)
-        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-            response = await client.post(f"{self._base_url}/api/generate", json=payload)
-            response.raise_for_status()
-            data = response.json()
+        response = await self._client.post(
+            "/api/generate", json=payload, timeout=timeout_seconds
+        )
+        response.raise_for_status()
+        data = response.json()
         usage = {
             "prompt_tokens": data.get("prompt_eval_count", 0) or 0,
             "completion_tokens": data.get("eval_count", 0) or 0,
@@ -48,14 +56,12 @@ class OllamaClient:
         self, prompt: str, model: str, scene: str, *, timeout_seconds: float
     ) -> AsyncIterator[str]:
         payload = self._build_payload(prompt, model, scene, stream=True)
-        async with (
-            httpx.AsyncClient(timeout=timeout_seconds) as client,
-            client.stream(
-                "POST",
-                f"{self._base_url}/api/generate",
-                json=payload,
-            ) as response,
-        ):
+        async with self._client.stream(
+            "POST",
+            "/api/generate",
+            json=payload,
+            timeout=timeout_seconds,
+        ) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():
                 raw = line.strip()
@@ -68,11 +74,13 @@ class OllamaClient:
 
     async def embed(self, text: str, model: str) -> list[float]:
         payload = {"model": model, "prompt": text}
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.post(f"{self._base_url}/api/embeddings", json=payload)
-            response.raise_for_status()
-            data = response.json()
+        response = await self._client.post("/api/embeddings", json=payload, timeout=45.0)
+        response.raise_for_status()
+        data = response.json()
         embedding = data.get("embedding", [])
         if not isinstance(embedding, list):
             raise ValueError("invalid embedding payload")
         return [float(x) for x in embedding]
+
+    async def aclose(self) -> None:
+        await self._client.aclose()

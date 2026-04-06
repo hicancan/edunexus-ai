@@ -5,6 +5,7 @@ import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.Difficulty;
 import com.edunexus.api.common.ResourceNotFoundException;
+import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.AnalyticsService;
 import com.edunexus.api.service.AiQuestionService;
 import com.edunexus.api.service.ChatService;
@@ -44,6 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/student")
 public class StudentController implements ControllerSupport {
 
+    private final AiClient aiClient;
     private final AnalyticsService analyticsService;
     private final ChatService chatService;
     private final ExerciseService exerciseService;
@@ -52,12 +54,14 @@ public class StudentController implements ControllerSupport {
     private final VoMapper voMapper;
 
     public StudentController(
+            AiClient aiClient,
             AnalyticsService analyticsService,
             ChatService chatService,
             ExerciseService exerciseService,
             AiQuestionService aiQuestionService,
             GovernanceService governance,
             VoMapper voMapper) {
+        this.aiClient = aiClient;
         this.analyticsService = analyticsService;
         this.chatService = chatService;
         this.exerciseService = exerciseService;
@@ -475,6 +479,110 @@ public class StudentController implements ControllerSupport {
                         Map.of("recordId", recordId.toString(), "items", items), trace(request)));
     }
 
+    // ── Socratic Scaffold Chain ──────────────────────────────────────────────
+
+    @PostMapping("/exercise/wrong-questions/{questionId}/socratic-probe")
+    public ResponseEntity<ApiResponse> socraticProbe(
+            @PathVariable("questionId") UUID questionId,
+            @Valid @RequestBody SocraticProbeReq req,
+            HttpServletRequest request) {
+        requireRole("STUDENT");
+        AuthUser user = currentUser();
+
+        var wrongEntry = exerciseService.findWrongBookEntry(user.userId(), questionId);
+        if (wrongEntry == null) throw new ResourceNotFoundException("错题记录不存在");
+
+        var question = exerciseService.findQuestion(questionId);
+        if (question == null) throw new ResourceNotFoundException("题目不存在");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("traceId", trace(request));
+        body.put("question", question.content());
+        body.put("userAnswer", req.userAnswer() == null ? "" : req.userAnswer());
+        body.put("correctAnswer", question.correctAnswer());
+        body.put("knowledgePoints", ApiDataMapper.parseNullableStringList(
+                question.knowledgePointsJson(), new com.fasterxml.jackson.databind.ObjectMapper()));
+        body.put("roundNumber", req.roundNumber());
+        body.put("studentResponses", req.studentResponses() == null ? List.of() : req.studentResponses());
+
+        var result = aiClient.socraticProbe(body);
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "SOCRATIC_PROBE",
+                "WRONG_BOOK",
+                questionId.toString(),
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        executionLaneFromProvider(ApiDataMapper.asString(result.get("provider"))),
+                        "roundNumber",
+                        req.roundNumber(),
+                        "provider",
+                        ApiDataMapper.asString(result.get("provider")),
+                        "model",
+                        ApiDataMapper.asString(result.get("model")),
+                        "latencyMs",
+                        ApiDataMapper.asInt(result.get("latencyMs"))));
+        return ResponseEntity.ok(ApiResponse.ok(result, trace(request)));
+    }
+
+    // ── Knowledge Topology Explorer ──────────────────────────────────────────
+
+    @GetMapping("/profile/knowledge-topology")
+    public ResponseEntity<ApiResponse> knowledgeTopology(HttpServletRequest request) {
+        requireRole("STUDENT");
+        AuthUser user = currentUser();
+
+        var weakPoints = exerciseService.getWeakPoints(user.userId());
+        List<String> knowledgePoints = weakPoints.stream()
+                .map(wp -> wp.knowledgePoint())
+                .distinct()
+                .toList();
+
+        if (knowledgePoints.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.ok(
+                    Map.of("nodes", List.of(), "edges", List.of(), "source", "EMPTY"),
+                    trace(request)));
+        }
+
+        List<Map<String, Object>> masteryData = weakPoints.stream()
+                .map(wp -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("knowledgePoint", wp.knowledgePoint());
+                    item.put("wrongCount", wp.wrongCount());
+                    item.put("status", wp.wrongCount() >= 3 ? "weak" : "unstable");
+                    return item;
+                })
+                .toList();
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("traceId", trace(request));
+        body.put("knowledgePoints", knowledgePoints);
+        body.put("masteryData", masteryData);
+
+        var result = aiClient.knowledgeTopology(body);
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "KNOWLEDGE_TOPOLOGY",
+                "STUDENT_ANALYTICS",
+                user.userId().toString(),
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        executionLaneFromProvider(ApiDataMapper.asString(result.get("provider"))),
+                        "provider",
+                        ApiDataMapper.asString(result.get("provider")),
+                        "model",
+                        ApiDataMapper.asString(result.get("model")),
+                        "latencyMs",
+                        ApiDataMapper.asInt(result.get("latencyMs")),
+                        "nodeCount",
+                        knowledgePoints.size()));
+        return ResponseEntity.ok(ApiResponse.ok(result, trace(request)));
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private boolean wantsSse(HttpServletRequest request) {
@@ -545,4 +653,9 @@ public class StudentController implements ControllerSupport {
             @NotBlank String sessionId, @NotNull @Size(min = 1) List<@Valid AnswerItem> answers) {}
 
     public record AnswerItem(@NotBlank String questionId, @NotBlank String userAnswer) {}
+
+    public record SocraticProbeReq(
+            @Min(1) @Max(3) int roundNumber,
+            String userAnswer,
+            List<String> studentResponses) {}
 }

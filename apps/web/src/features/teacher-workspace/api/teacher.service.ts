@@ -6,6 +6,8 @@ import {
   type DocumentStatus,
   type DocumentVO,
   type InterventionRecommendationVO,
+  type InterventionSandboxRequest,
+  type InterventionSandboxVO,
   type LessonPlanVO,
   type PagedResult,
   type PlanGenerateRequest,
@@ -166,6 +168,17 @@ export async function createTeacherSuggestion(
   const response = await apiClient.post<ApiEnvelope<TeacherSuggestionVO>>(
     "/teacher/suggestions",
     payload
+  );
+  return unwrapResponse(response);
+}
+
+export async function runInterventionSandbox(
+  payload: InterventionSandboxRequest
+): Promise<InterventionSandboxVO> {
+  const response = await apiClient.post<ApiEnvelope<InterventionSandboxVO>>(
+    "/teacher/interventions/sandbox",
+    payload,
+    { timeout: 180000 }
   );
   return unwrapResponse(response);
 }

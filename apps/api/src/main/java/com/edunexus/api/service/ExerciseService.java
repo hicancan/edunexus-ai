@@ -169,6 +169,10 @@ public class ExerciseService {
         return questionRepo.findById(questionId);
     }
 
+    public WrongBookEntry findWrongBookEntry(UUID studentId, UUID questionId) {
+        return wrongBookRepo.findByStudentAndQuestion(studentId, questionId);
+    }
+
     public int markWrongQuestionMastered(UUID studentId, UUID questionId) {
         return wrongBookRepo.markMastered(studentId, questionId);
     }

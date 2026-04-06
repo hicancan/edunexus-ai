@@ -231,6 +231,24 @@ $audits = Invoke-ApiJson -Method "Get" -Path "/api/v1/admin/audits?page=1&size=2
 Assert-True -Condition ($dashboard.data.totalUsers -ge 1) -Message "admin dashboard metrics empty"
 Assert-True -Condition ($audits.data.content.Count -ge 1) -Message "admin audits empty"
 
+# ── New Cognitive Features ───────────────────────────────────────────────
+
+# Knowledge Topology
+$topology = Invoke-ApiJson -Method "Get" -Path "/api/v1/student/profile/knowledge-topology" -Token $studentToken -TimeoutSec 90
+Assert-True -Condition ($null -ne $topology.data) -Message "knowledge topology returned null"
+
+# Socratic Probe
+$wrongQs = Invoke-ApiJson -Method "Get" -Path "/api/v1/student/exercise/wrong-questions?status=ACTIVE" -Token $studentToken
+if ($wrongQs.data.content.Count -gt 0) {
+  $probeQuestionId = $wrongQs.data.content[0].questionId
+  $probe = Invoke-ApiJson -Method "Post" -Path "/api/v1/student/exercise/wrong-questions/$probeQuestionId/socratic-probe" -Token $studentToken -Body @{ roundNumber = 1; studentResponses = @() } -TimeoutSec 90
+  Assert-True -Condition ($null -ne $probe.data) -Message "socratic probe returned null"
+}
+
+# Intervention Sandbox
+$sandbox = Invoke-ApiJson -Method "Post" -Path "/api/v1/teacher/interventions/sandbox" -Token $teacherToken -Body @{ studentCount = 31 } -TimeoutSec 90
+Assert-True -Condition ($null -ne $sandbox.data) -Message "intervention sandbox returned null"
+
 [pscustomobject]@{
   chat                            = "ok"
   exercise_no_answer_leak         = "ok"
@@ -240,4 +258,7 @@ Assert-True -Condition ($audits.data.content.Count -ge 1) -Message "admin audits
   teacher_plan_generate_export    = "ok"
   teacher_recommendations         = "ok"
   admin_users_resources_dashboard = "ok"
+  knowledge_topology              = "ok"
+  socratic_probe                  = "ok"
+  intervention_sandbox            = "ok"
 } | ConvertTo-Json -Depth 5

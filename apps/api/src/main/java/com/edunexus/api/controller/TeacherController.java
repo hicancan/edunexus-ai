@@ -3,6 +3,7 @@ package com.edunexus.api.controller;
 import com.edunexus.api.auth.AuthUser;
 import com.edunexus.api.common.ApiDataMapper;
 import com.edunexus.api.common.ApiResponse;
+import com.edunexus.api.service.AiClient;
 import com.edunexus.api.service.AnalyticsService;
 import com.edunexus.api.service.GovernanceService;
 import com.edunexus.api.service.KnowledgeService;
@@ -17,6 +18,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +44,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/teacher")
 public class TeacherController implements ControllerSupport {
 
+    private final AiClient aiClient;
     private final AnalyticsService analyticsService;
     private final KnowledgeService knowledgeService;
     private final LessonPlanService lessonPlanService;
@@ -50,12 +53,14 @@ public class TeacherController implements ControllerSupport {
     private final VoMapper voMapper;
 
     public TeacherController(
+            AiClient aiClient,
             AnalyticsService analyticsService,
             KnowledgeService knowledgeService,
             LessonPlanService lessonPlanService,
             SuggestionService suggestionService,
             GovernanceService governance,
             VoMapper voMapper) {
+        this.aiClient = aiClient;
         this.analyticsService = analyticsService;
         this.knowledgeService = knowledgeService;
         this.lessonPlanService = lessonPlanService;
@@ -559,6 +564,52 @@ public class TeacherController implements ControllerSupport {
                         trace(request)));
     }
 
+    // ── Intervention Sandbox ─────────────────────────────────────────────────
+
+    @PostMapping("/interventions/sandbox")
+    public ResponseEntity<ApiResponse> interventionSandbox(
+            @Valid @RequestBody InterventionSandboxReq req, HttpServletRequest request) {
+        requireRole("TEACHER");
+        AuthUser user = currentUser();
+        var recommendations = analyticsService.getInterventionRecommendations(user.userId());
+
+        List<Map<String, Object>> clusters = recommendations.stream()
+                .map(r -> {
+                    Map<String, Object> cluster = new LinkedHashMap<>();
+                    cluster.put("knowledgePoint", ApiDataMapper.asString(r.get("knowledgePoint")));
+                    cluster.put("studentCount", ApiDataMapper.asInt(r.get("studentCount")));
+                    cluster.put("totalWrongCount", ApiDataMapper.asInt(r.get("totalWrongCount")));
+                    return cluster;
+                })
+                .toList();
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("traceId", trace(request));
+        body.put("classWrongClusters", clusters);
+        body.put("studentCount", req.studentCount());
+
+        var result = aiClient.interventionSandbox(body);
+        governance.audit(
+                user.userId(),
+                user.role(),
+                "INTERVENTION_SANDBOX",
+                "TEACHER_SANDBOX",
+                "classroom",
+                trace(request),
+                Map.of(
+                        "executionLane",
+                        executionLaneFromProvider(ApiDataMapper.asString(result.get("provider"))),
+                        "provider",
+                        ApiDataMapper.asString(result.get("provider")),
+                        "model",
+                        ApiDataMapper.asString(result.get("model")),
+                        "latencyMs",
+                        ApiDataMapper.asInt(result.get("latencyMs")),
+                        "strategyCount",
+                        result.get("data") instanceof List<?> l ? l.size() : 0));
+        return ResponseEntity.ok(ApiResponse.ok(result, trace(request)));
+    }
+
     // ── Request records ──────────────────────────────────────────────────────
 
     public record PlanGenerateReq(
@@ -577,6 +628,8 @@ public class TeacherController implements ControllerSupport {
     public record BulkSuggestionReq(
             @NotBlank @Size(min = 1, max = 100) String knowledgePoint,
             @NotBlank @Size(min = 1, max = 2000) String suggestion) {}
+
+    public record InterventionSandboxReq(@Min(1) @Max(200) int studentCount) {}
 
     private String executionLaneFromProvider(String provider) {
         if (provider == null || provider.isBlank()) {

@@ -56,6 +56,8 @@ public class AiClient {
     private final long lessonPlanTimeoutSeconds;
     private final long kbIngestTimeoutSeconds;
     private final long kbDeleteTimeoutSeconds;
+    private final String aiHttpHost;
+    private final int aiHttpPort;
 
     private final ManagedChannel grpcChannel;
     private final RagChatServiceGrpc.RagChatServiceBlockingStub chatStub;
@@ -71,6 +73,8 @@ public class AiClient {
     public AiClient(
             @Value("${app.ai-service-grpc-host:127.0.0.1}") String grpcHost,
             @Value("${app.ai-service-grpc-port:50051}") int grpcPort,
+            @Value("${app.ai-service-http-host:127.0.0.1}") String aiHttpHost,
+            @Value("${app.ai-service-http-port:8000}") int aiHttpPort,
             @Value("${app.ai-question-timeout-seconds:150}") long aiQuestionTimeoutSeconds,
             @Value("${app.lesson-plan-timeout-seconds:180}") long lessonPlanTimeoutSeconds,
             @Value("${app.kb-ingest-timeout-seconds:180}") long kbIngestTimeoutSeconds,
@@ -81,6 +85,8 @@ public class AiClient {
         this.lessonPlanTimeoutSeconds = lessonPlanTimeoutSeconds;
         this.kbIngestTimeoutSeconds = kbIngestTimeoutSeconds;
         this.kbDeleteTimeoutSeconds = kbDeleteTimeoutSeconds;
+        this.aiHttpHost = aiHttpHost;
+        this.aiHttpPort = aiHttpPort;
 
         this.grpcChannel =
                 ManagedChannelBuilder.forAddress(grpcHost, grpcPort).usePlaintext().build();
@@ -517,6 +523,58 @@ public class AiClient {
             return Integer.parseInt(String.valueOf(val));
         } catch (NumberFormatException ex) {
             return defaultVal;
+        }
+    }
+
+    // ── New HTTP-based AI calls for deep features ────────────────────────
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> socraticProbe(Map<String, Object> body) {
+        return callAiHttp("/internal/v1/socratic-probe", body);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> knowledgeTopology(Map<String, Object> body) {
+        return callAiHttp("/internal/v1/knowledge-topology", body);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> interventionSandbox(Map<String, Object> body) {
+        return callAiHttp("/internal/v1/intervention-sandbox", body);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> callAiHttp(String path, Map<String, Object> body) {
+        String traceId = getString(body, "traceId", UUID.randomUUID().toString());
+        long startMs = System.currentTimeMillis();
+        try {
+            var headers = new org.springframework.http.HttpHeaders();
+            headers.set("Content-Type", "application/json");
+            headers.set("X-Service-Token", serviceToken);
+            headers.set("X-Trace-Id", traceId);
+
+            String aiServiceBaseUrl = "http://" + aiHttpHost + ":" + aiHttpPort;
+            var restTemplate = new org.springframework.web.client.RestTemplate();
+            restTemplate.getMessageConverters().add(
+                    0, new org.springframework.http.converter.StringHttpMessageConverter(StandardCharsets.UTF_8));
+            var entity = new org.springframework.http.HttpEntity<>(body, headers);
+            var response = restTemplate.postForEntity(
+                    aiServiceBaseUrl + path,
+                    entity,
+                    Map.class);
+
+            log.info(
+                    "ai_call_http path={} latency_ms={} trace_id={}",
+                    path, (System.currentTimeMillis() - startMs), traceId);
+
+            Map<String, Object> responseBody = response.getBody();
+            return responseBody != null ? responseBody : new LinkedHashMap<>();
+        } catch (Exception ex) {
+            log.error("ai_call_http_error path={} trace_id={} error={}", path, traceId, ex.getMessage());
+            throw new DependencyException(
+                    ErrorCode.SYSTEM_DEPENDENCY,
+                    "调用 AI 服务失败: " + path + ": " + ex.getMessage(),
+                    ex);
         }
     }
 }

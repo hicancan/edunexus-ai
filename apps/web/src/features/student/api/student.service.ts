@@ -21,8 +21,11 @@ import {
   type ExerciseRecordVO,
   type ExerciseResultVO,
   type ExerciseSubmitRequest,
+  type KnowledgeTopologyVO,
   type PagedResult,
   type QuestionVO,
+  type SocraticProbeRequest,
+  type SocraticProbeVO,
   type StudentAnalyticsVO,
   type WeakPointVO,
   type WrongBookEntryVO,
@@ -345,6 +348,22 @@ export async function listProfileWeakPoints(): Promise<WeakPointVO[]> {
 export async function getProfileAnalytics(): Promise<StudentAnalyticsVO> {
   const response = await apiClient.get<ApiEnvelope<StudentAnalyticsVO>>(
     "/student/profile/analytics"
+  );
+  return unwrapResponse(response);
+}
+
+export async function getKnowledgeTopology(): Promise<KnowledgeTopologyVO> {
+  const response = await apiClient.get<ApiEnvelope<KnowledgeTopologyVO>>("/student/profile/knowledge-topology");
+  return unwrapResponse(response);
+}
+
+export async function socraticProbe(
+  questionId: string,
+  payload: SocraticProbeRequest
+): Promise<SocraticProbeVO> {
+  const response = await apiClient.post<ApiEnvelope<SocraticProbeVO>>(
+    `/student/exercise/wrong-questions/${questionId}/socratic-probe`,
+    payload
   );
   return unwrapResponse(response);
 }

@@ -15,11 +15,15 @@ import {
   NTag,
   useDialog,
   useMessage,
+  NModal,
+  NScrollbar,
+  NInputGroup,
   type DataTableColumns
 } from "naive-ui";
-import { Search, Check } from "lucide-vue-next";
+import { Search, Check, MessageSquare } from "lucide-vue-next";
 import { readQueryInt, readQueryString, replaceQuery } from "../../app/providers/query-state";
 import { useExerciseStore } from "../../features/student/model/exercise";
+import { socraticProbe } from "../../features/student/api/student.service";
 import type { WrongBookEntryVO } from "../../services/contracts";
 
 const route = useRoute();
@@ -151,6 +155,70 @@ function confirmMarkMastered(questionId: string): void {
   });
 }
 
+const socraticState = reactive({
+  show: false,
+  questionId: "",
+  questionContent: "",
+  loading: false,
+  round: 1,
+  userAnswer: "",
+  messages: [] as { role: "ai" | "user"; text: string }[],
+  isFinished: false
+});
+
+async function openSocratic(row: WrongBookEntryVO) {
+  if (!row.questionId) return;
+  socraticState.show = true;
+  socraticState.questionId = row.questionId;
+  socraticState.questionContent = row.question?.content || "";
+  socraticState.round = 1;
+  socraticState.messages = [];
+  socraticState.userAnswer = "";
+  socraticState.isFinished = false;
+  socraticState.loading = true;
+
+  try {
+    const res = await socraticProbe(row.questionId, { roundNumber: 1 });
+    socraticState.messages.push({
+      role: "ai",
+      text: String(res.data.probe_question || res.data.summary || JSON.stringify(res.data))
+    });
+  } catch (err: any) {
+    message.error("追问失败: " + err.message);
+  } finally {
+    socraticState.loading = false;
+  }
+}
+
+async function sendSocraticReply() {
+  if (!socraticState.userAnswer.trim()) return;
+
+  socraticState.messages.push({ role: "user", text: socraticState.userAnswer });
+  const _ans = socraticState.userAnswer;
+  socraticState.userAnswer = "";
+  socraticState.loading = true;
+  socraticState.round += 1;
+
+  try {
+    const res = await socraticProbe(socraticState.questionId, {
+      roundNumber: socraticState.round,
+      userAnswer: _ans,
+      studentResponses: socraticState.messages.filter((m) => m.role === "user").map((m) => m.text)
+    });
+    const replyText = String(res.data.probe_question || res.data.summary || JSON.stringify(res.data));
+    socraticState.messages.push({ role: "ai", text: replyText });
+    if (socraticState.round >= 3 || res.data.encouragement) {
+      socraticState.isFinished = true;
+    }
+  } catch (err: any) {
+    socraticState.round -= 1;
+    socraticState.messages.pop();
+    message.error("回复失败: " + err.message);
+  } finally {
+    socraticState.loading = false;
+  }
+}
+
 const columns: DataTableColumns<WrongBookEntryVO> = [
   {
     title: "题目内容",
@@ -208,19 +276,34 @@ const columns: DataTableColumns<WrongBookEntryVO> = [
     align: "center",
     render(row) {
       if (row.status === "ACTIVE") {
-        return h(
-          NButton,
-          {
-            size: "small",
-            type: "primary",
-            secondary: true,
-            onClick: () => confirmMarkMastered(row.questionId || "")
-          },
-          {
-            default: () => "标记掌握",
-            icon: () => h(Check, { size: 14 })
-          }
-        );
+        return h(NSpace, { align: "center", justify: "center", size: "small" }, () => [
+          h(
+            NButton,
+            {
+              size: "small",
+              type: "info",
+              secondary: true,
+              onClick: () => openSocratic(row)
+            },
+            {
+              default: () => "苏格拉底追问",
+              icon: () => h(MessageSquare, { size: 14 })
+            }
+          ),
+          h(
+            NButton,
+            {
+              size: "small",
+              type: "primary",
+              secondary: true,
+              onClick: () => confirmMarkMastered(row.questionId || "")
+            },
+            {
+              default: () => "标记掌握",
+              icon: () => h(Check, { size: 14 })
+            }
+          )
+        ]);
       }
       return h(NText, { depth: 3 }, { default: () => "-" });
     }
@@ -290,6 +373,53 @@ onMounted(async () => {
           :bottom-bordered="false"
         />
       </n-card>
+
+      <!-- 苏格拉底追问弹窗 -->
+      <n-modal v-model:show="socraticState.show" transform-origin="center">
+        <n-card
+          style="width: 600px; max-height: 80vh; display: flex; flex-direction: column;"
+          title="苏格拉底追问 (Socratic Scaffold Chain)"
+          :bordered="false"
+          size="huge"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div style="flex: 1; overflow-y: hidden; display: flex; flex-direction: column; gap: 16px;">
+            <n-alert title="原题内容" type="info" :show-icon="false" style="margin-bottom: 8px;">
+              {{ socraticState.questionContent }}
+            </n-alert>
+            <n-scrollbar style="flex: 1; max-height: 40vh; padding: 0 8px;">
+              <n-space vertical :size="12">
+                <div
+                  v-for="(msg, idx) in socraticState.messages"
+                  :key="idx"
+                  :style="{ textAlign: msg.role === 'user' ? 'right' : 'left' }"
+                >
+                  <n-tag :type="msg.role === 'user' ? 'primary' : 'warning'" :bordered="false" style="padding: 12px; height: auto; max-width: 80%; text-align: left; white-space: pre-wrap; font-size: 14px;">
+                    {{ msg.text }}
+                  </n-tag>
+                </div>
+              </n-space>
+            </n-scrollbar>
+            <div v-if="!socraticState.isFinished">
+              <n-input-group>
+                <n-input
+                  v-model:value="socraticState.userAnswer"
+                  placeholder="输入你的思考或回复..."
+                  @keydown.enter="sendSocraticReply"
+                  :disabled="socraticState.loading"
+                />
+                <n-button type="primary" :loading="socraticState.loading" @click="sendSocraticReply">
+                  发送
+                </n-button>
+              </n-input-group>
+            </div>
+            <div v-else style="text-align: center; margin-top: 10px;">
+              <n-text depth="3">（追问结束，可关闭弹窗）</n-text>
+            </div>
+          </div>
+        </n-card>
+      </n-modal>
     </n-space>
   </div>
 </template>

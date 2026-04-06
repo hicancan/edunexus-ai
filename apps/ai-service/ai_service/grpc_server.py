@@ -62,7 +62,7 @@ async def serve_grpc(
         server,
     )
 
-    listen_addr = "[::]:50051"
+    listen_addr = f"[::]:{settings.ai_grpc_listen_port}"
     server.add_insecure_port(listen_addr)
     logger.info("Starting gRPC Server on %s", listen_addr)
     await server.start()

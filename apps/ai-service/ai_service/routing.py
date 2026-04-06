@@ -11,9 +11,15 @@ SCENE_PARAMS: dict[str, dict[str, float | int]] = {
     "ai_question_large": {"temperature": 0.45, "max_tokens": 4200, "top_p": 0.9},
     "teacher_suggestion": {"temperature": 0.35, "max_tokens": 1200, "top_p": 0.9},
     "lesson_plan": {"temperature": 0.3, "max_tokens": 1800, "top_p": 0.9},
+    "socratic_probe": {"temperature": 0.25, "max_tokens": 600, "top_p": 0.9},
+    "knowledge_topology": {"temperature": 0.2, "max_tokens": 2000, "top_p": 0.9},
+    "intervention_sandbox": {"temperature": 0.3, "max_tokens": 1500, "top_p": 0.9},
 }
 
-STRUCTURED_SCENES = {"ai_question", "ai_question_large", "teacher_suggestion", "lesson_plan"}
+STRUCTURED_SCENES = {
+    "ai_question", "ai_question_large", "teacher_suggestion", "lesson_plan",
+    "knowledge_topology", "intervention_sandbox",
+}
 REASONING_SCENES = {"wrong_analysis"}
 SCENE_PROVIDER_PREFERENCE: dict[str, list[str]] = {
     "chat_rag": ["ollama", "deepseek", "openai", "gemini"],
@@ -22,6 +28,9 @@ SCENE_PROVIDER_PREFERENCE: dict[str, list[str]] = {
     "wrong_analysis": ["deepseek", "ollama", "openai", "gemini"],
     "teacher_suggestion": ["deepseek", "ollama", "openai", "gemini"],
     "lesson_plan": ["deepseek", "ollama", "openai", "gemini"],
+    "socratic_probe": ["ollama", "deepseek", "openai", "gemini"],
+    "knowledge_topology": ["deepseek", "ollama", "openai", "gemini"],
+    "intervention_sandbox": ["deepseek", "ollama", "openai", "gemini"],
 }
 
 
@@ -141,6 +150,18 @@ def route_decision(settings: Settings, provider: str, scene: str) -> RouteDecisi
         reason = "教案生成优先使用云侧主模型，保证复杂生成质量"
     elif scene == "wrong_analysis" and provider == "deepseek":
         reason = "错因归因优先使用云侧高推理模型"
+    elif scene == "socratic_probe" and provider == "ollama":
+        reason = "苏格拉底追问使用边侧模型，保证课堂低延迟交互"
+    elif scene == "socratic_probe" and provider == "deepseek":
+        reason = "苏格拉底追问回退至云侧模型"
+    elif scene == "knowledge_topology" and provider == "deepseek":
+        reason = "知识拓扑推断需要跨概念关联能力，优先使用云侧主模型"
+    elif scene == "knowledge_topology" and provider == "ollama":
+        reason = "知识拓扑推断回退至本地结构化模型"
+    elif scene == "intervention_sandbox" and provider == "deepseek":
+        reason = "干预策略推演需要综合推理能力，优先使用云侧主模型"
+    elif scene == "intervention_sandbox" and provider == "ollama":
+        reason = "干预策略推演回退至本地结构化模型"
     elif scene in REASONING_SCENES:
         reason = "诊断分析任务使用高推理模型"
     elif scene in STRUCTURED_SCENES:
