@@ -29,7 +29,7 @@ public class ChatService {
 
     private final ChatRepository chatRepo;
     private final AiClient aiClient;
-    private final GovernanceService governance;
+
     private final RealtimeStudentStateService realtimeStateService;
     private final VoMapper voMapper;
     private final ObjectMapper objectMapper;
@@ -38,14 +38,14 @@ public class ChatService {
     public ChatService(
             ChatRepository chatRepo,
             AiClient aiClient,
-            GovernanceService governance,
+
             RealtimeStudentStateService realtimeStateService,
             VoMapper voMapper,
             ObjectMapper objectMapper,
             @org.springframework.beans.factory.annotation.Qualifier("chatStreamExecutor") TaskExecutor chatStreamExecutor) {
         this.chatRepo = chatRepo;
         this.aiClient = aiClient;
-        this.governance = governance;
+
         this.realtimeStateService = realtimeStateService;
         this.voMapper = voMapper;
         this.objectMapper = objectMapper;
@@ -248,7 +248,7 @@ public class ChatService {
     private int parseTokenUsage(Object tokenUsagePayload) {
         if (tokenUsagePayload == null) return 0;
         try {
-            @SuppressWarnings("unchecked")
+
             Map<String, Object> map =
                     objectMapper.convertValue(
                             tokenUsagePayload,

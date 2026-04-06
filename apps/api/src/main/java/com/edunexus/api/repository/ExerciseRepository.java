@@ -26,19 +26,7 @@ public class ExerciseRepository {
                             rs.getInt("time_spent"),
                             ApiDataMapper.toInstant(rs.getTimestamp("created_at")));
 
-    private static final RowMapper<ExerciseRecordItem> ITEM_MAPPER =
-            (rs, rn) ->
-                    new ExerciseRecordItem(
-                            (UUID) rs.getObject("id"),
-                            (UUID) rs.getObject("record_id"),
-                            (UUID) rs.getObject("question_id"),
-                            rs.getString("user_answer"),
-                            rs.getString("correct_answer"),
-                            rs.getBoolean("is_correct"),
-                            rs.getInt("score"),
-                            rs.getString("analysis"),
-                            rs.getString("teacher_suggestion"),
-                            ApiDataMapper.toInstant(rs.getTimestamp("created_at")));
+
 
     private final JdbcTemplate jdbc;
 

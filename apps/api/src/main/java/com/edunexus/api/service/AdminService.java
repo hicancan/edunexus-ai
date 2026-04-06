@@ -200,23 +200,7 @@ public class AdminService {
                 countOf("select count(distinct student_id) from wrong_book where status='ACTIVE'");
         long suggestedStudents =
                 countOf("select count(distinct student_id) from teacher_suggestions");
-        long riskKnowledgePoints =
-                countOf(
-                        """
-                        select count(distinct kp.knowledge_point)
-                        from wrong_book w
-                        join questions q on q.id = w.question_id
-                        join lateral jsonb_array_elements_text(coalesce(q.knowledge_points,'[]'::jsonb)) as kp(knowledge_point) on true
-                        where w.status='ACTIVE'
-                        """);
-        long suggestedKnowledgePoints =
-                countOf(
-                        """
-                        select count(distinct knowledge_point)
-                        from teacher_suggestions
-                        where knowledge_point is not null
-                          and btrim(knowledge_point) <> ''
-                        """);
+
         long recommendationViewCount =
                 countOf(
                         """
@@ -446,10 +430,7 @@ public class AdminService {
         return val == null ? 0L : val.longValue();
     }
 
-    private long countOf(String sql, Object... args) {
-        Number val = jdbc.queryForObject(sql, Number.class, args);
-        return val == null ? 0L : val.longValue();
-    }
+
 
     private List<Map<String, Object>> buildExecutionDistribution(StrategyObservation observation) {
         Map<String, Long> laneCounts = observation == null ? Map.of() : observation.laneCounts();
@@ -1026,18 +1007,7 @@ public class AdminService {
         return percentage(localObserved, totalTasks);
     }
 
-    private Double averageOf(Double... values) {
-        double total = 0D;
-        int count = 0;
-        for (Double value : values) {
-            if (value == null) {
-                continue;
-            }
-            total += value;
-            count++;
-        }
-        return count == 0 ? null : round2(total / count);
-    }
+
 
     private double percentage(double numerator, double denominator) {
         if (denominator <= 0) {
@@ -1066,15 +1036,7 @@ public class AdminService {
         return value == null ? 0L : 1L;
     }
 
-    private long signalCount(Double... values) {
-        long count = 0L;
-        for (Double value : values) {
-            if (value != null) {
-                count++;
-            }
-        }
-        return count;
-    }
+
 
     private String dataState(Double value) {
         return value == null ? "NO_SAMPLES" : "MEASURED";

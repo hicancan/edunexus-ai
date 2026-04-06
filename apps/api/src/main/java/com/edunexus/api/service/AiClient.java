@@ -540,17 +540,14 @@ public class AiClient {
 
     // ── New HTTP-based AI calls for deep features ────────────────────────
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> socraticProbe(Map<String, Object> body) {
         return callAiHttp("/internal/v1/socratic-probe", body);
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> knowledgeTopology(Map<String, Object> body) {
         return callAiHttp("/internal/v1/knowledge-topology", body);
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> interventionSandbox(Map<String, Object> body) {
         return callAiHttp("/internal/v1/intervention-sandbox", body);
     }

@@ -220,19 +220,13 @@ public class RealtimeStudentStateService {
 
     private void storeEvent(UUID studentId, RealtimeEvent event) {
         try {
-            String payload =
-                    objectMapper.writeValueAsString(
-                            Map.of(
-                                    "type",
-                                    event.type(),
-                                    "occurredAt",
-                                    event.occurredAt().toString(),
-                                    "totalQuestions",
-                                    event.totalQuestions(),
-                                    "wrongCount",
-                                    event.wrongCount(),
-                                    "knowledgePoints",
-                                    normalizeKnowledgePoints(event.knowledgePoints())));
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("type", event.type());
+            map.put("occurredAt", event.occurredAt().toString());
+            map.put("totalQuestions", event.totalQuestions());
+            map.put("wrongCount", event.wrongCount());
+            map.put("knowledgePoints", normalizeKnowledgePoints(event.knowledgePoints()));
+            String payload = objectMapper.writeValueAsString(map);
             String key = timelineKey(studentId);
             redis.opsForList().leftPush(key, payload);
             redis.opsForList().trim(key, 0, MAX_EVENTS - 1);

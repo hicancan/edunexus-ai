@@ -18,17 +18,17 @@ public class LessonPlanService {
 
     private final LessonPlanRepository planRepo;
     private final AiClient aiClient;
-    private final VoMapper voMapper;
+
     private final PdfExportService pdfExportService;
 
     public LessonPlanService(
             LessonPlanRepository planRepo,
             AiClient aiClient,
-            VoMapper voMapper,
+
             PdfExportService pdfExportService) {
         this.planRepo = planRepo;
         this.aiClient = aiClient;
-        this.voMapper = voMapper;
+
         this.pdfExportService = pdfExportService;
     }
 

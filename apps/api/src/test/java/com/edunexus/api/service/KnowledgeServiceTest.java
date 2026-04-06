@@ -17,6 +17,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.task.TaskExecutor;
@@ -33,6 +34,8 @@ class KnowledgeServiceTest {
     @Mock private AiClient aiClient;
 
     @Mock private GovernanceService governanceService;
+
+    @Captor private ArgumentCaptor<Map<String, Object>> deletePayloadCaptor;
 
     private final TaskExecutor directExecutor = Runnable::run;
 
@@ -58,11 +61,10 @@ class KnowledgeServiceTest {
 
         service.cleanupSupersededReadyDocuments(currentDocumentId, "trace-cleanup");
 
-        ArgumentCaptor<Map<String, Object>> deletePayload = ArgumentCaptor.forClass(Map.class);
-        verify(aiClient).deleteKb(deletePayload.capture());
-        assertEquals(duplicateId.toString(), deletePayload.getValue().get("documentId"));
-        assertEquals("trace-cleanup", deletePayload.getValue().get("traceId"));
-        assertEquals("kb-delete-" + duplicateId, deletePayload.getValue().get("idempotencyKey"));
+        verify(aiClient).deleteKb(deletePayloadCaptor.capture());
+        assertEquals(duplicateId.toString(), deletePayloadCaptor.getValue().get("documentId"));
+        assertEquals("trace-cleanup", deletePayloadCaptor.getValue().get("traceId"));
+        assertEquals("kb-delete-" + duplicateId, deletePayloadCaptor.getValue().get("idempotencyKey"));
         verify(objectStorageService).delete("s3://bucket/old-readme.md");
         verify(documentRepo).softDelete(duplicateId);
     }
@@ -113,11 +115,10 @@ class KnowledgeServiceTest {
 
         service.cleanupDuplicateReadyDocumentsOnStartup();
 
-        ArgumentCaptor<Map<String, Object>> deletePayload = ArgumentCaptor.forClass(Map.class);
-        verify(aiClient).deleteKb(deletePayload.capture());
-        assertEquals(duplicateId.toString(), deletePayload.getValue().get("documentId"));
+        verify(aiClient).deleteKb(deletePayloadCaptor.capture());
+        assertEquals(duplicateId.toString(), deletePayloadCaptor.getValue().get("documentId"));
         assertTrue(
-                String.valueOf(deletePayload.getValue().get("traceId"))
+                String.valueOf(deletePayloadCaptor.getValue().get("traceId"))
                         .startsWith("startup-document-dedupe-"));
         verify(documentRepo).softDelete(duplicateId);
     }
@@ -143,9 +144,8 @@ class KnowledgeServiceTest {
 
         service.cleanupDuplicateReadyDocumentsOnStartup();
 
-        ArgumentCaptor<Map<String, Object>> deletePayload = ArgumentCaptor.forClass(Map.class);
-        verify(aiClient).deleteKb(deletePayload.capture());
-        assertEquals(deletedId.toString(), deletePayload.getValue().get("documentId"));
+        verify(aiClient).deleteKb(deletePayloadCaptor.capture());
+        assertEquals(deletedId.toString(), deletePayloadCaptor.getValue().get("documentId"));
         verify(objectStorageService).delete("s3://bucket/deleted-readme.md");
     }
 
