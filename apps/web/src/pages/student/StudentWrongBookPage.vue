@@ -205,7 +205,9 @@ async function sendSocraticReply() {
       userAnswer: _ans,
       studentResponses: socraticState.messages.filter((m) => m.role === "user").map((m) => m.text)
     });
-    const replyText = String(res.data.probe_question || res.data.summary || JSON.stringify(res.data));
+    const replyText = String(
+      res.data.probe_question || res.data.summary || JSON.stringify(res.data)
+    );
     socraticState.messages.push({ role: "ai", text: replyText });
     if (socraticState.round >= 3 || res.data.encouragement) {
       socraticState.isFinished = true;
@@ -377,25 +379,38 @@ onMounted(async () => {
       <!-- 苏格拉底追问弹窗 -->
       <n-modal v-model:show="socraticState.show" transform-origin="center">
         <n-card
-          style="width: 600px; max-height: 80vh; display: flex; flex-direction: column;"
+          style="width: 600px; max-height: 80vh; display: flex; flex-direction: column"
           title="苏格拉底追问 (Socratic Scaffold Chain)"
           :bordered="false"
           size="huge"
           role="dialog"
           aria-modal="true"
         >
-          <div style="flex: 1; overflow-y: hidden; display: flex; flex-direction: column; gap: 16px;">
-            <n-alert title="原题内容" type="info" :show-icon="false" style="margin-bottom: 8px;">
+          <div
+            style="flex: 1; overflow-y: hidden; display: flex; flex-direction: column; gap: 16px"
+          >
+            <n-alert title="原题内容" type="info" :show-icon="false" style="margin-bottom: 8px">
               {{ socraticState.questionContent }}
             </n-alert>
-            <n-scrollbar style="flex: 1; max-height: 40vh; padding: 0 8px;">
+            <n-scrollbar style="flex: 1; max-height: 40vh; padding: 0 8px">
               <n-space vertical :size="12">
                 <div
                   v-for="(msg, idx) in socraticState.messages"
                   :key="idx"
                   :style="{ textAlign: msg.role === 'user' ? 'right' : 'left' }"
                 >
-                  <n-tag :type="msg.role === 'user' ? 'primary' : 'warning'" :bordered="false" style="padding: 12px; height: auto; max-width: 80%; text-align: left; white-space: pre-wrap; font-size: 14px;">
+                  <n-tag
+                    :type="msg.role === 'user' ? 'primary' : 'warning'"
+                    :bordered="false"
+                    style="
+                      padding: 12px;
+                      height: auto;
+                      max-width: 80%;
+                      text-align: left;
+                      white-space: pre-wrap;
+                      font-size: 14px;
+                    "
+                  >
                     {{ msg.text }}
                   </n-tag>
                 </div>
@@ -409,12 +424,16 @@ onMounted(async () => {
                   @keydown.enter="sendSocraticReply"
                   :disabled="socraticState.loading"
                 />
-                <n-button type="primary" :loading="socraticState.loading" @click="sendSocraticReply">
+                <n-button
+                  type="primary"
+                  :loading="socraticState.loading"
+                  @click="sendSocraticReply"
+                >
                   发送
                 </n-button>
               </n-input-group>
             </div>
-            <div v-else style="text-align: center; margin-top: 10px;">
+            <div v-else style="text-align: center; margin-top: 10px">
               <n-text depth="3">（追问结束，可关闭弹窗）</n-text>
             </div>
           </div>

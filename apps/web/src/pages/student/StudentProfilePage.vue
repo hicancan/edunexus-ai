@@ -16,14 +16,32 @@ import { CanvasRenderer } from "echarts/renderers";
 import { LineChart, BarChart, GraphChart } from "echarts/charts";
 import { GridComponent, TooltipComponent, LegendComponent } from "echarts/components";
 import VChart from "vue-echarts";
-import { RefreshCw, User as UserIcon, AlertTriangle, Sparkles, TrendingUp, Network } from "lucide-vue-next";
+import {
+  RefreshCw,
+  User as UserIcon,
+  AlertTriangle,
+  Sparkles,
+  TrendingUp,
+  Network
+} from "lucide-vue-next";
 import { getMe } from "../../features/auth/api/auth.service";
-import { getProfileAnalytics, getKnowledgeTopology } from "../../features/student/api/student.service";
+import {
+  getProfileAnalytics,
+  getKnowledgeTopology
+} from "../../features/student/api/student.service";
 import { toErrorMessage } from "../../services/error-message";
 import type { StudentAnalyticsVO, UserVO, KnowledgeTopologyVO } from "../../services/contracts";
 import { useAuthStore } from "../../features/auth/model/auth";
 
-use([CanvasRenderer, LineChart, BarChart, GraphChart, GridComponent, TooltipComponent, LegendComponent]);
+use([
+  CanvasRenderer,
+  LineChart,
+  BarChart,
+  GraphChart,
+  GridComponent,
+  TooltipComponent,
+  LegendComponent
+]);
 
 const auth = useAuthStore();
 const profile = ref<UserVO | null>(null);
@@ -197,8 +215,9 @@ async function loadTopology(): Promise<void> {
 }
 
 const topologyOption = computed(() => {
-  if (!topologyData.value || !topologyData.value.nodes || topologyData.value.nodes.length === 0) return {};
-  
+  if (!topologyData.value || !topologyData.value.nodes || topologyData.value.nodes.length === 0)
+    return {};
+
   return {
     tooltip: { trigger: "item", formatter: "{b}" },
     series: [
@@ -485,7 +504,7 @@ function realtimeDensityDisplay(value?: number | null): string {
           </n-spin>
         </section>
 
-        <section class="panel glass-card chart-panel" style="grid-column: span 1;">
+        <section class="panel glass-card chart-panel" style="grid-column: span 1">
           <div class="panel-head">
             <div>
               <h3 class="panel-title">知识点拓扑图谱 (Knowledge Topology)</h3>
@@ -493,10 +512,19 @@ function realtimeDensityDisplay(value?: number | null): string {
             </div>
           </div>
           <n-spin :show="topologyLoading">
-            <div v-if="!topologyData || !topologyData.nodes || topologyData.nodes.length === 0" class="empty-block">
+            <div
+              v-if="!topologyData || !topologyData.nodes || topologyData.nodes.length === 0"
+              class="empty-block"
+            >
               暂无足够的错误数据生成拓扑关联。
             </div>
-            <v-chart v-else class="trend-chart" :option="topologyOption" autoresize style="min-height: 300px;" />
+            <v-chart
+              v-else
+              class="trend-chart"
+              :option="topologyOption"
+              autoresize
+              style="min-height: 300px"
+            />
           </n-spin>
         </section>
       </div>

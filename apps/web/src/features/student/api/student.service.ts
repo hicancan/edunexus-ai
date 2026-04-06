@@ -199,9 +199,18 @@ export async function sendChatMessageStream(
         }
         let messageText = "发送消息失败";
         try {
-          const body = (await response.json()) as { message?: string; errorCode?: string; traceId?: string };
+          const body = (await response.json()) as {
+            message?: string;
+            errorCode?: string;
+            traceId?: string;
+          };
           if (body?.message) messageText = body.message;
-          throw new FetchEventSourceError(messageText, response.status, body?.errorCode, body?.traceId);
+          throw new FetchEventSourceError(
+            messageText,
+            response.status,
+            body?.errorCode,
+            body?.traceId
+          );
         } catch (e) {
           if (e instanceof FetchEventSourceError) throw e;
           throw new FetchEventSourceError(messageText, response.status);
@@ -333,7 +342,9 @@ export async function getProfileAnalytics(): Promise<StudentAnalyticsVO> {
 }
 
 export async function getKnowledgeTopology(): Promise<KnowledgeTopologyVO> {
-  const response = await apiClient.get<ApiEnvelope<KnowledgeTopologyVO>>("/student/profile/knowledge-topology");
+  const response = await apiClient.get<ApiEnvelope<KnowledgeTopologyVO>>(
+    "/student/profile/knowledge-topology"
+  );
   return unwrapResponse(response);
 }
 
