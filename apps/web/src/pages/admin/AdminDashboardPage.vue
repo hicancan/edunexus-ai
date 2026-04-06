@@ -561,6 +561,14 @@ onMounted(loadMetrics);
 
 .chart-panel {
   min-height: 420px;
+  height: 100%;
+  margin-top: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-panel > :last-child {
+  flex: 1;
 }
 
 .panel-head {
@@ -603,6 +611,7 @@ onMounted(loadMetrics);
   display: grid;
   gap: 8px;
   margin-top: 14px;
+  align-content: start;
 }
 
 .benchmark-item {
@@ -631,6 +640,7 @@ onMounted(loadMetrics);
   display: grid;
   gap: 12px;
   margin-top: 16px;
+  align-content: start;
 }
 
 .lane-grid,
@@ -642,6 +652,7 @@ onMounted(loadMetrics);
 .experiment-group-grid {
   display: grid;
   gap: 14px;
+  align-content: start;
 }
 
 .flow-card,
