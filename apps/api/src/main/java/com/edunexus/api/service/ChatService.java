@@ -38,7 +38,6 @@ public class ChatService {
     public ChatService(
             ChatRepository chatRepo,
             AiClient aiClient,
-
             RealtimeStudentStateService realtimeStateService,
             VoMapper voMapper,
             ObjectMapper objectMapper,

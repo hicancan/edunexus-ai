@@ -430,8 +430,6 @@ public class AdminService {
         return val == null ? 0L : val.longValue();
     }
 
-
-
     private List<Map<String, Object>> buildExecutionDistribution(StrategyObservation observation) {
         Map<String, Long> laneCounts = observation == null ? Map.of() : observation.laneCounts();
         long total = observation == null ? 0L : observation.executionSampleCount();
@@ -1007,8 +1005,6 @@ public class AdminService {
         return percentage(localObserved, totalTasks);
     }
 
-
-
     private double percentage(double numerator, double denominator) {
         if (denominator <= 0) {
             return 0D;
@@ -1035,8 +1031,6 @@ public class AdminService {
     private long nonNullSignalCount(Double value) {
         return value == null ? 0L : 1L;
     }
-
-
 
     private String dataState(Double value) {
         return value == null ? "NO_SAMPLES" : "MEASURED";

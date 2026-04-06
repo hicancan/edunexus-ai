@@ -22,10 +22,8 @@ public class LessonPlanService {
     private final PdfExportService pdfExportService;
 
     public LessonPlanService(
-            LessonPlanRepository planRepo,
-            AiClient aiClient,
+            LessonPlanRepository planRepo, AiClient aiClient, PdfExportService pdfExportService) {
 
-            PdfExportService pdfExportService) {
         this.planRepo = planRepo;
         this.aiClient = aiClient;
 

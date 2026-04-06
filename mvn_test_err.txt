@@ -1,0 +1,249 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------------< com.edunexus:api >--------------------------
+[INFO] Building edunexus-api 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- os:1.7.1:detect (default) @ api ---
+[INFO] ------------------------------------------------------------------------
+[INFO] Detecting the operating system and CPU architecture
+[INFO] ------------------------------------------------------------------------
+[INFO] os.detected.name: windows
+[INFO] os.detected.arch: x86_64
+[INFO] os.detected.bitness: 64
+[INFO] os.detected.version: 10.0
+[INFO] os.detected.version.major: 10
+[INFO] os.detected.version.minor: 0
+[INFO] os.detected.classifier: windows-x86_64
+[INFO] 
+[INFO] --- protobuf:0.6.1:compile (default) @ api ---
+[INFO] Compiling 2 proto file(s) to D:\code\github\hicancan\edunexus-ai\apps\api\target\generated-sources\protobuf\java
+[INFO] 
+[INFO] --- protobuf:0.6.1:compile-custom (default) @ api ---
+[INFO] Compiling 2 proto file(s) to D:\code\github\hicancan\edunexus-ai\apps\api\target\generated-sources\protobuf\grpc-java
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ api ---
+[INFO] Copying 12 resources from src\main\resources to target\classes
+[INFO] Copying 2 resources from ..\..\packages\shared-contracts\proto to target\classes
+[INFO] Copying 2 resources from ..\..\packages\shared-contracts\proto to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.0:compile (default-compile) @ api ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 140 source files with javac [debug parameters release 21] to target\classes
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ api ---
+[INFO] skip non existing resourceDirectory D:\code\github\hicancan\edunexus-ai\apps\api\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.14.0:testCompile (default-testCompile) @ api ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 9 source files with javac [debug parameters release 21] to target\test-classes
+[INFO] /D:/code/github/hicancan/edunexus-ai/apps/api/src/test/java/com/edunexus/api/service/KnowledgeServiceTest.java: D:\code\github\hicancan\edunexus-ai\apps\api\src\test\java\com\edunexus\api\service\KnowledgeServiceTest.java使用了未经检查或不安全的操作。
+[INFO] /D:/code/github/hicancan/edunexus-ai/apps/api/src/test/java/com/edunexus/api/service/KnowledgeServiceTest.java: 有关详细信息, 请使用 -Xlint:unchecked 重新编译。
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ api ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.edunexus.api.auth.JwtUtilTest
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.243 s -- in com.edunexus.api.auth.JwtUtilTest
+[INFO] Running com.edunexus.api.common.AnswerNormalizerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.edunexus.api.common.AnswerNormalizerTest
+[INFO] Running com.edunexus.api.common.ApiDataMapperTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in com.edunexus.api.common.ApiDataMapperTest
+[INFO] Running com.edunexus.api.contract.AuthApiContractIT
+13:36:27.045 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.edunexus.api.contract.AuthApiContractIT]: AuthApiContractIT does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+13:36:27.122 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.edunexus.api.ApiApplication for test class com.edunexus.api.contract.AuthApiContractIT
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.3)
+
+2026-04-06 13:36:27,523 level=INFO logger=o.h.validator.internal.util.Version traceId= msg="HV000001: Hibernate Validator 8.0.2.Final"
+2026-04-06 13:36:27,559 level=INFO logger=c.e.api.contract.AuthApiContractIT traceId= msg="Starting AuthApiContractIT using Java 21.0.2 with PID 26860 (started by yunca in D:\code\github\hicancan\edunexus-ai\apps\api)"
+2026-04-06 13:36:27,560 level=INFO logger=c.e.api.contract.AuthApiContractIT traceId= msg="No active profile set, falling back to 1 default profile: "default""
+2026-04-06 13:36:28,445 level=INFO logger=o.s.d.r.c.RepositoryConfigurationDelegate traceId= msg="Multiple Spring Data modules found, entering strict repository configuration mode"
+2026-04-06 13:36:28,450 level=INFO logger=o.s.d.r.c.RepositoryConfigurationDelegate traceId= msg="Bootstrapping Spring Data Redis repositories in DEFAULT mode."
+2026-04-06 13:36:28,491 level=INFO logger=o.s.d.r.c.RepositoryConfigurationDelegate traceId= msg="Finished Spring Data repository scanning in 24 ms. Found 0 Redis repository interfaces."
+2026-04-06 13:36:29,949 level=INFO logger=o.s.b.w.e.tomcat.TomcatWebServer traceId= msg="Tomcat initialized with port 0 (http)"
+2026-04-06 13:36:29,971 level=INFO logger=o.a.coyote.http11.Http11NioProtocol traceId= msg="Initializing ProtocolHandler ["http-nio-0.0.0.0-auto-1"]"
+2026-04-06 13:36:29,974 level=INFO logger=o.a.catalina.core.StandardService traceId= msg="Starting service [Tomcat]"
+2026-04-06 13:36:29,975 level=INFO logger=o.a.catalina.core.StandardEngine traceId= msg="Starting Servlet engine: [Apache Tomcat/10.1.36]"
+2026-04-06 13:36:30,070 level=INFO logger=o.a.c.c.C.[Tomcat].[localhost].[/] traceId= msg="Initializing Spring embedded WebApplicationContext"
+2026-04-06 13:36:30,071 level=INFO logger=o.s.b.w.s.c.ServletWebServerApplicationContext traceId= msg="Root WebApplicationContext: initialization completed in 2504 ms"
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+2026-04-06 13:36:30,479 level=INFO logger=com.zaxxer.hikari.HikariDataSource traceId= msg="HikariPool-1 - Starting..."
+2026-04-06 13:36:30,498 level=INFO logger=com.zaxxer.hikari.pool.HikariPool traceId= msg="HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@59172d2"
+2026-04-06 13:36:30,501 level=INFO logger=com.zaxxer.hikari.HikariDataSource traceId= msg="HikariPool-1 - Start completed."
+2026-04-06 13:36:30,557 level=INFO logger=org.flywaydb.core.FlywayExecutor traceId= msg="Database: jdbc:postgresql://127.0.0.1:5432/edunexus_test (PostgreSQL 17.9)"
+2026-04-06 13:36:30,629 level=INFO logger=o.f.c.i.s.JdbcTableSchemaHistory traceId= msg="Schema history table "public"."flyway_schema_history" does not exist yet"
+2026-04-06 13:36:30,636 level=INFO logger=o.f.core.internal.command.DbValidate traceId= msg="Successfully validated 10 migrations (execution time 00:00.044s)"
+2026-04-06 13:36:30,649 level=INFO logger=o.f.c.i.s.JdbcTableSchemaHistory traceId= msg="Creating Schema History table "public"."flyway_schema_history" ..."
+2026-04-06 13:36:30,705 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Current version of schema "public": << Empty Schema >>"
+2026-04-06 13:36:30,719 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202602260001 - init schema""
+2026-04-06 13:36:30,774 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202602260002 - seed data""
+2026-04-06 13:36:30,790 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202602260003 - student teacher relations""
+2026-04-06 13:36:30,804 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202602260004 - access token blacklist""
+2026-04-06 13:36:30,819 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202602261700 - seed password hashes""
+2026-04-06 13:36:30,838 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202602270100 - align platform schema""
+2026-04-06 13:36:30,861 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202602270200 - enforce enum constraints""
+2026-04-06 13:36:30,876 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202603021200 - bind documents to classrooms""
+2026-04-06 13:36:30,894 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202603051000 - deprecate student teacher relations""
+2026-04-06 13:36:30,910 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Migrating schema "public" to version "202604051610 - dedupe teacher suggestions""
+2026-04-06 13:36:30,933 level=INFO logger=o.f.core.internal.command.DbMigrate traceId= msg="Successfully applied 10 migrations to schema "public", now at version v202604051610 (execution time 00:00.081s)"
+2026-04-06 13:36:32,936 level=INFO logger=o.s.b.a.e.web.EndpointLinksResolver traceId= msg="Exposing 2 endpoints beneath base path '/actuator'"
+2026-04-06 13:36:32,967 level=INFO logger=o.a.c.c.C.[Tomcat].[localhost].[/] traceId= msg="Initializing Spring TestDispatcherServlet ''"
+2026-04-06 13:36:32,967 level=INFO logger=o.s.t.w.s.TestDispatcherServlet traceId= msg="Initializing Servlet ''"
+2026-04-06 13:36:32,968 level=INFO logger=o.s.t.w.s.TestDispatcherServlet traceId= msg="Completed initialization in 1 ms"
+2026-04-06 13:36:33,047 level=INFO logger=o.a.coyote.http11.Http11NioProtocol traceId= msg="Starting ProtocolHandler ["http-nio-0.0.0.0-auto-1"]"
+2026-04-06 13:36:33,053 level=INFO logger=o.s.b.w.e.tomcat.TomcatWebServer traceId= msg="Tomcat started on port 3140 (http) with context path '/'"
+2026-04-06 13:36:33,178 level=INFO logger=c.e.api.config.GrpcServerRunner traceId= msg="gRPC Server started, listening on 3125"
+2026-04-06 13:36:33,187 level=INFO logger=c.e.api.contract.AuthApiContractIT traceId= msg="Started AuthApiContractIT in 5.879 seconds (process running for 6.884)"
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.626 s -- in com.edunexus.api.contract.AuthApiContractIT
+[INFO] Running com.edunexus.api.contract.OpenApiSurfaceContractTest
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.043 s <<< FAILURE! -- in com.edunexus.api.contract.OpenApiSurfaceContractTest
+[ERROR] com.edunexus.api.contract.OpenApiSurfaceContractTest.openApiPathsAndMethods_shouldMatchControllerAnnotations -- Time elapsed: 0.038 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <[DELETE /api/v1/student/chat/session/{sessionId}, DELETE /api/v1/student/exercise/wrong-questions/{questionId}, DELETE /api/v1/teacher/knowledge/documents/{documentId}, DELETE /api/v1/teacher/plans/{planId}, GET /api/v1/admin/audits, GET /api/v1/admin/dashboard/metrics, GET /api/v1/admin/resources, GET /api/v1/admin/resources/{resourceId}/download, GET /api/v1/admin/users, GET /api/v1/auth/me, GET /api/v1/student/ai-questions, GET /api/v1/student/ai-questions/{recordId}/analysis, GET /api/v1/student/chat/session/{sessionId}, GET /api/v1/student/chat/sessions, GET /api/v1/student/exercise/questions, GET /api/v1/student/exercise/records, GET /api/v1/student/exercise/wrong-questions, GET /api/v1/student/exercise/{recordId}/analysis, GET /api/v1/student/profile/analytics, GET /api/v1/student/profile/weak-points, GET /api/v1/teacher/classrooms, GET /api/v1/teacher/interventions/recommendations, GET /api/v1/teacher/knowledge/documents, GET /api/v1/teacher/plans, GET /api/v1/teacher/plans/shared/{shareToken}, GET /api/v1/teacher/plans/{planId}/export, GET /api/v1/teacher/students, GET /api/v1/teacher/students/{studentId}/analytics, GET /api/v1/teacher/students/{studentId}/attribution, PATCH /api/v1/admin/users/{userId}, POST /api/v1/admin/users, POST /api/v1/auth/login, POST /api/v1/auth/logout, POST /api/v1/auth/refresh, POST /api/v1/auth/register, POST /api/v1/student/ai-questions/generate, POST /api/v1/student/ai-questions/submit, POST /api/v1/student/chat/session, POST /api/v1/student/chat/session/{sessionId}/message, POST /api/v1/student/exercise/submit, POST /api/v1/teacher/knowledge/documents, POST /api/v1/teacher/plans/generate, POST /api/v1/teacher/plans/{planId}/share, POST /api/v1/teacher/suggestions, POST /api/v1/teacher/suggestions/bulk, PUT /api/v1/teacher/plans/{planId}]> but was: <[DELETE /api/v1/student/chat/session/{sessionId}, DELETE /api/v1/student/exercise/wrong-questions/{questionId}, DELETE /api/v1/teacher/knowledge/documents/{documentId}, DELETE /api/v1/teacher/plans/{planId}, GET /api/v1/admin/audits, GET /api/v1/admin/dashboard/metrics, GET /api/v1/admin/resources, GET /api/v1/admin/resources/{resourceId}/download, GET /api/v1/admin/users, GET /api/v1/auth/me, GET /api/v1/student/ai-questions, GET /api/v1/student/ai-questions/{recordId}/analysis, GET /api/v1/student/chat/session/{sessionId}, GET /api/v1/student/chat/sessions, GET /api/v1/student/exercise/questions, GET /api/v1/student/exercise/records, GET /api/v1/student/exercise/wrong-questions, GET /api/v1/student/exercise/{recordId}/analysis, GET /api/v1/student/profile/analytics, GET /api/v1/student/profile/knowledge-topology, GET /api/v1/student/profile/weak-points, GET /api/v1/teacher/classrooms, GET /api/v1/teacher/interventions/recommendations, GET /api/v1/teacher/knowledge/documents, GET /api/v1/teacher/plans, GET /api/v1/teacher/plans/shared/{shareToken}, GET /api/v1/teacher/plans/{planId}/export, GET /api/v1/teacher/students, GET /api/v1/teacher/students/{studentId}/analytics, GET /api/v1/teacher/students/{studentId}/attribution, PATCH /api/v1/admin/users/{userId}, POST /api/v1/admin/users, POST /api/v1/auth/login, POST /api/v1/auth/logout, POST /api/v1/auth/refresh, POST /api/v1/auth/register, POST /api/v1/student/ai-questions/generate, POST /api/v1/student/ai-questions/submit, POST /api/v1/student/chat/session, POST /api/v1/student/chat/session/{sessionId}/message, POST /api/v1/student/exercise/submit, POST /api/v1/student/exercise/wrong-questions/{questionId}/socratic-probe, POST /api/v1/teacher/interventions/sandbox, POST /api/v1/teacher/knowledge/documents, POST /api/v1/teacher/plans/generate, POST /api/v1/teacher/plans/{planId}/share, POST /api/v1/teacher/suggestions, POST /api/v1/teacher/suggestions/bulk, PUT /api/v1/teacher/plans/{planId}]>
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:177)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1145)
+	at com.edunexus.api.contract.OpenApiSurfaceContractTest.openApiPathsAndMethods_shouldMatchControllerAnnotations(OpenApiSurfaceContractTest.java:59)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] Running com.edunexus.api.contract.StudentApiContractIT
+2026-04-06 13:36:33,660 level=INFO logger=o.s.t.c.s.AnnotationConfigContextLoaderUtils traceId= msg="Could not detect default configuration classes for test class [com.edunexus.api.contract.StudentApiContractIT]: StudentApiContractIT does not declare any static, non-private, non-final, nested classes annotated with @Configuration."
+2026-04-06 13:36:33,664 level=INFO logger=o.s.b.t.c.SpringBootTestContextBootstrapper traceId= msg="Found @SpringBootConfiguration com.edunexus.api.ApiApplication for test class com.edunexus.api.contract.StudentApiContractIT"
+2026-04-06 13:36:33,997 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=cdd697b0-30e7-482a-868e-65e3d338fc04 msg="realtime_state_unavailable studentId=00000000-0000-0000-0000-000000000003 message=Unable to connect to Redis"
+2026-04-06 13:36:34,044 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=0a2a284d-b4b6-4b57-9483-1938386b34fa msg="realtime_state_write_failed studentId=00000000-0000-0000-0000-000000000003 type=AI_GENERATE message=null"
+2026-04-06 13:36:34,095 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=2373a28b-4b15-487a-aac0-032168a025c0 msg="realtime_state_write_failed studentId=00000000-0000-0000-0000-000000000003 type=AI_SUBMIT message=Unable to connect to Redis"
+2026-04-06 13:36:34,132 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=40d5784f-8601-48e9-899d-4bd776f4caf2 msg="realtime_state_unavailable studentId=00000000-0000-0000-0000-000000000003 message=Unable to connect to Redis"
+2026-04-06 13:36:34,223 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=5e10f56b-280e-46bb-915f-eeea44403f34 msg="realtime_state_write_failed studentId=00000000-0000-0000-0000-000000000003 type=CHAT message=null"
+2026-04-06 13:36:34,322 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=b23865f9-d9a6-409e-a954-b0c45acf0d78 msg="realtime_state_write_failed studentId=00000000-0000-0000-0000-000000000003 type=EXERCISE message=Unable to connect to Redis"
+2026-04-06 13:36:34,340 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=4bb72ca3-9b84-4f3a-a459-b91f94c397e2 msg="realtime_state_unavailable studentId=00000000-0000-0000-0000-000000000003 message=Unable to connect to Redis"
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.720 s -- in com.edunexus.api.contract.StudentApiContractIT
+[INFO] Running com.edunexus.api.contract.TeacherAdminApiContractIT
+2026-04-06 13:36:34,380 level=INFO logger=o.s.t.c.s.AnnotationConfigContextLoaderUtils traceId= msg="Could not detect default configuration classes for test class [com.edunexus.api.contract.TeacherAdminApiContractIT]: TeacherAdminApiContractIT does not declare any static, non-private, non-final, nested classes annotated with @Configuration."
+2026-04-06 13:36:34,383 level=INFO logger=o.s.b.t.c.SpringBootTestContextBootstrapper traceId= msg="Found @SpringBootConfiguration com.edunexus.api.ApiApplication for test class com.edunexus.api.contract.TeacherAdminApiContractIT"
+2026-04-06 13:36:34,601 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=eb4336e8-4aa2-466a-a5b6-e888cd1e43fa msg="realtime_state_write_failed studentId=00000000-0000-0000-0000-000000000003 type=EXERCISE message=Unable to connect to Redis"
+2026-04-06 13:36:34,649 level=WARN logger=c.e.a.s.RealtimeStudentStateService traceId=6c2bf861-3982-4dae-a742-63727db090ff msg="realtime_state_unavailable studentId=00000000-0000-0000-0000-000000000003 message=Unable to connect to Redis"
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.508 s -- in com.edunexus.api.contract.TeacherAdminApiContractIT
+[INFO] Running com.edunexus.api.service.KnowledgeServiceTest
+2026-04-06 13:36:35,036 level=ERROR logger=c.e.api.service.KnowledgeService traceId= msg="cleanup_duplicate_document_kb_delete_failed documentId=910607d2-91ab-4ccb-b86c-a02d7b5c9907 traceId=trace-cleanup"
+java.lang.RuntimeException: qdrant unavailable
+	at com.edunexus.api.service.AiClient.deleteKb(AiClient.java:419)
+	at com.edunexus.api.service.KnowledgeService.retireSupersededDocuments(KnowledgeService.java:236)
+	at com.edunexus.api.service.KnowledgeService.cleanupSupersededReadyDocuments(KnowledgeService.java:156)
+	at com.edunexus.api.service.KnowledgeServiceTest.cleanupSupersededReadyDocuments_shouldKeepDuplicateVisibleWhenKbDeleteFails(KnowledgeServiceTest.java:90)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:767)
+	at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:156)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestableMethod(TimeoutExtension.java:147)
+	at org.junit.jupiter.engine.extension.TimeoutExtension.interceptTestMethod(TimeoutExtension.java:86)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(InterceptingExecutableInvoker.java:103)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.lambda$invoke$0(InterceptingExecutableInvoker.java:93)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain$InterceptedInvocation.proceed(InvocationInterceptorChain.java:106)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:64)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.chainAndInvoke(InvocationInterceptorChain.java:45)
+	at org.junit.jupiter.engine.execution.InvocationInterceptorChain.invoke(InvocationInterceptorChain.java:37)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:92)
+	at org.junit.jupiter.engine.execution.InterceptingExecutableInvoker.invoke(InterceptingExecutableInvoker.java:86)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.lambda$invokeTestMethod$8(TestMethodTestDescriptor.java:217)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.invokeTestMethod(TestMethodTestDescriptor.java:213)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:138)
+	at org.junit.jupiter.engine.descriptor.TestMethodTestDescriptor.execute(TestMethodTestDescriptor.java:68)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:156)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.invokeAll(SameThreadHierarchicalTestExecutorService.java:41)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$6(NodeTestTask.java:160)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$8(NodeTestTask.java:146)
+	at org.junit.platform.engine.support.hierarchical.Node.around(Node.java:137)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.lambda$executeRecursively$9(NodeTestTask.java:144)
+	at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.executeRecursively(NodeTestTask.java:143)
+	at org.junit.platform.engine.support.hierarchical.NodeTestTask.execute(NodeTestTask.java:100)
+	at org.junit.platform.engine.support.hierarchical.SameThreadHierarchicalTestExecutorService.submit(SameThreadHierarchicalTestExecutorService.java:35)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestExecutor.execute(HierarchicalTestExecutor.java:57)
+	at org.junit.platform.engine.support.hierarchical.HierarchicalTestEngine.execute(HierarchicalTestEngine.java:54)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:198)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:169)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:93)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.lambda$execute$0(EngineExecutionOrchestrator.java:58)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.withInterceptedStreams(EngineExecutionOrchestrator.java:141)
+	at org.junit.platform.launcher.core.EngineExecutionOrchestrator.execute(EngineExecutionOrchestrator.java:57)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:103)
+	at org.junit.platform.launcher.core.DefaultLauncher.execute(DefaultLauncher.java:85)
+	at org.junit.platform.launcher.core.DelegatingLauncher.execute(DelegatingLauncher.java:47)
+	at org.apache.maven.surefire.junitplatform.LazyLauncher.execute(LazyLauncher.java:56)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.execute(JUnitPlatformProvider.java:184)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invokeAllTests(JUnitPlatformProvider.java:148)
+	at org.apache.maven.surefire.junitplatform.JUnitPlatformProvider.invoke(JUnitPlatformProvider.java:122)
+	at org.apache.maven.surefire.booter.ForkedBooter.runSuitesInProcess(ForkedBooter.java:385)
+	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
+	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
+	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+2026-04-06 13:36:35,053 level=INFO logger=c.e.api.service.KnowledgeService traceId= msg="cleanup_duplicate_document_success documentId=09e905f3-c2be-48b0-aa4d-b43f9ca87e6d filename=README.md traceId=trace-cleanup"
+2026-04-06 13:36:35,057 level=INFO logger=c.e.api.service.KnowledgeService traceId= msg="cleanup_deleted_document_vectors_start count=1 traceId=startup-document-dedupe-a68a4186-f341-467d-989d-84423eb10cb1"
+2026-04-06 13:36:35,057 level=INFO logger=c.e.api.service.KnowledgeService traceId= msg="cleanup_deleted_document_success documentId=51769388-3057-47c0-8417-5664c0438e48 filename=README.md traceId=startup-document-dedupe-a68a4186-f341-467d-989d-84423eb10cb1"
+2026-04-06 13:36:35,059 level=INFO logger=c.e.api.service.KnowledgeService traceId= msg="cleanup_duplicate_documents_start count=1 traceId=startup-document-dedupe-b9c6a725-42d8-4d01-88b2-fd70d82e9c65"
+2026-04-06 13:36:35,059 level=INFO logger=c.e.api.service.KnowledgeService traceId= msg="cleanup_duplicate_document_success documentId=52f9763d-a75e-4c60-8c7b-f2ccb9e6f7ea filename=README.md traceId=startup-document-dedupe-b9c6a725-42d8-4d01-88b2-fd70d82e9c65"
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.165 s -- in com.edunexus.api.service.KnowledgeServiceTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   OpenApiSurfaceContractTest.openApiPathsAndMethods_shouldMatchControllerAnnotations:59 expected: <[DELETE /api/v1/student/chat/session/{sessionId}, DELETE /api/v1/student/exercise/wrong-questions/{questionId}, DELETE /api/v1/teacher/knowledge/documents/{documentId}, DELETE /api/v1/teacher/plans/{planId}, GET /api/v1/admin/audits, GET /api/v1/admin/dashboard/metrics, GET /api/v1/admin/resources, GET /api/v1/admin/resources/{resourceId}/download, GET /api/v1/admin/users, GET /api/v1/auth/me, GET /api/v1/student/ai-questions, GET /api/v1/student/ai-questions/{recordId}/analysis, GET /api/v1/student/chat/session/{sessionId}, GET /api/v1/student/chat/sessions, GET /api/v1/student/exercise/questions, GET /api/v1/student/exercise/records, GET /api/v1/student/exercise/wrong-questions, GET /api/v1/student/exercise/{recordId}/analysis, GET /api/v1/student/profile/analytics, GET /api/v1/student/profile/weak-points, GET /api/v1/teacher/classrooms, GET /api/v1/teacher/interventions/recommendations, GET /api/v1/teacher/knowledge/documents, GET /api/v1/teacher/plans, GET /api/v1/teacher/plans/shared/{shareToken}, GET /api/v1/teacher/plans/{planId}/export, GET /api/v1/teacher/students, GET /api/v1/teacher/students/{studentId}/analytics, GET /api/v1/teacher/students/{studentId}/attribution, PATCH /api/v1/admin/users/{userId}, POST /api/v1/admin/users, POST /api/v1/auth/login, POST /api/v1/auth/logout, POST /api/v1/auth/refresh, POST /api/v1/auth/register, POST /api/v1/student/ai-questions/generate, POST /api/v1/student/ai-questions/submit, POST /api/v1/student/chat/session, POST /api/v1/student/chat/session/{sessionId}/message, POST /api/v1/student/exercise/submit, POST /api/v1/teacher/knowledge/documents, POST /api/v1/teacher/plans/generate, POST /api/v1/teacher/plans/{planId}/share, POST /api/v1/teacher/suggestions, POST /api/v1/teacher/suggestions/bulk, PUT /api/v1/teacher/plans/{planId}]> but was: <[DELETE /api/v1/student/chat/session/{sessionId}, DELETE /api/v1/student/exercise/wrong-questions/{questionId}, DELETE /api/v1/teacher/knowledge/documents/{documentId}, DELETE /api/v1/teacher/plans/{planId}, GET /api/v1/admin/audits, GET /api/v1/admin/dashboard/metrics, GET /api/v1/admin/resources, GET /api/v1/admin/resources/{resourceId}/download, GET /api/v1/admin/users, GET /api/v1/auth/me, GET /api/v1/student/ai-questions, GET /api/v1/student/ai-questions/{recordId}/analysis, GET /api/v1/student/chat/session/{sessionId}, GET /api/v1/student/chat/sessions, GET /api/v1/student/exercise/questions, GET /api/v1/student/exercise/records, GET /api/v1/student/exercise/wrong-questions, GET /api/v1/student/exercise/{recordId}/analysis, GET /api/v1/student/profile/analytics, GET /api/v1/student/profile/knowledge-topology, GET /api/v1/student/profile/weak-points, GET /api/v1/teacher/classrooms, GET /api/v1/teacher/interventions/recommendations, GET /api/v1/teacher/knowledge/documents, GET /api/v1/teacher/plans, GET /api/v1/teacher/plans/shared/{shareToken}, GET /api/v1/teacher/plans/{planId}/export, GET /api/v1/teacher/students, GET /api/v1/teacher/students/{studentId}/analytics, GET /api/v1/teacher/students/{studentId}/attribution, PATCH /api/v1/admin/users/{userId}, POST /api/v1/admin/users, POST /api/v1/auth/login, POST /api/v1/auth/logout, POST /api/v1/auth/refresh, POST /api/v1/auth/register, POST /api/v1/student/ai-questions/generate, POST /api/v1/student/ai-questions/submit, POST /api/v1/student/chat/session, POST /api/v1/student/chat/session/{sessionId}/message, POST /api/v1/student/exercise/submit, POST /api/v1/student/exercise/wrong-questions/{questionId}/socratic-probe, POST /api/v1/teacher/interventions/sandbox, POST /api/v1/teacher/knowledge/documents, POST /api/v1/teacher/plans/generate, POST /api/v1/teacher/plans/{planId}/share, POST /api/v1/teacher/suggestions, POST /api/v1/teacher/suggestions/bulk, PUT /api/v1/teacher/plans/{planId}]>
+[INFO] 
+[ERROR] Tests run: 21, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  14.748 s
+[INFO] Finished at: 2026-04-06T13:36:35+08:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project api: There are test failures.
+[ERROR] 
+[ERROR] Please refer to D:\code\github\hicancan\edunexus-ai\apps\api\target\surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

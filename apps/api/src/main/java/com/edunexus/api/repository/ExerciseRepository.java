@@ -26,8 +26,6 @@ public class ExerciseRepository {
                             rs.getInt("time_spent"),
                             ApiDataMapper.toInstant(rs.getTimestamp("created_at")));
 
-
-
     private final JdbcTemplate jdbc;
 
     public ExerciseRepository(JdbcTemplate jdbc) {

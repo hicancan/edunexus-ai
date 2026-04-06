@@ -64,7 +64,8 @@ class KnowledgeServiceTest {
         verify(aiClient).deleteKb(deletePayloadCaptor.capture());
         assertEquals(duplicateId.toString(), deletePayloadCaptor.getValue().get("documentId"));
         assertEquals("trace-cleanup", deletePayloadCaptor.getValue().get("traceId"));
-        assertEquals("kb-delete-" + duplicateId, deletePayloadCaptor.getValue().get("idempotencyKey"));
+        assertEquals(
+                "kb-delete-" + duplicateId, deletePayloadCaptor.getValue().get("idempotencyKey"));
         verify(objectStorageService).delete("s3://bucket/old-readme.md");
         verify(documentRepo).softDelete(duplicateId);
     }
