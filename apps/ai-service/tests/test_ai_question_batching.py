@@ -37,8 +37,8 @@ class _FakeLLM:
 class _FakeContext:
     def __init__(
         self,
-        token: str = "change-this-in-local-too",
-        trace_id: str = "trace-test",  # noqa: S107
+        token: str = "change-this-in-local-too",  # noqa: S107
+        trace_id: str = "trace-test",
     ) -> None:
         self._metadata = (
             ("x-service-token", token),
