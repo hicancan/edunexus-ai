@@ -376,6 +376,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
 
+  /student/exercise/wrong-questions/{questionId}/socratic-probe:
+    post:
+      tags: [Student-Exercise]
+      summary: 基于错题触发苏格拉底式提问
+      operationId: triggerSocraticProbe
+      parameters:
+        - $ref: '#/components/parameters/QuestionId'
+      responses:
+        '200':
+          description: 触发成功。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
   /student/exercise/records:
     get:
       tags: [Student-Exercise]
@@ -474,6 +489,19 @@ paths:
       responses:
         '200':
           description: 查询成功。data → AiQuestionAnalysisVO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /student/profile/knowledge-topology:
+    get:
+      tags: [Student-Exercise]
+      summary: 获取学生知识点拓扑图数据
+      operationId: getStudentKnowledgeTopology
+      responses:
+        '200':
+          description: 查询成功。
           content:
             application/json:
               schema:
@@ -586,6 +614,19 @@ paths:
       responses:
         '200':
           description: 查询成功。data → InterventionRecommendationVO 数组
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /teacher/interventions/sandbox:
+    post:
+      tags: [Teacher-Analytics]
+      summary: 教学干预沙盒投递接口
+      operationId: sandboxIntervention
+      responses:
+        '200':
+          description: 拦截/投递成功。
           content:
             application/json:
               schema:
