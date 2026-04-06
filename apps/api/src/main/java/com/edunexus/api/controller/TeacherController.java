@@ -160,7 +160,9 @@ public class TeacherController implements ControllerSupport {
                         "recommendationCount",
                         data.size(),
                         "provider",
-                        data.isEmpty() ? "" : ApiDataMapper.asString(data.getFirst().get("provider")),
+                        data.isEmpty()
+                                ? ""
+                                : ApiDataMapper.asString(data.getFirst().get("provider")),
                         "model",
                         data.isEmpty() ? "" : ApiDataMapper.asString(data.getFirst().get("model")),
                         "latencyMs",
@@ -573,15 +575,23 @@ public class TeacherController implements ControllerSupport {
         AuthUser user = currentUser();
         var recommendations = analyticsService.getInterventionRecommendations(user.userId());
 
-        List<Map<String, Object>> clusters = recommendations.stream()
-                .map(r -> {
-                    Map<String, Object> cluster = new LinkedHashMap<>();
-                    cluster.put("knowledgePoint", ApiDataMapper.asString(r.get("knowledgePoint")));
-                    cluster.put("studentCount", ApiDataMapper.asInt(r.get("studentCount")));
-                    cluster.put("totalWrongCount", ApiDataMapper.asInt(r.get("totalWrongCount")));
-                    return cluster;
-                })
-                .toList();
+        List<Map<String, Object>> clusters =
+                recommendations.stream()
+                        .map(
+                                r -> {
+                                    Map<String, Object> cluster = new LinkedHashMap<>();
+                                    cluster.put(
+                                            "knowledgePoint",
+                                            ApiDataMapper.asString(r.get("knowledgePoint")));
+                                    cluster.put(
+                                            "studentCount",
+                                            ApiDataMapper.asInt(r.get("studentCount")));
+                                    cluster.put(
+                                            "totalWrongCount",
+                                            ApiDataMapper.asInt(r.get("totalWrongCount")));
+                                    return cluster;
+                                })
+                        .toList();
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("traceId", trace(request));

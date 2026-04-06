@@ -148,8 +148,7 @@ public class AdminService {
 
     public DashboardMetrics getDashboardMetrics() {
         long totalUsers =
-                countOf(
-                        "select count(*) from users where deleted_at is null and status='ACTIVE'");
+                countOf("select count(*) from users where deleted_at is null and status='ACTIVE'");
         long totalStudents =
                 countOf(
                         "select count(*) from users where role='STUDENT' and deleted_at is null and status='ACTIVE'");
@@ -159,7 +158,8 @@ public class AdminService {
         long totalAdmins =
                 countOf(
                         "select count(*) from users where role='ADMIN' and deleted_at is null and status='ACTIVE'");
-        long totalChatSessions = countOf("select count(*) from chat_sessions where is_deleted=false");
+        long totalChatSessions =
+                countOf("select count(*) from chat_sessions where is_deleted=false");
         long totalChatMessages = countOf("select count(*) from chat_messages");
         long totalExerciseRecords = countOf("select count(*) from exercise_records");
         long totalQuestions = countOf("select count(*) from questions where is_active=true");
@@ -167,7 +167,8 @@ public class AdminService {
         long totalKnowledgeChunks =
                 countOf(
                         "select coalesce(sum((result->>'chunks')::bigint),0) from job_runs where job_type='DOCUMENT_INGEST' and status='SUCCEEDED' and jsonb_exists(result,'chunks')");
-        long totalLessonPlans = countOf("select count(*) from lesson_plans where deleted_at is null");
+        long totalLessonPlans =
+                countOf("select count(*) from lesson_plans where deleted_at is null");
         long totalAiQuestionSessions = countOf("select count(*) from ai_question_sessions");
         long studentChatTurnCount =
                 countOf(
@@ -179,7 +180,8 @@ public class AdminService {
 
         long suggestionDispatchCount = countOf("select count(*) from teacher_suggestions");
         long readyDocuments =
-                countOf("select count(*) from documents where deleted_at is null and status='READY'");
+                countOf(
+                        "select count(*) from documents where deleted_at is null and status='READY'");
         long completedAiQuestionSessions =
                 countOf("select count(*) from ai_question_sessions where completed=true");
         long totalAuditLogs = countOf("select count(*) from audit_logs");
@@ -196,7 +198,8 @@ public class AdminService {
                 countOf("select count(*) from wrong_book where status='MASTERED'");
         long atRiskStudents =
                 countOf("select count(distinct student_id) from wrong_book where status='ACTIVE'");
-        long suggestedStudents = countOf("select count(distinct student_id) from teacher_suggestions");
+        long suggestedStudents =
+                countOf("select count(distinct student_id) from teacher_suggestions");
         long riskKnowledgePoints =
                 countOf(
                         """
@@ -334,7 +337,8 @@ public class AdminService {
         governanceSummary.put("readyDocuments", readyDocuments);
         governanceSummary.put("activeRiskStudents", atRiskStudents);
         governanceSummary.put("studentChatTurnCount", studentChatTurnCount);
-        governanceSummary.put("diagnosisInteractionCount", studentChatTurnCount + totalExerciseRecords);
+        governanceSummary.put(
+                "diagnosisInteractionCount", studentChatTurnCount + totalExerciseRecords);
         governanceSummary.put("completionCompletedUnits", completionCompletedUnits);
         governanceSummary.put("completionUnitSamples", completionUnitSamples);
         governanceSummary.put(
@@ -390,8 +394,7 @@ public class AdminService {
                                 60D,
                                 "%",
                                 activeWrongEntries + masteredWrongEntries,
-                                masteredWrongEntries
-                                        + " 道错题已从活跃列表进入掌握状态"),
+                                masteredWrongEntries + " 道错题已从活跃列表进入掌握状态"),
                         outcomeMetric(
                                 "教师建议覆盖率",
                                 suggestionCoverageRate,
@@ -531,7 +534,9 @@ public class AdminService {
                             ? observation.executionSampleCount()
                             : strategy.equals(runtimeStrategy)
                                     ? Math.max(
-                                            observation == null ? 0L : observation.latencySampleCount(),
+                                            observation == null
+                                                    ? 0L
+                                                    : observation.latencySampleCount(),
                                             completionUnitSamples)
                                     : 0L;
             rows.add(
@@ -635,7 +640,8 @@ public class AdminService {
                         : latencySampleCount;
         Double baselineLatency =
                 baselineObservation == null ? null : baselineObservation.avgLatencyMs();
-        Double baselineP95 = baselineObservation == null ? null : baselineObservation.p95LatencyMs();
+        Double baselineP95 =
+                baselineObservation == null ? null : baselineObservation.p95LatencyMs();
         Double baselineSensitiveOutboundRate =
                 baselineObservation == null || baselineObservation.privacyRetentionRate() == null
                         ? null
@@ -787,15 +793,14 @@ public class AdminService {
                     String strategy = normalizeStrategy(rs.getString("runtime_strategy"));
                     laneCountsByStrategy
                             .computeIfAbsent(strategy, ignored -> new LinkedHashMap<>())
-                            .put(
-                                    rs.getString("execution_lane"),
-                                    rs.getLong("sample_count"));
+                            .put(rs.getString("execution_lane"), rs.getLong("sample_count"));
                 });
 
         for (Map.Entry<String, Map<String, Long>> entry : laneCountsByStrategy.entrySet()) {
             String strategy = entry.getKey();
             Map<String, Long> laneCounts = entry.getValue();
-            long executionSampleCount = laneCounts.values().stream().mapToLong(Long::longValue).sum();
+            long executionSampleCount =
+                    laneCounts.values().stream().mapToLong(Long::longValue).sum();
             StrategyObservation existing = observations.get(strategy);
             observations.put(
                     strategy,
@@ -869,7 +874,12 @@ public class AdminService {
     }
 
     private Map<String, Object> outcomeMetric(
-            String label, Double value, double target, String unit, long sampleCount, String insight) {
+            String label,
+            Double value,
+            double target,
+            String unit,
+            long sampleCount,
+            String insight) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("label", label);
         row.put("value", value);
@@ -882,7 +892,8 @@ public class AdminService {
 
     private Map<String, Object> buildAuditLatencyMetric(
             String scene, String action, String source) {
-        return jdbc.query(
+        return jdbc
+                .query(
                         """
                         select
                           coalesce(avg((detail->>'latencyMs')::numeric), 0) as avg_latency_ms,
@@ -907,7 +918,8 @@ public class AdminService {
     }
 
     private Map<String, Object> buildJobLatencyMetric(String scene, String jobType, String source) {
-        return jdbc.query(
+        return jdbc
+                .query(
                         """
                         select
                           coalesce(avg(extract(epoch from (finished_at - started_at)) * 1000), 0) as avg_latency_ms,
@@ -932,7 +944,11 @@ public class AdminService {
     }
 
     private Map<String, Object> latencyMetric(
-            String scene, double avgLatencyMs, double p95LatencyMs, long sampleCount, String source) {
+            String scene,
+            double avgLatencyMs,
+            double p95LatencyMs,
+            long sampleCount,
+            String source) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("scene", scene);
         row.put("avgLatencyMs", sampleCount > 0 ? round2(avgLatencyMs) : null);

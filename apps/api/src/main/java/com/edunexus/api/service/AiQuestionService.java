@@ -57,7 +57,10 @@ public class AiQuestionService {
     }
 
     public record GenerateResult(
-            UUID sessionId, List<Map<String, Object>> questions, String routerDecision, int latencyMs) {}
+            UUID sessionId,
+            List<Map<String, Object>> questions,
+            String routerDecision,
+            int latencyMs) {}
 
     public GenerateResult generateQuestions(
             UUID studentId,

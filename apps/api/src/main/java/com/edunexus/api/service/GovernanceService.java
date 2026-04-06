@@ -22,9 +22,10 @@ public class GovernanceService {
             @Value("${app.runtime-strategy:云边端协同}") String runtimeStrategy) {
         this.db = db;
         this.objectMapper = objectMapper;
-        this.runtimeStrategy = runtimeStrategy == null || runtimeStrategy.isBlank()
-                ? "云边端协同"
-                : runtimeStrategy.trim();
+        this.runtimeStrategy =
+                runtimeStrategy == null || runtimeStrategy.isBlank()
+                        ? "云边端协同"
+                        : runtimeStrategy.trim();
     }
 
     public Map<String, Object> getIdempotentReplay(

@@ -26,14 +26,18 @@ class _FakeLLM:
         self._responses = responses
         self.prompts: list[str] = []
 
-    async def complete(self, prompt: str, scene: str, trace_id: str):  # pragma: no cover - exercised by test
+    async def complete(
+        self, prompt: str, scene: str, trace_id: str
+    ):  # pragma: no cover - exercised by test
         self.prompts.append(prompt)
         index = min(len(self.prompts) - 1, len(self._responses) - 1)
         return _FakeResult(text=self._responses[index])
 
 
 class _FakeContext:
-    def __init__(self, token: str = "change-this-in-local-too", trace_id: str = "trace-test") -> None:
+    def __init__(
+        self, token: str = "change-this-in-local-too", trace_id: str = "trace-test"
+    ) -> None:
         self._metadata = (
             ("x-service-token", token),
             ("x-trace-id", trace_id),
@@ -94,20 +98,20 @@ def _question_json(index: int) -> str:
     return (
         "["
         "{"
-        f"\"question_type\":\"SINGLE_CHOICE\",\"content\":\"题目{index}A\",\"options\":{{\"A\":\"1\",\"B\":\"2\",\"C\":\"3\",\"D\":\"4\"}},"
-        "\"correct_answer\":\"A\",\"explanation\":\"解析\",\"knowledge_points\":[\"牛顿第二定律\"]"
+        f'"question_type":"SINGLE_CHOICE","content":"题目{index}A","options":{{"A":"1","B":"2","C":"3","D":"4"}},'
+        '"correct_answer":"A","explanation":"解析","knowledge_points":["牛顿第二定律"]'
         "},"
         "{"
-        f"\"question_type\":\"SINGLE_CHOICE\",\"content\":\"题目{index}B\",\"options\":{{\"A\":\"1\",\"B\":\"2\",\"C\":\"3\",\"D\":\"4\"}},"
-        "\"correct_answer\":\"B\",\"explanation\":\"解析\",\"knowledge_points\":[\"牛顿第二定律\"]"
+        f'"question_type":"SINGLE_CHOICE","content":"题目{index}B","options":{{"A":"1","B":"2","C":"3","D":"4"}},'
+        '"correct_answer":"B","explanation":"解析","knowledge_points":["牛顿第二定律"]'
         "},"
         "{"
-        f"\"question_type\":\"SHORT_ANSWER\",\"content\":\"题目{index}C\",\"options\":{{}},"
-        "\"correct_answer\":\"质量与加速度\",\"explanation\":\"解析\",\"knowledge_points\":[\"牛顿第二定律\"]"
+        f'"question_type":"SHORT_ANSWER","content":"题目{index}C","options":{{}},'
+        '"correct_answer":"质量与加速度","explanation":"解析","knowledge_points":["牛顿第二定律"]'
         "},"
         "{"
-        f"\"question_type\":\"SINGLE_CHOICE\",\"content\":\"题目{index}D\",\"options\":{{\"A\":\"1\",\"B\":\"2\",\"C\":\"3\",\"D\":\"4\"}},"
-        "\"correct_answer\":\"C\",\"explanation\":\"解析\",\"knowledge_points\":[\"牛顿第二定律\"]"
+        f'"question_type":"SINGLE_CHOICE","content":"题目{index}D","options":{{"A":"1","B":"2","C":"3","D":"4"}},'
+        '"correct_answer":"C","explanation":"解析","knowledge_points":["牛顿第二定律"]'
         "}"
         "]"
     )

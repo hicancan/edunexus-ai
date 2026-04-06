@@ -28,8 +28,7 @@ public class JwtUtil {
             @Value("${app.jwt-expires-in:15m}") String access,
             @Value("${app.refresh-token-expires-in:14d}") String refresh,
             Environment env) {
-        String appEnv =
-                env.getProperty("APP_ENV", env.getProperty("app.env", "local"));
+        String appEnv = env.getProperty("APP_ENV", env.getProperty("app.env", "local"));
         boolean isLocal = "local".equalsIgnoreCase(appEnv);
 
         if (!isLocal && (secret.length() < 32 || DEFAULT_SECRET.equals(secret))) {

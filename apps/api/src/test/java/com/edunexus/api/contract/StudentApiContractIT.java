@@ -242,10 +242,7 @@ class StudentApiContractIT extends ApiContractIntegrationBase {
         List<Map<String, String>> answers = new ArrayList<>();
         for (JsonNode question : generatedQuestions) {
             String questionType = question.path("questionType").asText();
-            String userAnswer =
-                    "SHORT_ANSWER".equals(questionType)
-                            ? "明显错误"
-                            : "__invalid__";
+            String userAnswer = "SHORT_ANSWER".equals(questionType) ? "明显错误" : "__invalid__";
             answers.add(
                     Map.of("questionId", question.path("id").asText(), "userAnswer", userAnswer));
         }

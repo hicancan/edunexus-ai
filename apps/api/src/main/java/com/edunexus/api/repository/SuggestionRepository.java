@@ -14,7 +14,9 @@ public class SuggestionRepository {
     public record SaveResult(TeacherSuggestion suggestion, boolean created) {}
 
     public record DispatchSummary(
-            String knowledgePoint, int dispatchedStudentCount, java.time.Instant lastDispatchedAt) {}
+            String knowledgePoint,
+            int dispatchedStudentCount,
+            java.time.Instant lastDispatchedAt) {}
 
     private static final RowMapper<TeacherSuggestion> ROW_MAPPER =
             (rs, rn) ->

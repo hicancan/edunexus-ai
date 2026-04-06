@@ -17,8 +17,12 @@ SCENE_PARAMS: dict[str, dict[str, float | int]] = {
 }
 
 STRUCTURED_SCENES = {
-    "ai_question", "ai_question_large", "teacher_suggestion", "lesson_plan",
-    "knowledge_topology", "intervention_sandbox",
+    "ai_question",
+    "ai_question_large",
+    "teacher_suggestion",
+    "lesson_plan",
+    "knowledge_topology",
+    "intervention_sandbox",
 }
 REASONING_SCENES = {"wrong_analysis"}
 SCENE_PROVIDER_PREFERENCE: dict[str, list[str]] = {

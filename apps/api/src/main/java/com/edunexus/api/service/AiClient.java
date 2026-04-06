@@ -33,6 +33,7 @@ import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
+import jakarta.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -41,7 +42,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -103,8 +103,12 @@ public class AiClient {
         this.kbStub = KnowledgeBaseServiceGrpc.newBlockingStub(grpcChannel);
 
         this.restTemplate = restTemplateBuilder.build();
-        this.restTemplate.getMessageConverters().add(
-                0, new org.springframework.http.converter.StringHttpMessageConverter(StandardCharsets.UTF_8));
+        this.restTemplate
+                .getMessageConverters()
+                .add(
+                        0,
+                        new org.springframework.http.converter.StringHttpMessageConverter(
+                                StandardCharsets.UTF_8));
     }
 
     @PreDestroy
@@ -563,19 +567,23 @@ public class AiClient {
 
             String aiServiceBaseUrl = "http://" + aiHttpHost + ":" + aiHttpPort;
             var entity = new org.springframework.http.HttpEntity<>(body, headers);
-            var response = this.restTemplate.postForEntity(
-                    aiServiceBaseUrl + path,
-                    entity,
-                    Map.class);
+            var response =
+                    this.restTemplate.postForEntity(aiServiceBaseUrl + path, entity, Map.class);
 
             log.info(
                     "ai_call_http path={} latency_ms={} trace_id={}",
-                    path, (System.currentTimeMillis() - startMs), traceId);
+                    path,
+                    (System.currentTimeMillis() - startMs),
+                    traceId);
 
             Map<String, Object> responseBody = response.getBody();
             return responseBody != null ? responseBody : new LinkedHashMap<>();
         } catch (Exception ex) {
-            log.error("ai_call_http_error path={} trace_id={} error={}", path, traceId, ex.getMessage());
+            log.error(
+                    "ai_call_http_error path={} trace_id={} error={}",
+                    path,
+                    traceId,
+                    ex.getMessage());
             throw new DependencyException(
                     ErrorCode.SYSTEM_DEPENDENCY,
                     "调用 AI 服务失败: " + path + ": " + ex.getMessage(),

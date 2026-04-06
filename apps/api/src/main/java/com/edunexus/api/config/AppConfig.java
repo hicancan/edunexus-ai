@@ -54,8 +54,7 @@ public class AppConfig {
 
     @Bean
     public WebMvcConfigurer corsConfigurer(
-            @Value(
-                    "${app.cors-allowed-origin-patterns:http://127.0.0.1:*,http://localhost:*}")
+            @Value("${app.cors-allowed-origin-patterns:http://127.0.0.1:*,http://localhost:*}")
                     String[] allowedOriginPatterns) {
         return new WebMvcConfigurer() {
             @Override

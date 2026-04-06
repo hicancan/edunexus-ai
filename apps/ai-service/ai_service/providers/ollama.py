@@ -41,9 +41,7 @@ class OllamaClient:
         self, prompt: str, model: str, scene: str, *, timeout_seconds: float
     ) -> tuple[str, dict[str, int]]:
         payload = self._build_payload(prompt, model, scene, stream=False)
-        response = await self._client.post(
-            "/api/generate", json=payload, timeout=timeout_seconds
-        )
+        response = await self._client.post("/api/generate", json=payload, timeout=timeout_seconds)
         response.raise_for_status()
         data = response.json()
         usage = {

@@ -6,8 +6,8 @@ import com.edunexus.api.common.ApiResponse;
 import com.edunexus.api.common.Difficulty;
 import com.edunexus.api.common.ResourceNotFoundException;
 import com.edunexus.api.service.AiClient;
-import com.edunexus.api.service.AnalyticsService;
 import com.edunexus.api.service.AiQuestionService;
+import com.edunexus.api.service.AnalyticsService;
 import com.edunexus.api.service.ChatService;
 import com.edunexus.api.service.ExerciseService;
 import com.edunexus.api.service.GovernanceService;
@@ -142,7 +142,8 @@ public class StudentController implements ControllerSupport {
             return chatService.streamMessage(
                     sessionId, user.userId(), req.message(), trace(request));
         }
-        var result = chatService.sendMessage(sessionId, user.userId(), req.message(), trace(request));
+        var result =
+                chatService.sendMessage(sessionId, user.userId(), req.message(), trace(request));
         Map<String, Object> auditDetail = new LinkedHashMap<>();
         auditDetail.put("provider", result.provider());
         auditDetail.put("model", result.model());
@@ -500,10 +501,15 @@ public class StudentController implements ControllerSupport {
         body.put("question", question.content());
         body.put("userAnswer", req.userAnswer() == null ? "" : req.userAnswer());
         body.put("correctAnswer", question.correctAnswer());
-        body.put("knowledgePoints", ApiDataMapper.parseNullableStringList(
-                question.knowledgePointsJson(), new com.fasterxml.jackson.databind.ObjectMapper()));
+        body.put(
+                "knowledgePoints",
+                ApiDataMapper.parseNullableStringList(
+                        question.knowledgePointsJson(),
+                        new com.fasterxml.jackson.databind.ObjectMapper()));
         body.put("roundNumber", req.roundNumber());
-        body.put("studentResponses", req.studentResponses() == null ? List.of() : req.studentResponses());
+        body.put(
+                "studentResponses",
+                req.studentResponses() == null ? List.of() : req.studentResponses());
 
         var result = aiClient.socraticProbe(body);
         governance.audit(
@@ -535,26 +541,27 @@ public class StudentController implements ControllerSupport {
         AuthUser user = currentUser();
 
         var weakPoints = exerciseService.getWeakPoints(user.userId());
-        List<String> knowledgePoints = weakPoints.stream()
-                .map(wp -> wp.knowledgePoint())
-                .distinct()
-                .toList();
+        List<String> knowledgePoints =
+                weakPoints.stream().map(wp -> wp.knowledgePoint()).distinct().toList();
 
         if (knowledgePoints.isEmpty()) {
-            return ResponseEntity.ok(ApiResponse.ok(
-                    Map.of("nodes", List.of(), "edges", List.of(), "source", "EMPTY"),
-                    trace(request)));
+            return ResponseEntity.ok(
+                    ApiResponse.ok(
+                            Map.of("nodes", List.of(), "edges", List.of(), "source", "EMPTY"),
+                            trace(request)));
         }
 
-        List<Map<String, Object>> masteryData = weakPoints.stream()
-                .map(wp -> {
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("knowledgePoint", wp.knowledgePoint());
-                    item.put("wrongCount", wp.wrongCount());
-                    item.put("status", wp.wrongCount() >= 3 ? "weak" : "unstable");
-                    return item;
-                })
-                .toList();
+        List<Map<String, Object>> masteryData =
+                weakPoints.stream()
+                        .map(
+                                wp -> {
+                                    Map<String, Object> item = new LinkedHashMap<>();
+                                    item.put("knowledgePoint", wp.knowledgePoint());
+                                    item.put("wrongCount", wp.wrongCount());
+                                    item.put("status", wp.wrongCount() >= 3 ? "weak" : "unstable");
+                                    return item;
+                                })
+                        .toList();
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("traceId", trace(request));
@@ -655,7 +662,5 @@ public class StudentController implements ControllerSupport {
     public record AnswerItem(@NotBlank String questionId, @NotBlank String userAnswer) {}
 
     public record SocraticProbeReq(
-            @Min(1) @Max(3) int roundNumber,
-            String userAnswer,
-            List<String> studentResponses) {}
+            @Min(1) @Max(3) int roundNumber, String userAnswer, List<String> studentResponses) {}
 }

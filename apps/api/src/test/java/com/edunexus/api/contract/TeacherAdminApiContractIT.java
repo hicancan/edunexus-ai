@@ -251,7 +251,10 @@ class TeacherAdminApiContractIT extends ApiContractIntegrationBase {
                                         .path("data")
                                         .spliterator(),
                                 false)
-                        .filter(node -> bulkKnowledgePoint.equals(node.path("knowledgePoint").asText()))
+                        .filter(
+                                node ->
+                                        bulkKnowledgePoint.equals(
+                                                node.path("knowledgePoint").asText()))
                         .findFirst()
                         .orElseThrow();
         org.junit.jupiter.api.Assertions.assertTrue(
@@ -395,7 +398,8 @@ class TeacherAdminApiContractIT extends ApiContractIntegrationBase {
                 .andExpect(jsonPath("$.data.responseBenchmarks[0].dataState", notNullValue()))
                 .andExpect(jsonPath("$.data.strategyComparison", notNullValue()))
                 .andExpect(jsonPath("$.data.governanceSummary", notNullValue()))
-                .andExpect(jsonPath("$.data.governanceSummary.retentionTaskSamples", notNullValue()))
+                .andExpect(
+                        jsonPath("$.data.governanceSummary.retentionTaskSamples", notNullValue()))
                 .andExpect(jsonPath("$.data.governanceSummary.retrievalHitSamples", notNullValue()))
                 .andExpect(
                         jsonPath(

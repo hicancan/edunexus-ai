@@ -13,7 +13,9 @@ from ..repair import complete_with_json_repair
 from .base import abort_internal_error, require_internal_auth
 
 
-def _validate_suggestions(rows: list[dict], knowledge_points: set[str]) -> list[GeneratedTeachingSuggestion]:
+def _validate_suggestions(
+    rows: list[dict], knowledge_points: set[str]
+) -> list[GeneratedTeachingSuggestion]:
     output: list[GeneratedTeachingSuggestion] = []
     seen: set[str] = set()
     for row in rows:

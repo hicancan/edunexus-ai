@@ -145,9 +145,7 @@ class LessonPlanRequest(BaseModel):
 class TeachingSuggestionCandidate(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    knowledge_point: str = Field(
-        validation_alias=AliasChoices("knowledgePoint", "knowledge_point")
-    )
+    knowledge_point: str = Field(validation_alias=AliasChoices("knowledgePoint", "knowledge_point"))
     student_count: int = Field(
         default=0, ge=0, validation_alias=AliasChoices("studentCount", "student_count")
     )
@@ -352,9 +350,7 @@ class AIQuestionItem(BaseModel):
 class TeachingSuggestionItem(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    knowledge_point: str = Field(
-        validation_alias=AliasChoices("knowledge_point", "knowledgePoint")
-    )
+    knowledge_point: str = Field(validation_alias=AliasChoices("knowledge_point", "knowledgePoint"))
     suggestion_template: str = Field(
         validation_alias=AliasChoices("suggestion_template", "suggestionTemplate")
     )

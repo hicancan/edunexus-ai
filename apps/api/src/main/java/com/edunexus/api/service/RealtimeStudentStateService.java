@@ -52,9 +52,7 @@ public class RealtimeStudentStateService {
     }
 
     public void recordChatQuestion(UUID studentId) {
-        storeEvent(
-                studentId,
-                new RealtimeEvent("CHAT", Instant.now(), null, null, List.of()));
+        storeEvent(studentId, new RealtimeEvent("CHAT", Instant.now(), null, null, List.of()));
     }
 
     public void recordExerciseSubmission(
@@ -71,8 +69,7 @@ public class RealtimeStudentStateService {
 
     public void recordAiQuestionGeneration(UUID studentId) {
         storeEvent(
-                studentId,
-                new RealtimeEvent("AI_GENERATE", Instant.now(), null, null, List.of()));
+                studentId, new RealtimeEvent("AI_GENERATE", Instant.now(), null, null, List.of()));
     }
 
     public void recordAiQuestionSubmission(
@@ -93,7 +90,15 @@ public class RealtimeStudentStateService {
                     redis.opsForList().range(timelineKey(studentId), 0, MAX_EVENTS - 1);
             if (rawEvents == null || rawEvents.isEmpty()) {
                 return new RealtimeSnapshot(
-                        "NO_ACTIVITY", (int) WINDOW.toMinutes(), 0, 0, 0, 0, 0, 0D, List.of(),
+                        "NO_ACTIVITY",
+                        (int) WINDOW.toMinutes(),
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0D,
+                        List.of(),
                         List.of("近 10 分钟暂无新的课堂交互，当前画像主要依据历史学习轨迹。"));
             }
 
@@ -101,11 +106,22 @@ public class RealtimeStudentStateService {
             List<RealtimeEvent> recentEvents =
                     rawEvents.stream()
                             .map(this::parseEvent)
-                            .filter(event -> event != null && !event.occurredAt().isBefore(windowStart))
+                            .filter(
+                                    event ->
+                                            event != null
+                                                    && !event.occurredAt().isBefore(windowStart))
                             .toList();
             if (recentEvents.isEmpty()) {
                 return new RealtimeSnapshot(
-                        "NO_ACTIVITY", (int) WINDOW.toMinutes(), 0, 0, 0, 0, 0, 0D, List.of(),
+                        "NO_ACTIVITY",
+                        (int) WINDOW.toMinutes(),
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0D,
+                        List.of(),
                         List.of("近 10 分钟暂无新的课堂交互，当前画像主要依据历史学习轨迹。"));
             }
 
@@ -121,8 +137,7 @@ public class RealtimeStudentStateService {
                     case "CHAT" -> recentChatQuestions++;
                     case "EXERCISE" -> recentExerciseSubmissions++;
                     case "AI_GENERATE", "AI_SUBMIT" -> recentAiInteractions++;
-                    default -> {
-                    }
+                    default -> {}
                 }
                 recentWrongCount += safeInt(event.wrongCount());
                 recentQuestionAttempts += safeInt(event.totalQuestions());
@@ -155,16 +170,10 @@ public class RealtimeStudentStateService {
 
             List<String> signals = new ArrayList<>();
             if (recentChatQuestions >= 3) {
-                signals.add(
-                        "近 10 分钟已连续发起 "
-                                + recentChatQuestions
-                                + " 次课堂提问，当前处于高求助状态。");
+                signals.add("近 10 分钟已连续发起 " + recentChatQuestions + " 次课堂提问，当前处于高求助状态。");
             }
             if (recentWrongCount >= 3 && recentQuestionAttempts > 0) {
-                signals.add(
-                        "近 10 分钟错误密度为 "
-                                + round2(recentErrorDensity)
-                                + "%，建议优先放缓节奏并补一次低门槛诊断。");
+                signals.add("近 10 分钟错误密度为 " + round2(recentErrorDensity) + "%，建议优先放缓节奏并补一次低门槛诊断。");
             }
             if (!hotspotList.isEmpty()) {
                 signals.add(
@@ -191,7 +200,10 @@ public class RealtimeStudentStateService {
                     hotspotList,
                     signals);
         } catch (DataAccessException ex) {
-            log.warn("realtime_state_unavailable studentId={} message={}", studentId, ex.getMessage());
+            log.warn(
+                    "realtime_state_unavailable studentId={} message={}",
+                    studentId,
+                    ex.getMessage());
             return new RealtimeSnapshot(
                     "UNAVAILABLE",
                     (int) WINDOW.toMinutes(),
@@ -244,7 +256,9 @@ public class RealtimeStudentStateService {
                     row.get("totalQuestions") == null
                             ? null
                             : ApiDataMapper.asInt(row.get("totalQuestions")),
-                    row.get("wrongCount") == null ? null : ApiDataMapper.asInt(row.get("wrongCount")),
+                    row.get("wrongCount") == null
+                            ? null
+                            : ApiDataMapper.asInt(row.get("wrongCount")),
                     normalizeKnowledgePoints(
                             ApiDataMapper.parseNullableStringList(
                                     row.get("knowledgePoints"), objectMapper)));
@@ -257,7 +271,11 @@ public class RealtimeStudentStateService {
         if (knowledgePoints == null || knowledgePoints.isEmpty()) {
             return List.of();
         }
-        return knowledgePoints.stream().map(String::trim).filter(item -> !item.isBlank()).distinct().toList();
+        return knowledgePoints.stream()
+                .map(String::trim)
+                .filter(item -> !item.isBlank())
+                .distinct()
+                .toList();
     }
 
     private String timelineKey(UUID studentId) {

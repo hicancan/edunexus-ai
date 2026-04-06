@@ -105,12 +105,14 @@ public class WrongBookRepository {
                         studentId);
         return val == null ? 0L : val.longValue();
     }
+
     public WrongBookEntry findByStudentAndQuestion(UUID studentId, UUID questionId) {
-        var rows = jdbc.query(
-                "select id,student_id,question_id,wrong_count,last_wrong_time,status,updated_at from wrong_book where student_id=? and question_id=? limit 1",
-                ROW_MAPPER,
-                studentId,
-                questionId);
+        var rows =
+                jdbc.query(
+                        "select id,student_id,question_id,wrong_count,last_wrong_time,status,updated_at from wrong_book where student_id=? and question_id=? limit 1",
+                        ROW_MAPPER,
+                        studentId,
+                        questionId);
         return rows.isEmpty() ? null : rows.getFirst();
     }
 }

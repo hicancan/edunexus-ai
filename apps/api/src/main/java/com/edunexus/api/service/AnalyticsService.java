@@ -206,7 +206,11 @@ public class AnalyticsService {
                         realtimeSnapshot);
         Map<String, Object> supportStage =
                 buildSupportStage(
-                        recentAccuracy, rollingAccuracy, wrongBookCount, activeDays7d, realtimeSnapshot);
+                        recentAccuracy,
+                        rollingAccuracy,
+                        wrongBookCount,
+                        activeDays7d,
+                        realtimeSnapshot);
         List<String> behaviorSignals =
                 buildBehaviorSignals(
                         recentChatMessageCount,
@@ -372,12 +376,16 @@ public class AnalyticsService {
                 aiClient.generateTeacherSuggestions(
                         Map.of("teacherId", teacherId.toString(), "candidates", candidates));
         Map<String, String> generatedSuggestions =
-                ApiDataMapper.parseObjectList(aiResult.get("suggestions"), new com.fasterxml.jackson.databind.ObjectMapper())
+                ApiDataMapper.parseObjectList(
+                                aiResult.get("suggestions"),
+                                new com.fasterxml.jackson.databind.ObjectMapper())
                         .stream()
                         .collect(
                                 java.util.stream.Collectors.toMap(
                                         item -> ApiDataMapper.asString(item.get("knowledgePoint")),
-                                        item -> ApiDataMapper.asString(item.get("suggestionTemplate")),
+                                        item ->
+                                                ApiDataMapper.asString(
+                                                        item.get("suggestionTemplate")),
                                         (left, right) -> left,
                                         java.util.LinkedHashMap::new));
 
@@ -400,9 +408,7 @@ public class AnalyticsService {
                                     dispatchSummary == null
                                             ? 0
                                             : dispatchSummary.dispatchedStudentCount();
-                            out.put(
-                                    "suggestionTemplate",
-                                    generatedSuggestions.get(knowledgePoint));
+                            out.put("suggestionTemplate", generatedSuggestions.get(knowledgePoint));
                             out.put("generationSource", "AI");
                             out.put("provider", provider);
                             out.put("model", model);
@@ -626,7 +632,10 @@ public class AnalyticsService {
                 && !realtimeSnapshot.hotspotKnowledgePoints().isEmpty()) {
             actions.add(
                     "先处理近 10 分钟课堂态热点「"
-                            + realtimeSnapshot.hotspotKnowledgePoints().getFirst().get("knowledgePoint")
+                            + realtimeSnapshot
+                                    .hotspotKnowledgePoints()
+                                    .getFirst()
+                                    .get("knowledgePoint")
                             + "」，先用 1 道低门槛诊断题确认是否补齐。");
         }
         if (!topWeakPoints.isEmpty()) {
@@ -645,8 +654,7 @@ public class AnalyticsService {
             actions.add("把复盘任务拆成 10 到 15 分钟的小步任务，先提高连续学习天数。");
         }
         if (actions.isEmpty()) {
-            actions.add(
-                    "保持当前节奏，继续通过课堂提问、针对性练习和迁移题巩固掌握状态。");
+            actions.add("保持当前节奏，继续通过课堂提问、针对性练习和迁移题巩固掌握状态。");
         }
         actions.add("当前支持阶段：" + supportStage.get("label") + "，建议按对应支架强度安排后续学习。");
         return actions;

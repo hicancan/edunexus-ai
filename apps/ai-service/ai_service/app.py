@@ -139,6 +139,7 @@ def create_app() -> FastAPI:
         extra_fields: dict | None = None,
     ) -> JSONResponse:
         from .repair import complete_with_json_repair
+
         trace_id = request.headers.get("X-Trace-Id", "")
         parsed, result = await complete_with_json_repair(
             llm_service,
@@ -163,7 +164,6 @@ def create_app() -> FastAPI:
     @app.post("/internal/v1/socratic-probe")
     async def socratic_probe(request: Request) -> JSONResponse:
         from .prompts import socratic_probe_prompt
-        from .repair import complete_with_json_repair
 
         body = await request.json()
         trace_id = request.headers.get("X-Trace-Id", "")
@@ -189,7 +189,6 @@ def create_app() -> FastAPI:
     @app.post("/internal/v1/knowledge-topology")
     async def knowledge_topology(request: Request) -> JSONResponse:
         from .prompts import knowledge_topology_prompt
-        from .repair import complete_with_json_repair
 
         body = await request.json()
         trace_id = request.headers.get("X-Trace-Id", "")
@@ -202,7 +201,9 @@ def create_app() -> FastAPI:
             prompt,
             scene="knowledge_topology",
             repair_prompt="将下面文本转换为合法 JSON 对象，包含 nodes 和 edges 两个数组字段：\n",
-            extra_fields={"data": parsed or {"nodes": [], "edges": []}} if False else None, # Force default on frontend if empty
+            extra_fields={"data": parsed or {"nodes": [], "edges": []}}
+            if False
+            else None,  # Force default on frontend if empty
         )
 
     # ── Intervention Sandbox ─────────────────────────────────────────────
@@ -210,7 +211,6 @@ def create_app() -> FastAPI:
     @app.post("/internal/v1/intervention-sandbox")
     async def intervention_sandbox(request: Request) -> JSONResponse:
         from .prompts import intervention_sandbox_prompt
-        from .repair import complete_with_json_repair
 
         body = await request.json()
         trace_id = request.headers.get("X-Trace-Id", "")

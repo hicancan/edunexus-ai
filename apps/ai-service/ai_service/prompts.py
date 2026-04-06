@@ -84,9 +84,7 @@ def aiq_prompt(
         sanitize_text(item, 180) for item in (existing_questions or []) if sanitize_text(item, 180)
     ]
     existing_text = (
-        json.dumps(existing_questions[:12], ensure_ascii=False)
-        if existing_questions
-        else "[]"
+        json.dumps(existing_questions[:12], ensure_ascii=False) if existing_questions else "[]"
     )
     return (
         "你是资深命题老师。请基于输入生成个性化习题。\n"
@@ -235,9 +233,7 @@ def coerce_lesson_plan_markdown(
     numerals = ["一", "二", "三", "四", "五", "六"]
     for index, step in enumerate(step_blocks):
         numeral = numerals[index] if index < len(numerals) else str(index + 1)
-        lines.append(
-            f"### 步骤{numeral}：{step['title']}（{step_durations[index]} 分钟）"
-        )
+        lines.append(f"### 步骤{numeral}：{step['title']}（{step_durations[index]} 分钟）")
         lines.extend(_normalize_step_lines(step["body"], topic, index))
         lines.append("")
 
@@ -353,7 +349,9 @@ def _normalize_step_durations(
             if isinstance(value, int) and value > 0:
                 bases.append(value)
             else:
-                weight = default_weights[index] if index < len(default_weights) else 1 / len(step_blocks)
+                weight = (
+                    default_weights[index] if index < len(default_weights) else 1 / len(step_blocks)
+                )
                 bases.append(weight)
     return _allocate_duration(duration_mins, bases)
 
@@ -404,7 +402,9 @@ def _normalize_step_lines(body: str, topic: str, index: int) -> list[str]:
     ]
     lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
     if not lines:
-        lines = [fallback_by_index[index] if index < len(fallback_by_index) else fallback_by_index[-1]]
+        lines = [
+            fallback_by_index[index] if index < len(fallback_by_index) else fallback_by_index[-1]
+        ]
     return [line if line.startswith(("-", "*")) else f"- {line}" for line in lines[:4]]
 
 
@@ -522,4 +522,3 @@ def intervention_sandbox_prompt(
         f"班级错题聚类数据：{clusters_json}\n"
         f"班级总人数：{student_count}"
     )
-
