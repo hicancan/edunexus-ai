@@ -711,6 +711,7 @@ onMounted(loadMetrics);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(148, 163, 184, 0.14);
+  word-break: break-all;
 }
 
 .lane-label,
