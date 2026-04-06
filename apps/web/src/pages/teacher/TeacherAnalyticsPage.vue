@@ -476,6 +476,7 @@ onMounted(() => {
   gap: 16px;
   align-items: flex-start;
   min-height: 148px;
+  height: 100%;
 }
 
 .summary-icon {
@@ -527,6 +528,12 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: var(--space-4);
+}
+
+.overview-grid > .panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-head {

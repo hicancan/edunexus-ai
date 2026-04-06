@@ -90,10 +90,6 @@ h4 {
   transform: translateY(-2px);
 }
 
-.panel + .panel {
-  margin-top: var(--space-4);
-}
-
 .panel-head {
   display: flex;
   justify-content: space-between;

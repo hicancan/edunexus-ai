@@ -409,12 +409,12 @@ onMounted(loadPlans);
   gap: var(--space-5);
   margin-top: 16px;
 }
-
 .plan-card {
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
   border: 1px solid var(--color-border-glass);
 }
 

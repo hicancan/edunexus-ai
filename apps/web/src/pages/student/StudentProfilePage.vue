@@ -343,7 +343,7 @@ function realtimeDensityDisplay(value?: number | null): string {
               v-else-if="profile"
               label-placement="left"
               bordered
-              :column="2"
+              :column="1"
               size="large"
             >
               <n-descriptions-item label="用户名">
@@ -586,6 +586,7 @@ function realtimeDensityDisplay(value?: number | null): string {
   display: flex;
   gap: 14px;
   align-items: flex-start;
+  height: 100%;
 }
 
 .summary-icon {
@@ -697,6 +698,13 @@ function realtimeDensityDisplay(value?: number | null): string {
 
 .profile-card {
   border-radius: 14px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-card :deep(.n-card__content) {
+  flex: 1;
 }
 
 .card-icon {
@@ -705,6 +713,13 @@ function realtimeDensityDisplay(value?: number | null): string {
 
 .support-card {
   border-radius: 14px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.support-card :deep(.n-card__content) {
+  flex: 1;
 }
 
 .support-card.danger {
@@ -742,8 +757,12 @@ function realtimeDensityDisplay(value?: number | null): string {
   line-height: 1.8;
 }
 
-.chart-panel {
+.chart-panel,
+.insight-panel {
   min-height: 360px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-head {

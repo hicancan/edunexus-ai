@@ -316,12 +316,12 @@ onUnmounted(stopPolling);
   gap: var(--space-4);
   margin-top: 12px;
 }
-
 .doc-card {
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
   border: 1px solid var(--color-border-glass);
 }
 
