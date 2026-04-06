@@ -74,9 +74,9 @@ const benchmarkOption = computed(() => {
   return {
     tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
     legend: { data: ["平均时延", "P95 时延"], bottom: 0 },
-    grid: { left: 24, right: 24, top: 16, bottom: 56, containLabel: true },
+    grid: { left: 60, right: 24, top: 36, bottom: 56, containLabel: true },
     xAxis: { type: "category", data: rows.map((row) => row.scene || "未知场景") },
-    yAxis: { type: "value", name: "ms" },
+    yAxis: { type: "value", name: "ms", nameTextStyle: { padding: [0, 24, 0, 0] } },
     series: [
       {
         name: "平均时延",
