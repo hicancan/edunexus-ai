@@ -36,7 +36,9 @@ class _FakeLLM:
 
 class _FakeContext:
     def __init__(
-        self, token: str = "change-this-in-local-too", trace_id: str = "trace-test"  # noqa: S107
+        self,
+        token: str = "change-this-in-local-too",
+        trace_id: str = "trace-test",  # noqa: S107
     ) -> None:
         self._metadata = (
             ("x-service-token", token),
@@ -156,7 +158,7 @@ def test_generate_fails_when_questions_are_insufficient() -> None:
 
     with pytest.raises(RuntimeError) as exc_info:
         asyncio.run(servicer.Generate(request, _FakeContext()))
-    
+
     exc = exc_info.value
     assert grpc.StatusCode.INTERNAL.name in str(exc)
     assert "expected 8, got 4" in str(exc)
