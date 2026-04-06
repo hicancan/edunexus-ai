@@ -11,5 +11,6 @@ runs:
         cache: npm
         cache-dependency-path: apps/web/package-lock.json
     - name: Install
+      working-directory: apps/web
       run: npm ci
       shell: bash

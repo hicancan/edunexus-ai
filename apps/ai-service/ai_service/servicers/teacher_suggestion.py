@@ -21,7 +21,7 @@ def _validate_suggestions(
     for row in rows:
         try:
             suggestion = TeachingSuggestionItem.model_validate(row)
-        except Exception:
+        except Exception:  # noqa: S112
             continue
         if suggestion.knowledge_point not in knowledge_points or suggestion.knowledge_point in seen:
             continue

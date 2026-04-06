@@ -166,7 +166,6 @@ def create_app() -> FastAPI:
         from .prompts import socratic_probe_prompt
 
         body = await request.json()
-        trace_id = request.headers.get("X-Trace-Id", "")
         round_number = int(body.get("roundNumber", 1))
         prompt = socratic_probe_prompt(
             question=body.get("question", ""),
@@ -191,7 +190,6 @@ def create_app() -> FastAPI:
         from .prompts import knowledge_topology_prompt
 
         body = await request.json()
-        trace_id = request.headers.get("X-Trace-Id", "")
         prompt = knowledge_topology_prompt(
             knowledge_points=body.get("knowledgePoints", []),
             mastery_data=body.get("masteryData", []),
@@ -201,9 +199,6 @@ def create_app() -> FastAPI:
             prompt,
             scene="knowledge_topology",
             repair_prompt="将下面文本转换为合法 JSON 对象，包含 nodes 和 edges 两个数组字段：\n",
-            extra_fields={"data": parsed or {"nodes": [], "edges": []}}
-            if False
-            else None,  # Force default on frontend if empty
         )
 
     # ── Intervention Sandbox ─────────────────────────────────────────────
@@ -213,7 +208,6 @@ def create_app() -> FastAPI:
         from .prompts import intervention_sandbox_prompt
 
         body = await request.json()
-        trace_id = request.headers.get("X-Trace-Id", "")
         prompt = intervention_sandbox_prompt(
             class_wrong_clusters=body.get("classWrongClusters", []),
             student_count=int(body.get("studentCount", 0)),

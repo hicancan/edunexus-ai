@@ -36,7 +36,7 @@ class _FakeLLM:
 
 class _FakeContext:
     def __init__(
-        self, token: str = "change-this-in-local-too", trace_id: str = "trace-test"
+        self, token: str = "dummy-value", trace_id: str = "trace-test"  # noqa: S107
     ) -> None:
         self._metadata = (
             ("x-service-token", token),
@@ -152,9 +152,11 @@ def test_generate_fails_when_questions_are_insufficient() -> None:
         teacher_suggestions="[]",
     )
 
-    try:
+    import pytest
+
+    with pytest.raises(RuntimeError) as exc_info:
         asyncio.run(servicer.Generate(request, _FakeContext()))
-        raise AssertionError("Expected Generate to abort when output is insufficient.")
-    except RuntimeError as exc:
-        assert grpc.StatusCode.INTERNAL.name in str(exc)
-        assert "expected 8, got 4" in str(exc)
+    
+    exc = exc_info.value
+    assert grpc.StatusCode.INTERNAL.name in str(exc)
+    assert "expected 8, got 4" in str(exc)
