@@ -2,9 +2,12 @@
 import { computed } from "vue";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import markedKatex from "marked-katex-extension";
+import "katex/dist/katex.min.css";
 
 // GFM is enabled by default in marked v5+; set explicitly to ensure tables work
 marked.use({ gfm: true, breaks: false });
+marked.use(markedKatex({ throwOnError: false }));
 
 const props = defineProps<{
   content: string;
@@ -118,7 +121,7 @@ const renderedHtml = computed(() => {
   // Append trailing newlines so incomplete streaming blocks (tables, code fences)
   // are flushed and parsed correctly
   const rawHtml = marked.parse(preprocessed + "\n\n") as string;
-  return DOMPurify.sanitize(rawHtml);
+  return DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true, mathMl: true } });
 });
 </script>
 

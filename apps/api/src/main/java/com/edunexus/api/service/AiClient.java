@@ -45,7 +45,9 @@ import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 public class AiClient {
@@ -67,6 +69,7 @@ public class AiClient {
             teachingSuggestionStub;
     private final LessonPlanServiceGrpc.LessonPlanServiceBlockingStub lessonPlanStub;
     private final KnowledgeBaseServiceGrpc.KnowledgeBaseServiceBlockingStub kbStub;
+    private final RestTemplate restTemplate;
 
     public record ChatStreamChunk(String delta, List<Map<String, Object>> citations) {}
 
@@ -79,7 +82,8 @@ public class AiClient {
             @Value("${app.lesson-plan-timeout-seconds:180}") long lessonPlanTimeoutSeconds,
             @Value("${app.kb-ingest-timeout-seconds:180}") long kbIngestTimeoutSeconds,
             @Value("${app.kb-delete-timeout-seconds:60}") long kbDeleteTimeoutSeconds,
-            @Value("${app.ai-service-token}") String serviceToken) {
+            @Value("${app.ai-service-token}") String serviceToken,
+            RestTemplateBuilder restTemplateBuilder) {
         this.serviceToken = serviceToken;
         this.aiQuestionTimeoutSeconds = aiQuestionTimeoutSeconds;
         this.lessonPlanTimeoutSeconds = lessonPlanTimeoutSeconds;
@@ -97,6 +101,10 @@ public class AiClient {
         this.teachingSuggestionStub = TeachingSuggestionServiceGrpc.newBlockingStub(grpcChannel);
         this.lessonPlanStub = LessonPlanServiceGrpc.newBlockingStub(grpcChannel);
         this.kbStub = KnowledgeBaseServiceGrpc.newBlockingStub(grpcChannel);
+
+        this.restTemplate = restTemplateBuilder.build();
+        this.restTemplate.getMessageConverters().add(
+                0, new org.springframework.http.converter.StringHttpMessageConverter(StandardCharsets.UTF_8));
     }
 
     @PreDestroy
@@ -554,11 +562,8 @@ public class AiClient {
             headers.set("X-Trace-Id", traceId);
 
             String aiServiceBaseUrl = "http://" + aiHttpHost + ":" + aiHttpPort;
-            var restTemplate = new org.springframework.web.client.RestTemplate();
-            restTemplate.getMessageConverters().add(
-                    0, new org.springframework.http.converter.StringHttpMessageConverter(StandardCharsets.UTF_8));
             var entity = new org.springframework.http.HttpEntity<>(body, headers);
-            var response = restTemplate.postForEntity(
+            var response = this.restTemplate.postForEntity(
                     aiServiceBaseUrl + path,
                     entity,
                     Map.class);

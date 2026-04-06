@@ -5,6 +5,7 @@ import {
   getAccessTokenForRequest,
   unwrapResponse
 } from "../../../services/api-client";
+import { fetchEventSource } from "@microsoft/fetch-event-source";
 import {
   type AiQuestionAnalysisVO,
   type AiQuestionGenerateRequest,
@@ -169,89 +170,68 @@ export async function sendChatMessageStream(
   const token = getAccessTokenForRequest();
   const requestId = createRequestId();
   const idempotencyKey = createRequestId();
-  const response = await fetch(`${API_BASE_URL}/student/chat/session/${sessionId}/message`, {
-    method: "POST",
-    headers: {
-      Accept: "text/event-stream",
-      "Content-Type": "application/json",
-      "X-Request-Id": requestId,
-      "Idempotency-Key": idempotencyKey,
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify({ message })
-  });
 
-  if (!response.ok) {
-    let messageText = "发送消息失败";
-    try {
-      const body = (await response.json()) as {
-        message?: string;
-        errorCode?: string;
-        traceId?: string;
-      };
-      if (body?.message) {
-        messageText = body.message;
-      }
-      throw new ApiClientError(messageText, {
-        code: body?.errorCode,
-        status: response.status,
-        traceId: body?.traceId
-      });
-    } catch (error) {
-      if (error instanceof ApiClientError) {
-        throw error;
-      }
-      throw new ApiClientError(messageText, { status: response.status });
+  class FetchEventSourceError extends Error {
+    constructor(
+      public messageText: string,
+      public status?: number,
+      public code?: string,
+      public traceId?: string
+    ) {
+      super(messageText);
     }
   }
 
-  if (!response.body) {
-    throw new ApiClientError("流式响应为空", { status: response.status });
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8");
-  let buffer = "";
-  let doneSeen = false;
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const rawEvent = buffer.slice(0, boundary).replace(/\r/g, "");
-      buffer = buffer.slice(boundary + 2);
-
-      const dataLines = rawEvent
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trimStart());
-      if (dataLines.length > 0) {
-        const parsed = parseSsePayload(dataLines.join("\n"));
+  try {
+    await fetchEventSource(`${API_BASE_URL}/student/chat/session/${sessionId}/message`, {
+      method: "POST",
+      headers: {
+        Accept: "text/event-stream",
+        "Content-Type": "application/json",
+        "X-Request-Id": requestId,
+        "Idempotency-Key": idempotencyKey,
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ message }),
+      async onopen(response) {
+        if (response.ok && response.headers.get("content-type")?.includes("text/event-stream")) {
+          return;
+        }
+        let messageText = "发送消息失败";
+        try {
+          const body = (await response.json()) as { message?: string; errorCode?: string; traceId?: string };
+          if (body?.message) messageText = body.message;
+          throw new FetchEventSourceError(messageText, response.status, body?.errorCode, body?.traceId);
+        } catch (e) {
+          if (e instanceof FetchEventSourceError) throw e;
+          throw new FetchEventSourceError(messageText, response.status);
+        }
+      },
+      onmessage(msg) {
+        if (!msg.data) return;
+        const parsed = parseSsePayload(msg.data);
         if (parsed.event) {
           onEvent(parsed.event);
         }
-        if (parsed.done) {
-          doneSeen = true;
-          await reader.cancel();
-          break;
+      },
+      onerror(err) {
+        if (err instanceof FetchEventSourceError) {
+          throw err;
         }
+        throw err;
       }
+    });
 
-      boundary = buffer.indexOf("\n\n");
-    }
-
-    if (doneSeen) {
-      break;
-    }
-  }
-
-  if (!doneSeen) {
     onEvent({ type: "done" });
+  } catch (error) {
+    if (error instanceof FetchEventSourceError) {
+      throw new ApiClientError(error.messageText, {
+        status: error.status,
+        code: error.code,
+        traceId: error.traceId
+      });
+    }
+    throw new ApiClientError(error instanceof Error ? error.message : "流连接中断");
   }
 }
 

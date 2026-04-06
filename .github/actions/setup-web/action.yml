@@ -1,0 +1,15 @@
+name: "Setup Web Environment"
+description: "Sets up node, restores cache, and installs dependencies for web jobs"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+        cache: npm
+        cache-dependency-path: apps/web/package-lock.json
+    - name: Install
+      run: npm ci
+      shell: bash

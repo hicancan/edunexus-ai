@@ -28,7 +28,8 @@ export default defineConfig({
       "/api/v1": {
         target: process.env.API_BASE_URL || "http://localhost:8080",
         changeOrigin: true,
-        secure: false
+        secure: false,
+        timeout: 300000
       }
     }
   }

@@ -20,9 +20,16 @@ const activeSessionTitle = computed(() => {
   return current?.title || "新建会话";
 });
 
+let isScrolling = false;
 function scrollToBottom(): void {
-  if (!messageBoardRef.value) return;
-  messageBoardRef.value.scrollTop = messageBoardRef.value.scrollHeight;
+  if (isScrolling) return;
+  isScrolling = true;
+  requestAnimationFrame(() => {
+    if (messageBoardRef.value) {
+      messageBoardRef.value.scrollTop = messageBoardRef.value.scrollHeight;
+    }
+    isScrolling = false;
+  });
 }
 
 async function loadSessions(): Promise<void> {

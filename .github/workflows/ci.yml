@@ -20,15 +20,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: ESLint Check
         run: npm run lint
       - name: Prettier Format Check
@@ -79,15 +71,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: Unit tests
         run: npm run test
 
@@ -98,15 +82,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: Type check
         run: npm run typecheck
 
@@ -117,15 +93,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: Build
         run: npm run build
 
@@ -136,15 +104,7 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup-web
       - name: Prod dependency audit
         run: npm audit --omit=dev --audit-level=high
 

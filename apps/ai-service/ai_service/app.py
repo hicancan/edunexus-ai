@@ -130,6 +130,36 @@ def create_app() -> FastAPI:
 
     # ── Socratic Scaffold Chain ──────────────────────────────────────────
 
+    async def _json_repaired_response(
+        request: Request,
+        prompt: str,
+        scene: str,
+        repair_prompt: str,
+        expect_array: bool = False,
+        extra_fields: dict | None = None,
+    ) -> JSONResponse:
+        from .repair import complete_with_json_repair
+        trace_id = request.headers.get("X-Trace-Id", "")
+        parsed, result = await complete_with_json_repair(
+            llm_service,
+            prompt,
+            scene=scene,
+            trace_id=trace_id,
+            expect_array=expect_array,
+            repair_prompt_fn=lambda text: repair_prompt + text,
+        )
+        content = {
+            "data": parsed or ([] if expect_array else {}),
+            "provider": result.provider,
+            "model": result.model,
+            "reason": result.reason,
+            "latencyMs": result.latency_ms,
+            "traceId": trace_id,
+        }
+        if extra_fields:
+            content.update(extra_fields)
+        return JSONResponse(content=content)
+
     @app.post("/internal/v1/socratic-probe")
     async def socratic_probe(request: Request) -> JSONResponse:
         from .prompts import socratic_probe_prompt
@@ -146,24 +176,13 @@ def create_app() -> FastAPI:
             round_number=round_number,
             student_responses=body.get("studentResponses", []),
         )
-        parsed, result = await complete_with_json_repair(
-            llm_service,
+        return await _json_repaired_response(
+            request,
             prompt,
             scene="socratic_probe",
-            trace_id=trace_id,
-            repair_prompt_fn=lambda text: (
-                "将下面文本转换为合法 JSON 对象：\n" + text
-            ),
+            repair_prompt="将下面文本转换为合法 JSON 对象：\n",
+            extra_fields={"roundNumber": round_number},
         )
-        return JSONResponse(content={
-            "data": parsed or {},
-            "roundNumber": round_number,
-            "provider": result.provider,
-            "model": result.model,
-            "reason": result.reason,
-            "latencyMs": result.latency_ms,
-            "traceId": trace_id,
-        })
 
     # ── Knowledge Topology Explorer ──────────────────────────────────────
 
@@ -178,23 +197,13 @@ def create_app() -> FastAPI:
             knowledge_points=body.get("knowledgePoints", []),
             mastery_data=body.get("masteryData", []),
         )
-        parsed, result = await complete_with_json_repair(
-            llm_service,
+        return await _json_repaired_response(
+            request,
             prompt,
             scene="knowledge_topology",
-            trace_id=trace_id,
-            repair_prompt_fn=lambda text: (
-                "将下面文本转换为合法 JSON 对象，包含 nodes 和 edges 两个数组字段：\n" + text
-            ),
+            repair_prompt="将下面文本转换为合法 JSON 对象，包含 nodes 和 edges 两个数组字段：\n",
+            extra_fields={"data": parsed or {"nodes": [], "edges": []}} if False else None, # Force default on frontend if empty
         )
-        return JSONResponse(content={
-            "data": parsed or {"nodes": [], "edges": []},
-            "provider": result.provider,
-            "model": result.model,
-            "reason": result.reason,
-            "latencyMs": result.latency_ms,
-            "traceId": trace_id,
-        })
 
     # ── Intervention Sandbox ─────────────────────────────────────────────
 
@@ -209,26 +218,13 @@ def create_app() -> FastAPI:
             class_wrong_clusters=body.get("classWrongClusters", []),
             student_count=int(body.get("studentCount", 0)),
         )
-        parsed, result = await complete_with_json_repair(
-            llm_service,
+        return await _json_repaired_response(
+            request,
             prompt,
             scene="intervention_sandbox",
-            trace_id=trace_id,
             expect_array=True,
-            repair_prompt_fn=lambda text: (
-                "将下面文本转换为合法 JSON 数组，每个元素包含"
-                " strategy_name/description/target_knowledge_points/"
-                "estimated_minutes/estimated_fix_rate/target_student_count/priority：\n" + text
-            ),
+            repair_prompt="将下面文本转换为合法 JSON 数组，每个元素包含 strategy_name/description/target_knowledge_points/estimated_minutes/estimated_fix_rate/target_student_count/priority：\n",
         )
-        return JSONResponse(content={
-            "data": parsed or [],
-            "provider": result.provider,
-            "model": result.model,
-            "reason": result.reason,
-            "latencyMs": result.latency_ms,
-            "traceId": trace_id,
-        })
 
     return app
 
