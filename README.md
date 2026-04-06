@@ -1,4 +1,4 @@
-# EduNexus-AI：面向课堂即时诊断与个性化干预的智能辅学系统
+# EduNexus-AI：面向课堂即时诊断与个性化干预的云边端协同智能辅学系统
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)](https://github.com/hicancan/edunexus-ai)
 [![Frontend](https://img.shields.io/badge/Frontend-Vue%203.5%20%7C%20Vite%206-42b883)](https://github.com/hicancan/edunexus-ai)
@@ -8,6 +8,8 @@
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue)](./LICENSE)
 
 EduNexus-AI 是一套以**“课堂即时诊断与个性化干预”**为核心构建的云边端协同智能辅学系统。它的设计理念超越了传统的“大模型试题库推荐”，全面跃升为**面向学习支持的形成性评价数字中枢**。系统以服务学生认知建构、问题暴露、学习调节与教师干预为导向，实现了教与学微观过程的完整闭环。
+
+---
 
 ## 🎓 核心教育理念与系统亮点
 
@@ -110,10 +112,6 @@ graph TB
 | :-----------------------------------------------: | :-----------------------------------------------------: |
 | ![教案配置](doc/picture/readme/teacher-plans.png) | ![预警干预](doc/picture/readme/teacher-suggestions.png) |
 
-|                   干预沙盘多模态联演 (教师组)                   |                      苏格拉底无缝追问 (学生端)                      |
-| :-------------------------------------------------------------: | :-----------------------------------------------------------------: |
-| ![沙盘推演](doc/picture/readme/teacher-suggestions-sandbox.png) | ![苏格拉底纠偏](doc/picture/readme/student-wrong-book-socratic.png) |
-
 ### 骨干底座：全局治理与无缝审计
 
 面向系统运营方提供的实景透视面板和权限合规追踪。确保资源调配与高敏感的教学数据运转处在大盘的注视之下。
@@ -130,16 +128,18 @@ graph TB
 
 ## 🛠 本地环境全量启停与极速体验指引
 
-本项目极度注重企业级工程落地，系统提供了针对 Windows (PowerShell) 开箱即用的一键挂载构建脚本。
+本项目极度注重企业级工程落地，系统提供了针对 Windows (PowerShell) / Linux / macOS 开箱即用的一键挂载构建脚本。
 
 ### 所需基建依赖
 
 - **Node.js** >= 20
 - **JDK** >= 21
-- **Python** = 3.12 (并安装 `uv` 及 `grpcio-tools`)
+- **Python** = 3.12 (建议安装 `uv` 包管理器)
 - **Docker** 引擎环境
 
 ### 服务全景式启动
+
+**对于 Windows 用户 (PowerShell):**
 
 ```powershell
 # 1. 初始化环境变量 (默认配置已调优)
@@ -149,7 +149,14 @@ cp .env.example .env
 ./scripts/run-dev.ps1 -InstallDeps
 
 # 3. 极速调度所有容器网络 (PG/Redis/MinIO/Qdrant) 并拉起微服务集群，保持稳定驻守
-./scripts/run-dev.ps1 -StartUp -Wait
+./scripts/run-dev.ps1
+```
+
+**对于 macOS / Linux 用户 (Bash):**
+
+```bash
+cp .env.example .env
+./scripts/run-dev.sh
 ```
 
 _集群启动后默认调度路由:_

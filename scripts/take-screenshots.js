@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import path from 'path';
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = 'http://localhost:4174';
 const PIC_DIR = path.resolve('doc/picture/readme');
 
 async function shot(page, p, filename) {
