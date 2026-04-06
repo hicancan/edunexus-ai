@@ -421,8 +421,8 @@ onMounted(async () => {
                 <n-input
                   v-model:value="socraticState.userAnswer"
                   placeholder="输入你的思考或回复..."
-                  @keydown.enter="sendSocraticReply"
                   :disabled="socraticState.loading"
+                  @keydown.enter="sendSocraticReply"
                 />
                 <n-button
                   type="primary"
