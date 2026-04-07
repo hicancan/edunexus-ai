@@ -220,13 +220,13 @@ onMounted(() => {
       </div>
 
       <div class="panel glass-card search-panel">
-        <n-form inline label-placement="left" :show-feedback="false" class="ethereal-form">
+        <n-form inline label-placement="left" :show-feedback="false" class="ethereal-form search-form">
           <n-form-item label="学生">
             <n-select
               v-model:value="studentId"
               :options="studentOptions"
               placeholder="请选择学生"
-              style="width: 360px"
+              style="width: 320px"
               filterable
               :loading="classroomStore.studentsLoading"
             />
@@ -260,64 +260,64 @@ onMounted(() => {
         v-if="classroomStore.studentsError"
         type="error"
         :show-icon="true"
-        style="border-radius: var(--radius-md)"
+        style="border-radius: var(--radius-md); margin-bottom: var(--space-4)"
         >{{ classroomStore.studentsError }}</n-alert
       >
       <n-alert
         v-if="analyticsStore.classroomError"
         type="error"
         :show-icon="true"
-        style="border-radius: var(--radius-md)"
+        style="border-radius: var(--radius-md); margin-bottom: var(--space-4)"
         >{{ analyticsStore.classroomError }}</n-alert
       >
       <n-alert
         v-if="analyticsStore.analyticsError"
         type="error"
         :show-icon="true"
-        style="border-radius: var(--radius-md)"
+        style="border-radius: var(--radius-md); margin-bottom: var(--space-4)"
         >{{ analyticsStore.analyticsError }}</n-alert
       >
       <n-alert
         v-if="analyticsStore.attributionError"
         type="error"
         :show-icon="true"
-        style="border-radius: var(--radius-md)"
+        style="border-radius: var(--radius-md); margin-bottom: var(--space-4)"
         >{{ analyticsStore.attributionError }}</n-alert
       >
 
       <n-spin :show="analyticsStore.classroomLoading">
         <div class="summary-grid">
           <div class="summary-card panel glass-card">
-            <div class="summary-icon primary"><Users :size="22" /></div>
-            <div>
+            <div class="summary-icon primary"><Users :size="24" /></div>
+            <div class="summary-content">
               <p class="summary-label">班级总人数</p>
               <h3 class="summary-value">{{ classroomSummary.totalStudents }}</h3>
               <p class="summary-hint">当前已纳入教师工作台的学生数量</p>
             </div>
           </div>
           <div class="summary-card panel glass-card">
-            <div class="summary-icon danger"><ShieldAlert :size="22" /></div>
-            <div>
+            <div class="summary-icon danger"><ShieldAlert :size="24" /></div>
+            <div class="summary-content">
               <p class="summary-label">高风险学生</p>
               <h3 class="summary-value">{{ classroomSummary.highRiskCount }}</h3>
               <p class="summary-hint">正确率偏低或错题积压较多的学生</p>
             </div>
           </div>
           <div class="summary-card panel glass-card">
-            <div class="summary-icon info"><Activity :size="22" /></div>
-            <div>
+            <div class="summary-icon info"><Activity :size="24" /></div>
+            <div class="summary-content">
               <p class="summary-label">班级平均正确率</p>
-              <h3 class="summary-value">{{ classroomSummary.averageAccuracy }}%</h3>
+              <h3 class="summary-value">{{ classroomSummary.averageAccuracy }}<small>%</small></h3>
               <p class="summary-hint">说明课堂即时诊断后的整体掌握程度</p>
             </div>
           </div>
           <div class="summary-card panel glass-card">
-            <div class="summary-icon warning"><Radar :size="22" /></div>
-            <div>
+            <div class="summary-icon warning"><Radar :size="24" /></div>
+            <div class="summary-content">
               <p class="summary-label">活跃错题压力</p>
               <h3 class="summary-value">{{ classroomSummary.unresolvedWrongBook }}</h3>
               <p class="summary-hint">
-                {{ classroomSummary.attentionCount }} 名学生处于“需关注 / 高风险”状态
+                {{ classroomSummary.attentionCount }} 名学生处于“需关注”状态
               </p>
             </div>
           </div>
@@ -463,71 +463,112 @@ onMounted(() => {
 <style scoped>
 .search-panel {
   padding: 16px 24px;
+  margin-bottom: var(--space-2);
+}
+
+.search-form {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-2);
 }
 
 .summary-card {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  min-height: 148px;
+  gap: 20px;
+  align-items: center;
+  padding: 24px;
+  min-height: 130px;
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
   height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05));
+  pointer-events: none;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-float);
+  border-color: rgba(92, 101, 246, 0.2);
 }
 
 .summary-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: var(--shadow-float);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
 }
 
-.summary-icon.primary {
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-}
+.summary-icon.primary { background: linear-gradient(135deg, #4f46e5, #3b82f6); }
+.summary-icon.danger { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+.summary-icon.info { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+.summary-icon.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
 
-.summary-icon.danger {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-}
-
-.summary-icon.info {
-  background: linear-gradient(135deg, #14b8a6, #0f766e);
-}
-
-.summary-icon.warning {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+.summary-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .summary-label {
-  margin: 2px 0 6px;
+  margin: 0 0 4px;
   color: var(--color-text-muted);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .summary-value {
   margin: 0;
-  font-size: 2rem;
-  font-family: var(--font-code);
+  font-size: 2.25rem;
+  font-weight: 800;
+  font-family: var(--font-title);
+  color: var(--color-text-main);
+  line-height: 1.1;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.summary-value small {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
 
 .summary-hint {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--color-text-muted);
-  line-height: 1.5;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .overview-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  gap: var(--space-4);
+  gap: var(--space-5);
+  margin-top: var(--space-4);
 }
 
 .overview-grid > .panel {
@@ -539,72 +580,87 @@ onMounted(() => {
 .panel-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
+  margin-bottom: 20px;
 }
 
 .panel-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-main);
 }
 
 .panel-note {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--color-text-muted);
-  line-height: 1.5;
+  font-size: 0.875rem;
 }
 
 .panel-badge {
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.14);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.1);
+  white-space: nowrap;
 }
 
 .panel-badge.neutral {
-  color: #9a3412;
-  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.1);
 }
 
 .hotspot-list,
 .pulse-list {
   display: grid;
-  gap: 14px;
-  margin-top: 18px;
+  gap: 12px;
 }
 
 .hotspot-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 140px;
-  gap: 14px;
+  gap: 16px;
   align-items: center;
-  padding: 16px 18px;
-  border: 1px solid rgba(59, 130, 246, 0.14);
+  padding: 16px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  transition: var(--transition-smooth);
+}
+
+.hotspot-item:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(59, 130, 246, 0.2);
+  transform: translateX(4px);
 }
 
 .hotspot-name {
   margin: 0;
   font-size: 1rem;
+  font-weight: 600;
 }
 
 .hotspot-meta {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
+  font-size: 0.875rem;
   color: var(--color-text-muted);
 }
 
 .hotspot-bar {
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(59, 130, 246, 0.12);
+  background: rgba(59, 130, 246, 0.08);
 }
 
 .hotspot-bar.realtime {
-  background: rgba(20, 184, 166, 0.14);
+  background: rgba(20, 184, 166, 0.1);
 }
 
 .hotspot-fill {
@@ -615,24 +671,22 @@ onMounted(() => {
 }
 
 .hotspot-fill.realtime {
-  background: linear-gradient(90deg, #2dd4bf, #0f766e);
+  background: linear-gradient(90deg, #2dd4bf, #0d9488);
 }
 
 .pulse-card {
-  padding: 16px 18px;
+  padding: 18px 20px;
   border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.6);
   text-align: left;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+  transition: var(--transition-smooth);
 }
 
 .pulse-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(59, 130, 246, 0.2);
   box-shadow: var(--shadow-float);
 }
 
@@ -644,82 +698,82 @@ onMounted(() => {
 }
 
 .pulse-main {
-  margin: 10px 0 6px;
-  font-weight: 600;
+  margin: 12px 0 4px;
+  font-weight: 700;
+  font-size: 1rem;
 }
 
 .pulse-sub {
   margin: 0;
+  font-size: 0.875rem;
   color: var(--color-text-muted);
-  line-height: 1.5;
 }
 
 .pulse-meta {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   color: #475569;
-  font-size: 0.82rem;
+  font-size: 0.8125rem;
 }
 
 .pulse-meta.subtle {
-  line-height: 1.5;
+  margin-top: 4px;
+  color: var(--color-text-muted);
 }
 
 .risk-tag {
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 0.76rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
-.risk-tag.danger {
-  color: #b91c1c;
-  background: rgba(239, 68, 68, 0.16);
-}
-
-.risk-tag.warning {
-  color: #b45309;
-  background: rgba(245, 158, 11, 0.16);
-}
-
-.risk-tag.success {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.16);
-}
+.risk-tag.danger { color: #dc2626; background: rgba(239, 68, 68, 0.1); }
+.risk-tag.warning { color: #d97706; background: rgba(245, 158, 11, 0.1); }
+.risk-tag.success { color: #059669; background: rgba(16, 185, 129, 0.1); }
 
 .empty-block {
-  margin-top: 18px;
-  padding: 28px;
+  margin-top: 20px;
+  padding: 40px;
   text-align: center;
   color: var(--color-text-muted);
-  border: 1px dashed var(--color-border-glass);
+  border: 2px dashed rgba(59, 130, 246, 0.1);
   border-radius: 16px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .selected-panel {
+  margin-top: var(--space-8);
   display: grid;
-  gap: 12px;
+  gap: 20px;
 }
 
 .section-title-row {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .section-title {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  font-weight: 700;
 }
 
 .section-note {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--color-text-muted);
 }
 
 .chart-loading-state {
-  padding: 32px 24px;
+  padding: 60px 24px;
   text-align: center;
   color: var(--color-text-muted);
+}
+
+@media (max-width: 1280px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 1024px) {
@@ -729,6 +783,10 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .hotspot-item {
     grid-template-columns: 1fr;
   }
@@ -736,6 +794,7 @@ onMounted(() => {
   .section-title-row,
   .panel-head {
     flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
