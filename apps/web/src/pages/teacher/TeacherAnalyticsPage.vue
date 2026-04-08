@@ -220,7 +220,12 @@ onMounted(() => {
       </div>
 
       <div class="panel glass-card search-panel">
-        <n-form inline label-placement="left" :show-feedback="false" class="ethereal-form search-form">
+        <n-form
+          inline
+          label-placement="left"
+          :show-feedback="false"
+          class="ethereal-form search-form"
+        >
           <n-form-item label="学生">
             <n-select
               v-model:value="studentId"
@@ -519,10 +524,18 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.summary-icon.primary { background: linear-gradient(135deg, #4f46e5, #3b82f6); }
-.summary-icon.danger { background: linear-gradient(135deg, #ef4444, #b91c1c); }
-.summary-icon.info { background: linear-gradient(135deg, #0d9488, #14b8a6); }
-.summary-icon.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.summary-icon.primary {
+  background: linear-gradient(135deg, #4f46e5, #3b82f6);
+}
+.summary-icon.danger {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+}
+.summary-icon.info {
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+}
+.summary-icon.warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
 
 .summary-content {
   flex: 1;
@@ -727,9 +740,18 @@ onMounted(() => {
   font-weight: 700;
 }
 
-.risk-tag.danger { color: #dc2626; background: rgba(239, 68, 68, 0.1); }
-.risk-tag.warning { color: #d97706; background: rgba(245, 158, 11, 0.1); }
-.risk-tag.success { color: #059669; background: rgba(16, 185, 129, 0.1); }
+.risk-tag.danger {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+}
+.risk-tag.warning {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.1);
+}
+.risk-tag.success {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+}
 
 .empty-block {
   margin-top: 20px;
